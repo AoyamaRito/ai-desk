@@ -1,0 +1,7 @@
+//@ order = $E61E, $4EC8
+//{ 01:KeepMe @low $E61E
+This should stay.
+//}
+//{ 02:ChangeMe @high $4EC8
+This should be changed.
+//}

@@ -1,0 +1,29 @@
+//@ order = $6922, $8024, $FADE
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test</title>
+</head>
+<body>
+  <div id="state-area">
+    <h2>State</h2>
+    //{ 01:State @low $6922
+    let state = { count: 0 };
+    //}
+  </div>
+
+  <div id="logic-area">
+    <h2>Logic</h2>
+    //{ 02:Logic @high $8024
+    function calculate() { return 42; }
+    //}
+  </div>
+
+  <div id="render-area">
+    <h2>Render</h2>
+    //{ 03:Render @mid $FADE
+    function draw() { console.log("draw"); }
+    //}
+  </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+[0] Type: plain
+[1] Type: section, Order: "01", Name: "Types", Importance: 2, Tags: [core], UID: $7B21
+[2] Type: plain
+[3] Type: section, Order: "02", Name: "Parsing", Importance: 3, Tags: [core], UID: $4489
+[4] Type: plain
+[5] Type: section, Order: "03", Name: "Logic", Importance: 2, Tags: [core], UID: $AB0E
+[6] Type: plain
+[7] Type: section, Order: "04", Name: "Sorting", Importance: 2, Tags: [core], UID: $0D54
+[8] Type: plain
+[9] Type: section, Order: "05", Name: "IO", Importance: 1, Tags: [], UID: $2678
+[10] Type: plain
+[11] Type: section, Order: "", Name: "[SortOrder]:[Name]", Importance: 1, Tags: [], UID: $6CBC
+[12] Type: section, Order: "", Name: "[SortOrder]:[Name]", Importance: 1, Tags: [], UID: $3A9A
+
+Metadata:
+  Order: [$7B21 $4489 $AB0E $0D54 $2678 $6CBC $3A9A]
+  Bookmarks: map[]

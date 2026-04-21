@@ -1,32 +1,33 @@
 # ai-desk
 
-> 大規模単一ファイル開発のためのAIネイティブツール
+> 大規模単一ファイル開発のためのAIネイティブツール (Name-Only Edition)
 
 ## 3行で
 
-- 7000行超のファイルをセクション単位で管理
-- AIコーダーが必要な部分だけ読み書き
-- トークン消費を最小化
+- 何千行もあるファイルを「セクション名」で管理
+- AIコーダーが必要な部分だけを抽出(focus)して上書き(apply)
+- トークン消費を最小化しつつ、物理的な行番号やGit差分を汚さない
 
 ## 問題
 
 AIコーダーは大規模ファイルが苦手:
-- ファイル切り替えでコンテキストを失う
-- 全体を読むとトークンを消費しすぎる
-- 部分編集で意図しない箇所を壊す
+- ファイル分割 = コンテキストを失う
+- 全体読み込み = トークンを浪費する
+- 単純な置換 = インデントや行番号のズレで破壊する
 
-## 解決
+## 解決：抽出と注入 (Extract & Inject)
 
-セクションマーカーでコードを区切り、UIDで管理:
+セクションマーカーでコードを区切り、**「名前(Name)」**で管理します。
+ファイルの物理順序を一切変更しないため、安全です。
 
 ```javascript
-//{ AuthModule @high #core $AUTH01
+//{ 01:AuthModule @high #core
 function login(user, pass) {
   // ...
 }
 //}
 
-//{ UserModule @mid #feature $USER01
+//{ 02:UserModule @mid #feature
 function getProfile(id) {
   // ...
 }
@@ -43,7 +44,7 @@ npm install -g ai-desk
 npm install ai-desk
 ```
 
-## 使い方
+## 使い方（AI向け3ステップ）
 
 ### 1. 構造を把握（トークン節約）
 
@@ -53,100 +54,53 @@ ai-desk app.js skeleton
 
 出力:
 ```
-//{ AuthModule @high #core $AUTH01
-  //{ [Collapsed: 50 lines]
+//{ 01:AuthModule @high #core
+  // [Collapsed: 50 lines]
 //}
-//{ UserModule @mid #feature $USER01
-  //{ [Collapsed: 30 lines]
+//{ 02:UserModule @mid #feature
+  // [Collapsed: 30 lines]
 //}
 ```
 
-### 2. 必要なセクションを読む
+### 2. 必要なセクションを抽出して読む
 
 ```bash
-ai-desk app.js focus $AUTH01
+ai-desk app.js focus AuthModule
 ```
+*指定したセクションのコードだけが標準出力されます。*
 
 ### 3. 編集してパッチを適用
 
+パッチファイル (`patch.js`) に修正したセクションを書いて：
 ```bash
-# patch.js にセクションを書いて
-ai-desk app.js apply patch.js -w
+ai-desk app.js apply patch.js
 ```
-
-### 4. Git前に正規化
-
-```bash
-ai-desk app.js restore -w
-```
-
-## セクション形式
-
-```
-//{ name @importance #tag1 #tag2 $UID
-code...
-//}
-```
-
-| 要素 | 説明 | 例 |
-|------|------|-----|
-| name | セクション名 | `AuthModule` |
-| @importance | 重要度 | `@high`, `@mid`, `@low` |
-| #tags | タグ（複数可） | `#core #security` |
-| $UID | 一意ID | `$AUTH01`, `$MY_UID` |
-
-## AI ワークフロー
-
-```
-1. skeleton  → 全体構造を把握（最小トークン）
-2. focus     → 必要セクションを展開
-3. 編集      → パッチファイル作成
-4. apply -w  → UIDでマッチして適用
-5. restore   → git commit前に正規化
-```
+*元のファイルの該当箇所が「名前一致」で上書きされます。*
 
 ## コマンド一覧
 
 | コマンド | 説明 |
 |----------|------|
-| `skeleton` | 構造のみ表示（折りたたみ） |
-| `focus [$UID]` | @high展開、または指定UID |
-| `apply <patch>` | パッチ適用（UID照合） |
-| `restore` | git用に順序正規化 |
-| `save << name` | ブックマーク保存 |
-| `load >> name` | ブックマーク読込 |
-| `test` | デバッグ出力 |
+| `skeleton [Name...]` | 構造のみ表示（折りたたみ）。名前を指定するとそこだけ展開。 |
+| `focus [Name...]` | 指定した名前のセクションだけを抽出して表示。 |
+| `apply <patch>` | パッチファイルのセクションを名前一致で適用。 |
+| `test` | 内部構造のデバッグ出力。 |
 
-## オプション
+## 安全設計
 
-| オプション | 説明 |
-|------------|------|
-| `-w, --write` | ファイルに書き込み（デフォルト: stdout） |
-
-## なぜ単一ファイル？
-
-AIコーダーにとって:
-- ファイル切り替え = コンテキストロス
-- モジュール分割 = 依存関係の把握コスト
-- 単一ファイル + セクション = 最適解
+- **ランダムUIDの廃止**: 人間にもAIにも分かりやすいセマンティックな「名前」だけを使用。
+- **重複防御**: 同じ名前のセクションが複数存在する場合は、破壊を防ぐためパッチ適用をスキップします。
+- **In-Place Mutation**: 物理ファイルの順序は変更しないため、Linterの行番号やGitのDiffは常に正確です。
 
 ## 対応形式
 
 | 言語 | 開始 | 終了 |
 |------|------|------|
-| JS/TS/Go/C | `//{ ... //}` | |
-| HTML | `<!-- { ... --> ` | |
-| CSS | `/* { ... */ ` | |
-| Python/Shell | `# { ... # }` | |
-| VVV形式 | `VVV ... AAA` | |
-
-## テスト
-
-```bash
-node ai_desk.js --help    # ヘルプ
-node stress_e2e.js        # ストレステスト (15テスト)
-node attack_test.js       # エッジケース (13テスト)
-```
+| JS/TS/Go/C | `// { ...` | `// }` |
+| HTML | `<!-- { ...` | `<!-- } -->` |
+| CSS | `/* { ...` | `/* } */` |
+| Python/Shell | `# { ...` | `# }` |
+| VVV形式 | `VVV ...` | `AAA` |
 
 ## ライセンス
 

@@ -103,16 +103,18 @@ test('Multiple # tags preserved', () => {
 test('Apply preserves order', () => {
   write('//{ A $UID1\na\n//}\n//{ B $UID2\nb\n//}');
   fs.writeFileSync(PATCHF, '//{ A $UID1\na_modified\n//}');
-  const out = execSync(`${CMD} ${TMPF} apply ${PATCHF}`, { encoding: 'utf8' });
-  const aPos = out.indexOf('$UID1');
-  const bPos = out.indexOf('$UID2');
+  execSync(`${CMD} ${TMPF} apply ${PATCHF}`, { encoding: 'utf8' });
+  const out = fs.readFileSync(TMPF, 'utf8');
+  const aPos = out.indexOf('//{ A');
+  const bPos = out.indexOf('//{ B');
   assert(aPos < bPos && aPos > 0, 'Order should be preserved');
 });
 
 test('Apply with underscore UID', () => {
   write('//{ A $MY_UID_1\na\n//}');
   fs.writeFileSync(PATCHF, '//{ A $MY_UID_1\na_modified\n//}');
-  const out = execSync(`${CMD} ${TMPF} apply ${PATCHF}`, { encoding: 'utf8' });
+  execSync(`${CMD} ${TMPF} apply ${PATCHF}`, { encoding: 'utf8' });
+  const out = fs.readFileSync(TMPF, 'utf8');
   assert(out.includes('a_modified'), 'Should apply patch');
   assert(out.includes('$MY_UID_1'), 'Should preserve UID');
 });

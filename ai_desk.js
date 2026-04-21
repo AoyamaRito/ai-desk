@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-//@ order = $77B49386E, $B3DB3E3B8, $7C1BC8E1E, $C8B7D0ED1, $6D8801094
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-//{ 01:Types @high #core $77B49386E
+//{ 01:Types @high #core $4E8D9F23C
 class Chunk {
   constructor({ type, sortOrder = "", name = "Unnamed", importance = 1, tags = [], uid = "", content = "" }) {
     this.type = type; // "section" or "plain"
@@ -32,7 +31,7 @@ const IMPORTANCE = {
 };
 //}
 
-//{ 02:Utilities @mid #core $B3DB3E3B8
+//{ 02:Utilities @mid #core $B2A8C1F4D
 function calcChecksum(base) {
   let sum = 0;
   for (let i = 0; i < base.length; i++) {
@@ -54,17 +53,13 @@ function generateUID(existingSet = new Set()) {
 
 function isValidUID(uid) {
   if (!uid || !uid.startsWith("$")) return false;
-  // Accept any alphanumeric UID (user-provided)
-  // Only generate new UID when section has no UID at all
   const body = uid.substring(1);
   if (body.length === 0) return false;
-  // Allow alphanumeric, underscore (for user-defined UIDs like $MY_UID)
   return /^[0-9A-Za-z_]+$/.test(body);
 }
 
-// Regex refined to be less greedy and support HTML/CSS properly
-// UID pattern: $XXXX (alphanumeric + underscore, 1-50 chars)
-const sectionRegex = /^(?:(?:\/\/|\/\*|<!--|#)\s*\{|VVV)\s*(?:([0-9a-zA-Z]+):)?([^\s@#$]+)?(?:\s+@([a-zA-Z0-9/._-]+))?(?:\s+(#[^$]*))?(?:\s*(\$[0-9A-Za-z_]{1,50}))?(?:\s*-->)?/;
+// ^\s* を追加し、インデント対応。非破壊対応のため適度に緩くマッチさせる。
+const sectionRegex = /^\s*(?:(?:\/\/|\/\*|<!--|#)\s*\{|VVV)\s*(?:([0-9a-zA-Z]+):)?([^\s@#$]+)?(?:\s+@([a-zA-Z0-9/._-]+))?(?:\s+(#[^$]*))?(?:\s*(\$[0-9A-Za-z_]{1,50}))?(?:\s*-->)?/;
 const sectionEndRegex = /^\s*(?:(?:\/\/|\/\*|<!--|-->|\*\/|#)\s*\}|AAA)/;
 const metaOrderRegex = /^\/\/@\s*order\s*=\s*(.+)$/;
 const metaBookmarkRegex = /^\/\/@\s*bookmark:(\w+)\s*=\s*(.+)$/;
@@ -94,49 +89,72 @@ function getStyleForFile(filename) {
   const ext = path.extname(filename).toLowerCase();
   switch (ext) {
     case ".html": case ".htm": case ".vue": case ".svelte": case ".xml":
-      return { prefix: "<!-- {", suffix: "<!-- } -->", html: true };
+      return { prefix: "<!-- {", suffix: "<!-- } -->", inlineComment: (msg) => `<!-- ${msg} -->`, html: true };
     case ".css": case ".scss": case ".less":
-      return { prefix: "/* {", suffix: "/* } */" };
+      return { prefix: "/* {", suffix: "/* } */", inlineComment: (msg) => `/* ${msg} */` };
     case ".js": case ".ts": case ".go": case ".c": case ".cpp": case ".java": case ".rust": case ".rs": case ".php": case ".swift": case ".kt":
-      return { prefix: "//{", suffix: "//}" };
+      return { prefix: "// {", suffix: "// }", inlineComment: (msg) => `// ${msg}` };
     case ".py": case ".rb": case ".sh": case ".yaml": case ".yml": case ".toml": case ".conf":
-      return { prefix: "# {", suffix: "# }" };
+      return { prefix: "# {", suffix: "# }", inlineComment: (msg) => `# ${msg}` };
     default:
-      return { prefix: "VVV", suffix: "AAA" };
+      return { prefix: "VVV", suffix: "AAA", inlineComment: (msg) => `[${msg}]` };
   }
+}
+
+// 行分割ユーティリティ（改行コードを保持し、末尾の改行なし状態も完璧に復元可能にする）
+function splitLinesWithEndings(content) {
+  const lines = [];
+  let start = 0;
+  while (start < content.length) {
+    let rn = content.indexOf('\r\n', start);
+    let n = content.indexOf('\n', start);
+    
+    let end = -1;
+    let ending = '';
+    if (rn !== -1 && (n === -1 || rn < n)) {
+      end = rn;
+      ending = '\r\n';
+    } else if (n !== -1) {
+      end = n;
+      ending = '\n';
+    }
+
+    if (end === -1) {
+      lines.push({ text: content.substring(start), ending: '' });
+      break;
+    } else {
+      lines.push({ text: content.substring(start, end), ending });
+      start = end + ending.length;
+    }
+  }
+  return lines;
 }
 //}
 
-//{ 03:Parsing @high #core $7C1BC8E1E
+//{ 03:Parsing @high #core $C5D1E4F8A
 function parse(content) {
-  // Detect line endings to preserve them
-  const isCRLF = content.includes('\r\n');
-  const eol = isCRLF ? '\r\n' : '\n';
-  const lines = content.split(/\r?\n/);
+  const lines = splitLinesWithEndings(content);
   
-  // Accurately preserve trailing newline state
-  const endsWithNewline = content.endsWith('\n');
-  if (lines.length > 0 && lines[lines.length - 1] === "") {
-    lines.pop();
-  }
-
   const chunks = [];
   const meta = new Metadata();
   let currentLines = [];
   let inSection = false;
   let curHeader = {};
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmedLine = line.trim();
+  const buildContent = (lineObjs) => lineObjs.map(l => l.text + l.ending).join('');
 
-    if (trimmedLine.startsWith("//@")) {
-      const orderMatch = trimmedLine.match(metaOrderRegex);
+  for (let i = 0; i < lines.length; i++) {
+    const lineObj = lines[i];
+    const text = lineObj.text;
+    const trimmedText = text.trim();
+
+    if (trimmedText.startsWith("//@")) {
+      const orderMatch = trimmedText.match(metaOrderRegex);
       if (orderMatch) {
         meta.order = orderMatch[1].split(",").map(s => s.trim()).filter(s => s);
         continue;
       }
-      const bookmarkMatch = trimmedLine.match(metaBookmarkRegex);
+      const bookmarkMatch = trimmedText.match(metaBookmarkRegex);
       if (bookmarkMatch) {
         const name = bookmarkMatch[1];
         const uids = bookmarkMatch[2].split(",").map(s => s.trim()).filter(s => s);
@@ -145,55 +163,69 @@ function parse(content) {
       }
     }
 
-    if (sectionRegex.test(trimmedLine) && !sectionEndRegex.test(trimmedLine)) {
+    if (sectionRegex.test(text) && !sectionEndRegex.test(text)) {
       if (!inSection && currentLines.length > 0) {
-        chunks.push(new Chunk({ type: "plain", content: currentLines.join(eol) + eol }));
+        chunks.push(new Chunk({ type: "plain", content: buildContent(currentLines) }));
         currentLines = [];
       }
       inSection = true;
-      curHeader = parseHeader(trimmedLine);
-      currentLines.push(line);
-    } else if (sectionEndRegex.test(trimmedLine) && inSection) {
-      currentLines.push(line);
+      curHeader = parseHeader(text);
+      currentLines.push(lineObj);
+    } else if (sectionEndRegex.test(text) && inSection) {
+      currentLines.push(lineObj);
       chunks.push(new Chunk({
         type: "section",
         ...curHeader,
-        content: currentLines.join(eol) + eol
+        content: buildContent(currentLines)
       }));
       currentLines = [];
       inSection = false;
     } else {
-      currentLines.push(line);
+      currentLines.push(lineObj);
     }
   }
 
   if (currentLines.length > 0) {
-    chunks.push(new Chunk({ type: "plain", content: currentLines.join(eol) + (endsWithNewline ? eol : "") }));
+    chunks.push(new Chunk({ type: "plain", content: buildContent(currentLines) }));
   }
 
-  return { chunks, meta, eol };
+  return { chunks, meta };
 }
 //}
 
-//{ 04:CoreLogic @high #core $C8B7D0ED1
+//{ 04:CoreLogic @high #core $D6E2F5B1C
+function injectUID(lineText, style, uid) {
+  // すでにUIDがある場合は置換、なければ挿入
+  const uidPattern = /\$[0-9A-Za-z_]{1,50}/;
+  if (uidPattern.test(lineText)) {
+    return lineText.replace(uidPattern, uid);
+  }
+
+  // 元の行のインデントや自由コメントを維持しつつUIDを末尾(または閉じタグの手前)に挿入する
+  const trimmed = lineText.trimEnd();
+  if (style.html && trimmed.endsWith("-->")) {
+     return trimmed.slice(0, -3).trimEnd() + ` ${uid} -->`;
+  }
+  if (trimmed.endsWith("*/")) {
+     return trimmed.slice(0, -2).trimEnd() + ` ${uid} */`;
+  }
+  return trimmed + ` ${uid}`;
+}
+
 function ensureUIDs(chunks, filename) {
   const existingSet = new Set(chunks.filter(c => c.uid).map(c => c.uid));
   const style = getStyleForFile(filename);
 
   for (const chunk of chunks) {
     if (chunk.type === "section" && (!chunk.uid || !isValidUID(chunk.uid))) {
-      const oldUID = chunk.uid;
       chunk.uid = generateUID(existingSet);
       existingSet.add(chunk.uid);
       
-      const lines = chunk.content.split(/\r?\n/);
+      const lines = splitLinesWithEndings(chunk.content);
       if (lines.length > 0) {
-        // Re-construct header with correct format and closing tag if HTML
-        const h = parseHeader(lines[0]);
-        const tagsStr = h.tags.length ? " #" + h.tags.join(" #") : "";
-        let newHeader = `${style.prefix.replace(/ $/, '')} ${h.sortOrder}:${h.name} @${h.importance === 3 ? "high" : h.importance === 2 ? "mid" : "low"}${tagsStr} ${chunk.uid}${style.html ? " -->" : ""}`;
-        lines[0] = newHeader;
-        chunk.content = lines.join(chunk.content.includes('\r\n') ? '\r\n' : '\n');
+        // ヘッダー行を完全に再構築するのではなく、元の行にUIDを挿入する
+        lines[0].text = injectUID(lines[0].text, style, chunk.uid);
+        chunk.content = lines.map(l => l.text + l.ending).join('');
       }
     }
   }
@@ -212,11 +244,18 @@ function formatMetadata(meta) {
   return lines.length > 0 ? lines.join("\n") + "\n" : "";
 }
 
-function sortForFocus(chunks) {
+function sortForFocus(chunks, targetUIDs = []) {
   const sections = chunks.filter(c => c.type === "section");
   const sectionIndices = chunks.map((c, i) => c.type === "section" ? i : -1).filter(i => i !== -1);
+  const targetSet = new Set(targetUIDs);
 
   sections.sort((a, b) => {
+    // Target UIDs come first
+    const aIsTarget = targetSet.has(a.uid);
+    const bIsTarget = targetSet.has(b.uid);
+    if (aIsTarget && !bIsTarget) return -1;
+    if (!aIsTarget && bIsTarget) return 1;
+
     if (a.importance !== b.importance) return b.importance - a.importance;
     const tagA = a.tags[0] || "";
     const tagB = b.tags[0] || "";
@@ -264,19 +303,24 @@ function sortForRestore(chunks, meta) {
   return result;
 }
 
-function sortForSkeleton(chunks, filename) {
+function sortForSkeleton(chunks, filename, targetUIDs = []) {
   const style = getStyleForFile(filename);
-  const commentPrefix = style.prefix.split(' ')[0]; // e.g., //, #, /*
+  const targetSet = new Set(targetUIDs);
 
   return chunks.map(c => {
-    if (c.type === "section" && c.importance < IMPORTANCE.HIGH) {
-      const lines = c.content.split(/\r?\n/).filter(l => l !== "");
-      if (lines.length >= 2) {
+    // Collapse if not HIGH importance AND not a target UID
+    if (c.type === "section" && c.importance < IMPORTANCE.HIGH && !targetSet.has(c.uid)) {
+      const lines = splitLinesWithEndings(c.content);
+      const validLines = lines.filter(l => l.text.trim() !== "");
+      if (validLines.length >= 2) {
         const header = lines[0];
         const footer = lines[lines.length - 1];
+        const collapsedCount = lines.length - 2;
+        const collapsedMsg = `  ${style.inlineComment(`[Collapsed: ${collapsedCount} lines]`)}`;
+        const eol = header.ending || '\n';
         return new Chunk({
           ...c,
-          content: `${header}\n  ${commentPrefix} [Collapsed: ${lines.length - 2} lines]\n${footer}\n`
+          content: `${header.text}${eol}${collapsedMsg}${eol}${footer.text}${footer.ending}`
         });
       }
     }
@@ -285,60 +329,46 @@ function sortForSkeleton(chunks, filename) {
 }
 //}
 
-//{ 05:CLI @high #core $6D8801094
+//{ 05:CLI @high #core $E7F3A2B1D
 function printHelp() {
   console.log(`ai-desk - AI-Native Cognitive Workspace Manager
 
-SECTION FORMAT:
-  //{ name @importance #tag1 #tag2 $UID
-  code here...
-  //}
+Usage:
+  ai-desk <filename> <mode> [args...]
 
-  @importance: @high, @mid, @low (default: @low)
-  #tags:       Any tags for categorization
-  $UID:        Unique ID (auto-generated if omitted, or user-defined like $MY_UID)
+Modes:
+  focus [UID...]      Sorts by Importance (@high) and Tags. Priority to UID.
+  restore             Normalizes order for Git.
+  skeleton [UID...]   Collapses mid/low sections. Keeps UID expanded.
+  apply <patch>       (Mutation) Applies section updates from patch.
+  list                Show all bookmarks.
+  test                Debug structure.
 
-MODES:
-  skeleton      Show structure only (collapsed sections) - for context
-  focus [$UID]  Expand @high sections (or specific $UID)
-  apply <patch> Apply section updates by $UID matching
-  restore       Normalize order for git commit
-  save << name  Save current order as bookmark
-  load >> name  Load bookmark order
-  list          Show all bookmarks
-  test          Debug structure
+Options:
+  -w, --write         Write results back to file (Default is stdout for Views).
 
-OPTIONS:
-  -w, --write   Write result to file (default: stdout)
-
-AI WORKFLOW:
-  1. ai-desk app.js skeleton          # Understand structure (minimal tokens)
-  2. ai-desk app.js focus $TARGET     # Read specific section
-  3. [Edit and save as patch.js]
-  4. ai-desk app.js apply patch.js -w # Apply changes
-  5. ai-desk app.js restore -w        # Before git commit
-
-EXAMPLES:
-  ai-desk app.js skeleton             # Overview (low tokens)
-  ai-desk app.js focus                # Show @high sections
-  ai-desk app.js focus $AUTH01        # Show specific section
-  ai-desk app.js apply fix.js -w      # Apply patch
+Examples:
+  ai-desk app.js focus -w      # Write focused view to file
+  ai-desk app.js focus $UID    # Prioritize specific section
+  ai-desk app.js skeleton $UID # Structure with target expanded
 `);
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length < 1 || args.includes("-h") || args.includes("--help")) {
+  if (args.length < 2 || args.includes("-h") || args.includes("--help")) {
     printHelp();
     return;
   }
 
+  // 位置引数を厳密化: 0=file, 1=mode
   const filePath = args[0];
-  const isWrite = args.includes("-w") || args.includes("--write");
-  const modeArg = args.find(a => !a.startsWith("-") && a !== filePath) || "focus";
-  const extraArgs = args.filter(a => !a.startsWith("-") && a !== filePath && a !== modeArg);
+  let mode = args[1];
+  
+  // flags
+  let isWrite = args.includes("-w") || args.includes("--write");
+  const extraArgs = args.slice(2).filter(a => a !== "-w" && a !== "--write");
 
-  let mode = modeArg;
   if (mode === "<<" && extraArgs[0]) mode = "save";
   else if (mode === ">>" && extraArgs[0]) mode = "load";
 
@@ -348,15 +378,7 @@ async function main() {
   }
 
   const content = fs.readFileSync(filePath, 'utf8');
-  let { chunks, meta, eol } = parse(content);
-
-  // Record original UIDs before ensureUIDs (for apply mode matching)
-  const originalUIDMap = new Map();
-  chunks.forEach((c, i) => {
-    if (c.type === "section" && c.uid) {
-      originalUIDMap.set(c.uid, i);
-    }
-  });
+  let { chunks, meta } = parse(content);
 
   // Always ensure UIDs when reading
   chunks = ensureUIDs(chunks, filePath);
@@ -365,6 +387,7 @@ async function main() {
   }
 
   let outputChunks = chunks;
+  let isMutation = false;
 
   switch (mode) {
     case "test":
@@ -378,7 +401,7 @@ async function main() {
       return;
 
     case "focus":
-      outputChunks = sortForFocus(chunks);
+      outputChunks = sortForFocus(chunks, extraArgs);
       break;
 
     case "restore":
@@ -386,15 +409,14 @@ async function main() {
       break;
 
     case "skeleton":
-      if (isWrite) {
-        console.error("Error: skeleton mode cannot write to file (destructive). Use stdout only.");
-        process.exit(1);
-      }
-      const focused = sortForFocus(chunks);
-      outputChunks = sortForSkeleton(focused, filePath);
+      // Skeleton は絶対に書き戻さない (データ破壊防止)
+      isWrite = false;
+      const focused = sortForFocus(chunks, extraArgs);
+      outputChunks = sortForSkeleton(focused, filePath, extraArgs);
       break;
 
     case "apply":
+      isMutation = true;
       const patchPath = extraArgs[0];
       if (!patchPath) {
         console.error("Error: Patch file required.");
@@ -402,85 +424,87 @@ async function main() {
       }
       const patchContent = fs.readFileSync(patchPath, 'utf8');
       const { chunks: patchChunks } = parse(patchContent);
-
+      
       const patchUIDMap = new Map();
       const patchNameMap = new Map();
+      const patchNameCount = new Map();
+      
       patchChunks.filter(c => c.type === "section").forEach(pc => {
         if (pc.uid) patchUIDMap.set(pc.uid, pc);
-        if (pc.name && pc.name !== "Unnamed") patchNameMap.set(pc.name, pc);
+        if (pc.name && pc.name !== "Unnamed") {
+          patchNameMap.set(pc.name, pc);
+          patchNameCount.set(pc.name, (patchNameCount.get(pc.name) || 0) + 1);
+        }
+      });
+
+      // ターゲット側の Name カウント
+      const targetNameCount = new Map();
+      chunks.filter(c => c.type === "section").forEach(c => {
+        if (c.name && c.name !== "Unnamed") {
+          targetNameCount.set(c.name, (targetNameCount.get(c.name) || 0) + 1);
+        }
       });
 
       let appliedCount = 0;
       const usedUIDs = new Set();
+      let hasUnmatched = false;
 
-      // Helper: apply patch content while preserving target UID
-      const applyPatch = (target, patch) => {
-        const targetUID = target.uid;
-        const patchLines = patch.content.split(/\r?\n/);
-        if (patchLines.length > 0) {
-          // Replace UID in patch header with target's UID
-          patchLines[0] = patchLines[0].replace(/\$[0-9A-Z]{4,9}/g, targetUID);
-        }
-        return new Chunk({
-          ...patch,
-          uid: targetUID,
-          content: patchLines.join(patch.content.includes('\r\n') ? '\r\n' : '\n')
-        });
-      };
-
-      // Match using original UIDs (before ensureUIDs rewrote them)
-      patchUIDMap.forEach((patch, patchUID) => {
-        if (originalUIDMap.has(patchUID)) {
-          const idx = originalUIDMap.get(patchUID);
-          chunks[idx] = applyPatch(chunks[idx], patch);
-          usedUIDs.add(patchUID);
-          appliedCount++;
-        }
-      });
-
-      // Fallback: match by name for patches not matched by UID
       chunks.forEach((c, i) => {
         if (c.type !== "section") return;
-        // Skip if already applied
-        if ([...originalUIDMap.entries()].some(([uid, idx]) => idx === i && usedUIDs.has(uid))) return;
-
-        if (patchNameMap.has(c.name) && !usedUIDs.has(patchNameMap.get(c.name).uid)) {
-          chunks[i] = applyPatch(c, patchNameMap.get(c.name));
-          console.error(`  Warning: Matched "${c.name}" by Name.`);
+        
+        let patchChunk = null;
+        if (c.uid && patchUIDMap.has(c.uid)) {
+          patchChunk = patchUIDMap.get(c.uid);
+          usedUIDs.add(c.uid);
+          appliedCount++;
+        } else if (c.name && c.name !== "Unnamed" && patchNameMap.has(c.name)) {
+          // Name 衝突検知
+          if (targetNameCount.get(c.name) > 1 || patchNameCount.get(c.name) > 1) {
+             console.error(`  Warning: Ambiguous Name "${c.name}". Found multiple instances. Skipping patch for safety.`);
+             return;
+          }
+          patchChunk = patchNameMap.get(c.name);
+          console.error(`  Notice: Matched "${c.name}" by Name. UID was missing or mismatched.`);
+          usedUIDs.add(c.uid); // dummy mark
           appliedCount++;
         }
-      });
 
+        if (patchChunk) {
+           let content = patchChunk.content;
+           if (!content.endsWith('\n')) {
+              content += '\n';
+           }
+           chunks[i] = new Chunk({ ...patchChunk, content });
+        }
+      });
+      
       // Warn about unused patches
-      patchUIDMap.forEach((_, uid) => {
-        if (!usedUIDs.has(uid)) console.error(`  Warning: Patch UID ${uid} not found in target file.`);
+      patchUIDMap.forEach((pc, uid) => {
+        if (!usedUIDs.has(uid)) {
+          console.error(`  Warning: Unmatched patch section: [UID: ${uid}, Name: ${pc.name}]. Use manual insertion to add new sections.`);
+          hasUnmatched = true;
+        }
       });
 
       console.error(`Applied ${appliedCount} sections.`);
       outputChunks = chunks;
       break;
-
+    
     case "save":
+      isMutation = true;
       const saveName = extraArgs[0];
-      if (!saveName) {
-        console.error("Error: Bookmark name required.");
-        process.exit(1);
-      }
       meta.bookmarks[saveName] = chunks.filter(c => c.type === "section").map(c => c.uid);
       console.error(`Bookmark '${saveName}' saved.`);
       break;
-
+    
     case "load":
+      isMutation = true;
       const loadName = extraArgs[0];
-      if (!loadName) {
-        console.error("Error: Bookmark name required.");
-        process.exit(1);
-      }
       if (meta.bookmarks[loadName]) {
         const uids = meta.bookmarks[loadName];
         const uidMap = new Map(chunks.filter(c => c.type === "section").map(s => [s.uid, s]));
         const sortedSections = uids.map(uid => uidMap.get(uid)).filter(s => s);
-
+        
         // Append missing ones
         const bookmarkUIDs = new Set(uids);
         chunks.filter(c => c.type === "section").forEach(s => {
@@ -510,10 +534,12 @@ async function main() {
   }
 
   const result = formatMetadata(meta) + outputChunks.map(c => c.content).join("");
-
-  if (isWrite) {
+  
+  if (isWrite || isMutation) {
     fs.writeFileSync(filePath, result, 'utf8');
-    console.error(`File ${filePath} updated.`);
+    if (isMutation || isWrite) {
+       console.error(`File ${filePath} updated.`);
+    }
   } else {
     process.stdout.write(result);
   }

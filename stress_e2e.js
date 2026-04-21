@@ -7,9 +7,9 @@ let passed = 0;
 let failed = 0;
 
 const run = (file, args = '') => {
-    // 全モードがstdoutデフォルトなので、ファイル更新が必要な場合は -w を付与
+    // 常に書き込むため、-w は付けない(新しい ai_desk.js は apply/save/load 等で自動的にファイル更新する)
     let cmdArgs = args;
-    if (['focus', 'restore', 'load', 'apply', '<<'].some(m => args.includes(m)) && !args.includes('-w')) {
+    if (['focus', 'restore'].some(m => args.includes(m)) && !args.includes('-w')) {
         cmdArgs += ' -w';
     }
     return execSync(`${COG} ${file} ${cmdArgs}`, { encoding: 'utf8', stdio: 'pipe' });

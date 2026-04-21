@@ -1,12 +1,12 @@
-//@ order = $ECE1, $DE69, $E8ED
-//{ 02:CoreLogic @high $DE69
+//@ order = $BAC7D, $DF835, $6CA60
+//{ 02:CoreLogic @high $DF835
 function process() {
   return "old data";
 }
 //}
-//{ 03:View @mid $E8ED
+//{ 03:View @mid $6CA60
   // [Collapsed: 3 lines]
 //}
-//{ 01:Initialization @low $ECE1
+//{ 01:Initialization @low $BAC7D
   // [Collapsed: 2 lines]
 //}

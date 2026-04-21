@@ -1,0 +1,70 @@
+//@ order = $D7197A467, $A05173438
+VVV 01:X @high $D7197A467
+X
+//}
+VVV 02:Y @mid $A05173438
+Y
+//}
+//@ order = $DE2F8CC87, $722072C90
+VVV 01:X @high $DE2F8CC87
+X
+//}
+VVV 02:Y @mid $722072C90
+Y
+//}
+//@ order = $AB8282B09, $75739C406
+VVV 01:X @high $AB8282B09
+X
+//}
+VVV 02:Y @mid $75739C406
+Y
+//}
+//@ order = $FA1019AB5, $DB5BBE6AB
+VVV 01:X @high $FA1019AB5
+X
+//}
+VVV 02:Y @mid $DB5BBE6AB
+Y
+//}
+//@ order = $B9349B9DA, $C1C8D0EDC
+VVV 01:X @high $B9349B9DA
+X
+//}
+VVV 02:Y @mid $C1C8D0EDC
+Y
+//}
+//@ order = $2B629251D, $C7D23C8B0
+VVV 01:X @high $2B629251D
+X
+//}
+VVV 02:Y @mid $C7D23C8B0
+Y
+//}
+//@ order = $8EFD721D5, $3F5DEEAF3
+VVV 01:X @high $8EFD721D5
+X
+//}
+VVV 02:Y @mid $3F5DEEAF3
+Y
+//}
+//@ order = $F133B736F, $15B750127
+VVV 01:X @high $F133B736F
+X
+//}
+VVV 02:Y @mid $15B750127
+Y
+//}
+//@ order = $4B7A84082, $60D4A294E
+VVV 01:X @high $4B7A84082
+X
+//}
+VVV 02:Y @mid $60D4A294E
+Y
+//}
+//@ order = $48CB7210B, $2564F91A2
+VVV 01:X @high $48CB7210B
+X
+//}
+VVV 02:Y @mid $2564F91A2
+Y
+//}

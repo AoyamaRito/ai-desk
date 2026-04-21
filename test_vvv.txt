@@ -1,0 +1,4 @@
+//@ order = $AA305
+VVV 01:SystemPrompt @high $AA305
+You are an expert AI assistant.
+AAA

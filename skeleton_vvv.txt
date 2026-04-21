@@ -1,0 +1,7 @@
+//@ order = $A0269, $D4710
+VVV 02:Main @high $D4710
+This is main logic.
+AAA
+VVV 01:Docs @low $A0269
+  // [Collapsed: 2 lines]
+AAA

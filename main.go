@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -19,7 +20,7 @@ type Chunk struct {
 	Name       string   // セクション名
 	Importance int      // 3(high), 2(mid), 1(low)
 	Tags       []string // ["tag1", "tag2"] 等
-	UID        string   // 自動生成ID "$XXXX"
+	UID        string   // 自動生成ID "$XXXXC"
 	Content    string   // 中身
 }
 
@@ -28,8 +29,9 @@ type Metadata struct {
 	Bookmarks map[string][]string // bookmark名 -> $UID列
 }
 
-// セクション開始行をパースする正規表現
-var sectionRegex = regexp.MustCompile(`^//\{\s*(?:([0-9a-zA-Z]+):)?([^\s@#$]+)?(?:\s+@([a-zA-Z0-9]+))?(?:\s+(#[^$]*))?(?:\s*(\$[A-Z0-9]+))?`)
+// セクション開始行をパースする正規表現 (コメント記号 //, /*, <!--, # を許容。または VVV)
+var sectionRegex = regexp.MustCompile(`^(?:(?://|/\*|<!--|#)\s*\{|VVV)\s*(?:([0-9a-zA-Z]+):)?([^\s@#$]+)?(?:\s+@([a-zA-Z0-9]+))?(?:\s+(#[^$]*))?(?:\s*(\$[0-9A-Z]{4,5}))?`)
+var sectionEndRegex = regexp.MustCompile(`^(?:(?://|/\*|<!--|-->| \*/|#)\s*\}|AAA)`)
 
 // メタデータ行の正規表現
 var metaOrderRegex = regexp.MustCompile(`^//@\s*order\s*=\s*(.+)$`)
@@ -37,10 +39,30 @@ var metaBookmarkRegex = regexp.MustCompile(`^//@\s*bookmark:(\w+)\s*=\s*(.+)$`)
 //}
 
 //{ 02:Parsing @high #core $DE34
+func calcChecksum(base string) byte {
+	var sum int
+	for i := 0; i < len(base); i++ {
+		sum += int(base[i])
+	}
+	// 0-F (16進数)の文字を返す
+	return "0123456789ABCDEF"[sum%16]
+}
+
 func generateUID() string {
 	bytes := make([]byte, 2)
 	rand.Read(bytes)
-	return "$" + strings.ToUpper(hex.EncodeToString(bytes))
+	base := strings.ToUpper(hex.EncodeToString(bytes)) // 4文字
+	checksum := calcChecksum(base)
+	return "$" + base + string(checksum)
+}
+
+func isValidUID(uid string) bool {
+	if !strings.HasPrefix(uid, "$") || len(uid) < 5 {
+		return true // 古い形式（4文字等）は互換性のため許可
+	}
+	base := uid[1:5]
+	checksum := uid[5]
+	return calcChecksum(base) == checksum
 }
 
 func parseHeader(line string) (sortOrder, name string, importance int, tags []string, uid string) {
@@ -147,7 +169,7 @@ func parse(filePath string) ([]Chunk, Metadata, []string, error) {
 			continue
 		}
 
-		if strings.HasPrefix(trimmedLine, "//{") {
+		if sectionRegex.MatchString(trimmedLine) {
 			if !inSection && len(currentLines) > 0 {
 				chunks = append(chunks, Chunk{Type: "plain", Content: strings.Join(currentLines, "\n") + "\n"})
 				currentLines = nil
@@ -155,7 +177,7 @@ func parse(filePath string) ([]Chunk, Metadata, []string, error) {
 			inSection = true
 			curSortOrder, curName, curImportance, curTags, curUID = parseHeader(trimmedLine)
 			currentLines = append(currentLines, line)
-		} else if strings.HasPrefix(trimmedLine, "//}") {
+		} else if sectionEndRegex.MatchString(trimmedLine) {
 			currentLines = append(currentLines, line)
 			chunks = append(chunks, Chunk{
 				Type:       "section",
@@ -412,7 +434,7 @@ Modes:
   restore   Restores to original order for clean git diff.
   apply <patch>  Applies section updates from a patch file (matched by $UID).
   skeleton  Collapses @mid and @low sections to save tokens for AI.
-  init      Interactive assistant to add sections to a plain file.
+  init [--yes|-y]  Assistant to add sections (interactive by default, auto if --yes).
   test      Parses and prints structure without modifying.
 
 Bookmarks:
@@ -441,6 +463,22 @@ Examples:
 //}
 
 //{ 07:Main @high #core $9D2C
+func getStyleForFile(filename string) (prefix, suffix string) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".html", ".htm", ".vue", ".svelte", ".xml":
+		return "<!-- {", "<!-- } -->"
+	case ".css", ".scss", ".less":
+		return "/* {", "/* } */"
+	case ".js", ".ts", ".go", ".c", ".cpp", ".java", ".rust", ".rs", ".php", ".swift", ".kt":
+		return "// {", "// }"
+	case ".py", ".rb", ".sh", ".yaml", ".yml", ".toml", ".conf":
+		return "# {", "# }"
+	default:
+		return "VVV", "AAA"
+	}
+}
+
 func main() {
 
 	if len(os.Args) < 2 || os.Args[1] == "-h" || os.Args[1] == "--help" {
@@ -515,6 +553,14 @@ func main() {
 	switch mode {
 	case "init":
 		// インタラクティブ初期化
+		autoYes := false
+		for _, arg := range extraArgs {
+			if arg == "--yes" || arg == "-y" {
+				autoYes = true
+				break
+			}
+		}
+
 		file, err := os.Open(filePath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
@@ -530,24 +576,29 @@ func main() {
 
 		declRegex := regexp.MustCompile(`^(?:export\s+)?(?:func|function|const|let|var|class|type)\s+([a-zA-Z0-9_]+)`)
 		
-		fmt.Println("=== Interactive Section Init ===")
-		fmt.Println("Scanning for declarations. Press 'y' to wrap in a section, 'n' to skip, 'q' to quit.")
+		if !autoYes {
+			fmt.Println("=== Interactive Section Init ===")
+			fmt.Println("Scanning for declarations. Press 'y' to wrap in a section, 'n' to skip, 'q' to quit.")
+		} else {
+			fmt.Println("=== Auto Section Init (Non-interactive) ===")
+		}
 		
 		var newLines []string
 		inAutoSection := false
 		reader := bufio.NewReader(os.Stdin)
 		sectionCount := 1
+		
+		secPrefix, secSuffix := getStyleForFile(filePath)
 
 		for i := 0; i < len(lines); i++ {
 			line := lines[i]
 			
-			// すでにセクション内ならスキップ判定などはしないが、今回は単純なプレーンテキストを想定
-			if strings.HasPrefix(strings.TrimSpace(line), "//{") {
+			if sectionRegex.MatchString(strings.TrimSpace(line)) {
 				inAutoSection = true
 				newLines = append(newLines, line)
 				continue
 			}
-			if strings.HasPrefix(strings.TrimSpace(line), "//}") {
+			if sectionEndRegex.MatchString(strings.TrimSpace(line)) {
 				inAutoSection = false
 				newLines = append(newLines, line)
 				continue
@@ -556,25 +607,37 @@ func main() {
 			if !inAutoSection {
 				if matches := declRegex.FindStringSubmatch(line); len(matches) > 1 {
 					name := matches[1]
-					fmt.Printf("\n[Line %d] %s\n", i+1, strings.TrimSpace(line))
-					fmt.Printf("Create section '%s'? [y/N/q]: ", name)
 					
-					ans, _ := reader.ReadString('\n')
-					ans = strings.ToLower(strings.TrimSpace(ans))
-					
-					if ans == "q" {
-						break
-					} else if ans == "y" {
-						fmt.Printf("Importance (3=high, 2=mid, 1=low) [2]: ")
-						imp, _ := reader.ReadString('\n')
-						imp = strings.TrimSpace(imp)
-						impStr := "@mid"
-						if imp == "3" { impStr = "@high" }
-						if imp == "1" { impStr = "@low" }
+					createSection := false
+					impStr := "@low"
 
+					if autoYes {
+						createSection = true
+						fmt.Printf("Auto-creating section for '%s'\n", name)
+					} else {
+						fmt.Printf("\n[Line %d] %s\n", i+1, strings.TrimSpace(line))
+						fmt.Printf("Create section '%s'? [y/N/q]: ", name)
+						
+						ans, _ := reader.ReadString('\n')
+						ans = strings.ToLower(strings.TrimSpace(ans))
+						
+						if ans == "q" {
+							break
+						} else if ans == "y" {
+							createSection = true
+							fmt.Printf("Importance (3=high, 2=mid, 1=low) [2]: ")
+							imp, _ := reader.ReadString('\n')
+							imp = strings.TrimSpace(imp)
+							impStr = "@mid"
+							if imp == "3" { impStr = "@high" }
+							if imp == "1" { impStr = "@low" }
+						}
+					}
+
+					if createSection {
 						orderStr := fmt.Sprintf("%02d", sectionCount)
 						uid := generateUID()
-						header := fmt.Sprintf("//{ %s:%s %s %s", orderStr, name, impStr, uid)
+						header := fmt.Sprintf("%s %s:%s %s %s", secPrefix, orderStr, name, impStr, uid)
 						
 						newLines = append(newLines, header)
 						newLines = append(newLines, line)
@@ -587,7 +650,7 @@ func main() {
 
 			// 自動セクション内で空行が来たらセクションを閉じる（簡易的な推測）
 			if inAutoSection && strings.TrimSpace(line) == "" {
-				newLines = append(newLines, "//}")
+				newLines = append(newLines, secSuffix)
 				newLines = append(newLines, line)
 				inAutoSection = false
 				continue
@@ -597,7 +660,7 @@ func main() {
 		}
 
 		if inAutoSection {
-			newLines = append(newLines, "//}")
+			newLines = append(newLines, secSuffix)
 		}
 
 		err = os.WriteFile(filePath, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
@@ -640,7 +703,7 @@ func main() {
 		return
 	case "apply":
 		if len(extraArgs) < 1 {
-			fmt.Fprintln(os.Stderr, "Usage: cog-sort <file> apply <patch_file>")
+			fmt.Fprintln(os.Stderr, "Usage: ai_desk <file> apply <patch_file>")
 			os.Exit(1)
 		}
 		patchPath := extraArgs[0]
@@ -656,7 +719,11 @@ func main() {
 		for _, pc := range patchChunks {
 			if pc.Type == "section" {
 				if pc.UID != "" {
-					patchUIDMap[pc.UID] = pc
+					if !isValidUID(pc.UID) {
+						fmt.Fprintf(os.Stderr, "  Warning: Invalid UID checksum detected in patch: %s. Skipping exact UID match.\n", pc.UID)
+					} else {
+						patchUIDMap[pc.UID] = pc
+					}
 				}
 				if pc.Name != "" && pc.Name != "Unnamed" && pc.Name != "Unknown" {
 					patchNameMap[pc.Name] = pc

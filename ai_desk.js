@@ -289,28 +289,40 @@ function sortForSkeleton(chunks, filename) {
 function printHelp() {
   console.log(`ai-desk - AI-Native Cognitive Workspace Manager
 
-Usage:
-  ai-desk <filename> [mode] [args...]
+SECTION FORMAT:
+  //{ name @importance #tag1 #tag2 $UID
+  code here...
+  //}
 
-Modes:
-  focus         Sorts by Importance (@high) and Tags.
-  restore       Normalizes order for Git.
-  skeleton      Collapses mid/low sections for AI context.
-  apply <patch> Applies section updates from patch.
-  save << name  Save current order as bookmark.
-  load >> name  Load bookmark order.
-  list          Show all bookmarks.
-  test          Debug structure.
+  @importance: @high, @mid, @low (default: @low)
+  #tags:       Any tags for categorization
+  $UID:        Unique ID (auto-generated if omitted, or user-defined like $MY_UID)
 
-Options:
-  -w, --write   Write result to file (default: stdout for all modes).
+MODES:
+  skeleton      Show structure only (collapsed sections) - for context
+  focus [$UID]  Expand @high sections (or specific $UID)
+  apply <patch> Apply section updates by $UID matching
+  restore       Normalize order for git commit
+  save << name  Save current order as bookmark
+  load >> name  Load bookmark order
+  list          Show all bookmarks
+  test          Debug structure
 
-Examples:
-  ai-desk app.js focus              # Preview focused view
-  ai-desk app.js focus -w           # Apply focused order to file
-  ai-desk app.js apply patch.js     # Preview patched result
-  ai-desk app.js apply patch.js -w  # Actually apply the patch
-  ai-desk app.js restore -w         # Normalize for git commit
+OPTIONS:
+  -w, --write   Write result to file (default: stdout)
+
+AI WORKFLOW:
+  1. ai-desk app.js skeleton          # Understand structure (minimal tokens)
+  2. ai-desk app.js focus $TARGET     # Read specific section
+  3. [Edit and save as patch.js]
+  4. ai-desk app.js apply patch.js -w # Apply changes
+  5. ai-desk app.js restore -w        # Before git commit
+
+EXAMPLES:
+  ai-desk app.js skeleton             # Overview (low tokens)
+  ai-desk app.js focus                # Show @high sections
+  ai-desk app.js focus $AUTH01        # Show specific section
+  ai-desk app.js apply fix.js -w      # Apply patch
 `);
 }
 

@@ -307,3 +307,33 @@ C
 VVV 02:B @low $ACDED0023
 B
 //}
+//@ order = $B1A9D6CDE, $580ADFCF1, $A518E4844
+VVV 01:A @high $B1A9D6CDE
+A
+//}
+VVV 03:C @mid $A518E4844
+C
+//}
+VVV 02:B @low $580ADFCF1
+B
+//}
+//@ order = $B1A9D6CDE, $580ADFCF1, $A518E4844
+VVV 01:A @high $B1A9D6CDE
+A
+//}
+VVV 03:C @mid $A518E4844
+C
+//}
+VVV 02:B @low $580ADFCF1
+B
+//}
+//@ order = $B1A9D6CDE, $580ADFCF1, $A518E4844
+VVV 01:A @high $B1A9D6CDE
+A
+//}
+VVV 03:C @mid $A518E4844
+C
+//}
+VVV 02:B @low $580ADFCF1
+B
+//}

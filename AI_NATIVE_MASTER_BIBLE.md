@@ -11,7 +11,9 @@ AIと人間が共創し、バグを絶滅させ、永続的な保守性を確保
 すべての情報の流れは、以下の4層を一方向にのみ流れること。
 
 1. **L1: Physical (物理層)**: DOM取得、イベント登録、外部APIアクセス。
-2. **L2: Intent (意図層)**: 生のイベントを「何がしたいか（Command JSON）」に変換する。
+2. **L2: Intent (意図層)**: 生のイベントを Command JSON に変換する。入力源（UI/タッチ/ゲームパッド/AI自身の操作/リプレイ/テスト）を問わず L3 への唯一の入口であり、Command列はそのままアプリの仕様書・ログ・Undo単位を兼ねる。L3 は物理イベントを知らず、Command型だけを見て REAL を更新する。
+
+   例: ドラッグ操作は L1 では mousedown/mousemove/mouseup の3種イベントだが、L2 で `DragBegin / DragMove / DragCommit / DragCancel` の Command 列に畳まれる。閾値判定・キャンセル分岐・ドロップ判定はすべて L2 に隔離され、L3 は `DragCommit` 1個を受けて REAL を更新するだけでよい。入力源がタッチや AI 操作に変わっても L3 は無変更。
 3. **L3: Logic (論理層)**: `REAL_state` を純粋に更新する。
 4. **L4: Draw (描画層)**: `REAL_state` を元に DOM を狙撃更新する。
 

@@ -237,3 +237,47 @@ AIが空間・時間・存在を制御するための「究極の聖域」です
 - **時空・演出操作**: スローモーション、フェードアウト、親子連動、状態異常のエフェクト伝播は、すべて「親のLocal」をいじるだけで完結させます。
 
 
+// [ai_s_emblem:#low#config State-Architecture]
+## §13. 状態の純粋性：REAL / CACHE 規約
+
+ドメインロジック（ビジネスロジック、ゲームステート等）における数値や状態の管理は、以下の規約に従います。
+
+**※ 適用除外：** §12 の 3Dplus 空間ツリー（`node.local` / `node.world` 等の空間・時空座標系）には、この規約は適用しません。空間計算は §12 の「純粋一方向変換」に従います。
+
+数値データは2種類のみ。
+
+- **`REAL_<名前>`**: 真実。書き換え可能。（例: `REAL_gold`, `REAL_playerStats`）
+- **`cache(REAL, 用途)`**: REAL から作る使い捨ての派生値。
+
+### 13.1 ルール
+
+1. **一方向変換**: REAL から CACHE への変換のみ。逆はない。
+2. **保持の禁止**: CACHE は変数に保持（保存）しない。必要な時に毎回 `cache()` 関数（またはそれに準ずるゲッター）を呼んで生成する。
+3. **直接更新**: REAL への代入（書き換え）は、外部値の受け取り、または専用の更新関数から直接行う。CACHEを経由した書き換えは禁止。
+
+### 13.2 例
+
+```javascript
+// 真実の定義
+let REAL_playerData = { baseAtk: 10, weaponAtk: 15 };
+
+// CACHE（派生値）の利用：使う時に作る（変数に保持しない）
+function renderStatus() {
+  draw(cache(REAL_playerData, "totalAtk")); 
+}
+
+// 派生ロジックの実装例
+function cache(realState, purpose) {
+  if (purpose === "totalAtk") {
+    return realState.baseAtk + realState.weaponAtk;
+  }
+}
+
+// 状態の更新：真実を直接書き換える
+function equipWeapon(newWeaponAtk) {
+  REAL_playerData.weaponAtk = newWeaponAtk;
+}
+```
+
+この規約により、「状態Aは更新したが、そこから計算される変数Bを更新し忘れた」というAI特有の同期漏れバグを物理的に排除します。
+// [/ai_s_emblem: State-Architecture]

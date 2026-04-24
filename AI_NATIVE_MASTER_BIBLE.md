@@ -1,0 +1,51 @@
+# AI-Native 開発マスターバイブル (Unified V3.5)
+
+AIと人間が共創し、バグを絶滅させ、永続的な保守性を確保するための究極の規約。
+
+## 0. 基本原則
+- **Zero-Dependency / Zero-Server**: ライブラリやサーバーという「ブラックボックス」を排除し、推論を100%透明にする。
+- **Physical Separation**: HTML(構造), CSS(表現), JS(論理)を物理的に分離し、疎結合を保つ。
+- **Single Logic File**: 論理（JS）は1ファイルに集約し、`ai-desk` エンブレムで論理境界を管理する。
+
+## 1. 4層バニラ・アーキテクチャ (§情報の環)
+すべての情報の流れは、以下の4層を一方向にのみ流れること。
+
+1. **L1: Physical (物理層)**: DOM取得、イベント登録、外部APIアクセス。
+2. **L2: Intent (意図層)**: 生のイベントを「何がしたいか（Command JSON）」に変換する。
+3. **L3: Logic (論理層)**: `REAL_state` を純粋に更新する。
+4. **L4: Draw (描画層)**: `REAL_state` を元に DOM を狙撃更新する。
+
+## 2. REAL / SHADOW 規約 (§状態の純粋性)
+同期漏れバグを物理的に絶滅させるための管理。
+
+- **REAL_<名前>**: 唯一の真実。書き換え可能。
+- **shadow(REAL, 用途)**: REAL から作る使い捨ての派生値。**「保持禁止」**。使う瞬間に生成し、使い終わったら捨てる。
+- **一方向性**: REAL → SHADOW への変換のみを許可する。
+
+## 3. 3Dplus 時空座標系 (§因果の投影)
+3D空間や複雑な親子関係を制御するための「聖域」。
+
+- **純粋一方向変換**: 「ローカル座標」と「ワールド座標」を絶対に混ぜない。
+- **Level-based Projection**: 再帰を禁止し、深さ0（親）から順にループでワールド状態を確定させる。
+- **投影要素**: 位置・回転だけでなく、時間(t)、存在(Alpha)、生存(Visibility)も「座標」として投影する。
+
+## 4. AI-Reasonable Coding (実装の型)
+
+### イベント登録
+HTML側に `onclick` は書かない。必ず JS の `initPhysical()` で `addEventListener` すること。
+
+### 狙撃型更新 (Sniper Update)
+描画層は、`document.activeElement` をチェックし、ユーザーが入力中の要素を不用意に上書きしてはならない。
+
+### エンブレム定義
+JSファイルは必ず以下のタグでセクションを区切ること。
+```javascript
+// [ai_s_emblem:#<importance>#<category> Name]
+// ... code ...
+// [/ai_s_emblem: Name]
+```
+
+---
+**Version**: 1.0 (Master Bible Edition)
+**Date**: 2026-04-25
+**Author**: Hiroyuki OKINOI, Gemini CLI

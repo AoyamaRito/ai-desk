@@ -36,9 +36,11 @@ JSファイルは必ず以下のタグでセクション（機能の塊）を区
 1. **L1: Physical (物理層)**: DOM取得、イベント登録、外部API（localStorage等）アクセス。
    - **禁忌**: ここで `REAL_state` を直接書き換えてはいけない。
 2. **L2: Intent (意図層)**: 生のイベントを Command JSON に変換する。入力源（UI/リプレイ/AI操作等）を問わず L3 への唯一の入口。
+   - **非同期と副作用**: 外部API呼び出しや重い非同期処理（通信等）は L2 で行い、その結果（成功・失敗）を Command として L3 に渡す。
    - 例: ドラッグ操作は L1 での 3種イベントを L2 で `DragCommit` 等の論理コマンドへ畳む。
-3. **L3: Logic (論理層)**: `REAL_state` を純粋に更新する。
-   - 副作用: 更新後、必ず `bridgeLogic2Draw()` を呼び出す。
+3. **L3: Logic (論理層)**: `(REAL_state, Command) => newState` の Reducer として機能し、状態を純粋に更新する。
+   - **イベントソーシング**: 受信した Command は履歴（イベントログ）として配列に追記し、ハッシュ計算を行う。
+   - **副作用のトリガー**: 状態更新後、必ず `bridgeLogic2Draw()`, `bridgeLogic2Persistent()`, `bridgeLogic2Network()` 等の明示的な Bridge 関数を呼び出し、副作用を外界へ伝播させる。
 4. **L4: Draw (描画層)**: `REAL_state` を元に DOM を狙撃更新（Sniper Update）する。
    - **ルール**: `document.activeElement` と一致する要素（入力中のテキストエリア等）は不用意に上書きしない。
 

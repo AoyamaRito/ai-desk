@@ -13,6 +13,7 @@ Modes:
   skeleton           List structure with emblems replaced by placeholders.
   focus <Name>       Extract the exact source code of the specified emblem.
   apply <patch>      Replace emblems in target matching the patch's emblem names.
+  check              Verify emblem integrity (nesting, uniqueness, completeness).
 
 Format:
   // [ai_s_emblem:#importance#tag1#tag2 Name]
@@ -104,6 +105,42 @@ function main() {
       console.log(output);
       break;
 
+    case 'check':
+      console.log(`[Check] Verifying ${filePath}...`);
+      let errors = 0;
+      const names = new Set();
+      
+      // 1. Basic validation from extractEmblems
+      emblems.forEach(emb => {
+        if (names.has(emb.name)) {
+          console.error(`Error: Duplicate emblem name found: '${emb.name}'`);
+          errors++;
+        }
+        names.add(emb.name);
+      });
+
+      // 2. Structural validation (Manual scan for unmatched tags)
+      const startTags = (code.match(/\/\/ \[ai_s_emblem:/g) || []).length;
+      const endTags = (code.match(/\/\/ \[\/ai_s_emblem:/g) || []).length;
+
+      if (startTags !== endTags) {
+        console.error(`Error: Tag count mismatch! Start tags: ${startTags}, End tags: ${endTags}`);
+        errors++;
+      }
+
+      if (emblems.length !== startTags) {
+        console.error(`Error: Some emblems are malformed and couldn't be parsed correctly.`);
+        errors++;
+      }
+
+      if (errors === 0) {
+        console.log(`✓ All ${emblems.length} emblems are valid and unique.`);
+      } else {
+        console.log(`✗ Found ${errors} error(s) in emblem structure.`);
+        process.exit(1);
+      }
+      break;
+
     case 'focus':
       const targetName = extraArgs[0];
       if (!targetName) {
@@ -138,15 +175,18 @@ function main() {
       let newCode = code;
       let appliedCount = 0;
 
-      // Re-fetch emblems for accurate indices after each replacement
+      // Base tag counts for destruction check
+      const baseStartTags = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;
+      
       patchEmblems.forEach(pEmb => {
-        // Refresh target emblems because indices change
         const currentEmblems = extractEmblems(newCode);
         const matches = currentEmblems.filter(e => e.name === pEmb.name);
         
         if (matches.length === 1) {
           const tEmb = matches[0];
-          newCode = newCode.slice(0, tEmb.start) + pEmb.fullMatch + newCode.slice(tEmb.end);
+          // Tag Immutability: Preserve target's header and footer. Only replace content.
+          const safeReplacement = `${tEmb.header}\n${pEmb.content.trim()}\n${tEmb.footer}`;
+          newCode = newCode.slice(0, tEmb.start) + safeReplacement + newCode.slice(tEmb.end);
           appliedCount++;
           console.log(`Applied patch for: ${pEmb.name}`);
         } else if (matches.length > 1) {
@@ -157,8 +197,22 @@ function main() {
       });
 
       if (appliedCount > 0) {
+        // Destruction Fence: Check if the patch accidentally destroyed or added tags inside the content
+        const postStartTags = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;
+        const postEndTags = (newCode.match(/\/\/ \[\/ai_s_emblem:/g) || []).length;
+
+        if (postStartTags !== postEndTags) {
+          console.error(`\n[FATAL] Apply cancelled! Tag structure corrupted (starts: ${postStartTags}, ends: ${postEndTags}).`);
+          process.exit(1);
+        }
+        if (postStartTags !== baseStartTags) {
+          console.error(`\n[FATAL] Apply cancelled! Emblem count changed (${baseStartTags} -> ${postStartTags}).`);
+          console.error(`Structural changes (adding/removing emblems) are restricted in 'apply' to prevent destruction.`);
+          process.exit(1);
+        }
+
         fs.writeFileSync(filePath, newCode, 'utf8');
-        console.log(`Successfully updated ${filePath}.`);
+        console.log(`Successfully updated ${filePath}. (Immutability check passed)`);
       }
       break;
 

@@ -1,0 +1,152 @@
+[
+  {
+    "price": 12000,
+    "weight": 10,
+    "result": 0
+  },
+  {
+    "price": 4000,
+    "weight": 4,
+    "result": 800
+  },
+  {
+    "price": 12000,
+    "weight": 15,
+    "result": 0
+  },
+  {
+    "price": 11000,
+    "weight": 6,
+    "result": 0
+  },
+  {
+    "price": 14000,
+    "weight": 15,
+    "result": 0
+  },
+  {
+    "price": 7000,
+    "weight": 4,
+    "result": 400
+  },
+  {
+    "price": 2000,
+    "weight": 10,
+    "result": 1000
+  },
+  {
+    "price": 10000,
+    "weight": 13,
+    "result": 0
+  },
+  {
+    "price": 6000,
+    "weight": 11,
+    "result": 650
+  },
+  {
+    "price": 5000,
+    "weight": 14,
+    "result": 650
+  },
+  {
+    "price": 0,
+    "weight": 6,
+    "result": 1000
+  },
+  {
+    "price": 12000,
+    "weight": 8,
+    "result": 0
+  },
+  {
+    "price": 14000,
+    "weight": 6,
+    "result": 0
+  },
+  {
+    "price": 12000,
+    "weight": 2,
+    "result": 0
+  },
+  {
+    "price": 0,
+    "weight": 14,
+    "result": 1300
+  },
+  {
+    "price": 14000,
+    "weight": 15,
+    "result": 0
+  },
+  {
+    "price": 12000,
+    "weight": 9,
+    "result": 0
+  },
+  {
+    "price": 4000,
+    "weight": 9,
+    "result": 1000
+  },
+  {
+    "price": 12000,
+    "weight": 13,
+    "result": 0
+  },
+  {
+    "price": 10000,
+    "weight": 14,
+    "result": 0
+  },
+  {
+    "price": 3000,
+    "weight": 13,
+    "result": 1300
+  },
+  {
+    "price": 13000,
+    "weight": 7,
+    "result": 0
+  },
+  {
+    "price": 14000,
+    "weight": 4,
+    "result": 0
+  },
+  {
+    "price": 5000,
+    "weight": 11,
+    "result": 650
+  },
+  {
+    "price": 1000,
+    "weight": 2,
+    "result": 800
+  },
+  {
+    "price": 5000,
+    "weight": 11,
+    "result": 650
+  },
+  {
+    "price": 7000,
+    "weight": 3,
+    "result": 400
+  },
+  {
+    "price": 8000,
+    "weight": 1,
+    "result": 400
+  },
+  {
+    "price": 11000,
+    "weight": 12,
+    "result": 0
+  },
+  {
+    "price": 8000,
+    "weight": 8,
+    "result": 500
+  }
+]

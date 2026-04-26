@@ -14,6 +14,7 @@ Modes:
   focus <Name>       Extract the exact source code of the specified emblem.
   apply <patch>      Replace emblems in target matching the patch's emblem names.
   check              Verify emblem integrity (nesting, uniqueness, completeness).
+  miner <data.json>  [AI-Only] Extract logic (laws) from data and synthesize code.
 
 Format:
   // [ai_s_emblem:#importance#tag1#tag2 Name]
@@ -139,6 +140,21 @@ function main() {
         console.log(`✗ Found ${errors} error(s) in emblem structure.`);
         process.exit(1);
       }
+      break;
+
+    case 'miner':
+      const dataPath = extraArgs[0];
+      if (!dataPath || !fs.existsSync(dataPath)) {
+        console.error('Error: Valid data file (.json or .csv) required for mining.');
+        process.exit(1);
+      }
+      const dataContent = fs.readFileSync(dataPath, 'utf8');
+      console.log(`\n[Miner] Data loaded from ${dataPath}.`);
+      console.log(`\n--- DATASET START ---`);
+      console.log(dataContent);
+      console.log(`--- DATASET END ---`);
+      console.log(`\n[AI Action Required]: Analyze the dataset above, extract the underlying laws, and synthesize a self-contained Heavy Function in JavaScript.`);
+      // Note: The actual synthesis happens in the AI's reasoning loop after this output.
       break;
 
     case 'focus':

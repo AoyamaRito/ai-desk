@@ -145,7 +145,7 @@ function saveSnapshot(data) {
 function listSnapshots() {
   if (!fs.existsSync(SNAPSHOT_DIR)) return [];
   return fs.readdirSync(SNAPSHOT_DIR)
-    .filter(f => f.endsWith('.html'))
+    .filter(f => f.endsWith('.html') && f.startsWith('snapshot_'))
     .map(f => ({
       name: f,
       path: `/snapshots/${f}`,
@@ -171,6 +171,9 @@ let currentRecordingId = null;
 const recordedFrames = [];
 
 function startRecording() {
+  if (currentRecordingId) {
+    console.warn(`[Video] Warning: startRecording called while session '${currentRecordingId}' is active. Previous frames discarded.`);
+  }
   currentRecordingId = Date.now().toString(36);
   recordedFrames.length = 0;
   console.log(`[Video] Started recording: ${currentRecordingId}`);
@@ -353,8 +356,9 @@ function handleRequest(req, res) {
     res.end(JSON.stringify(structs, null, 2));
   } else if (req.method === 'GET' && urlPath.startsWith('/structures/')) {
     const file = urlPath.replace('/structures/', '');
-    const filepath = path.join(STRUCTURE_DIR, file);
-    if (fs.existsSync(filepath)) {
+    const baseDir = path.resolve(STRUCTURE_DIR);
+    const filepath = path.resolve(baseDir, file);
+    if (filepath.startsWith(baseDir + path.sep) && fs.existsSync(filepath)) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(fs.readFileSync(filepath));
     } else {
@@ -605,6 +609,7 @@ function tryListen(port, attempt = 1) {
 // [ai_s_emblem:#mid#docs ClientSnippet]
 /*
  * ブラウザ側に貼るコード (コピペ用)
+ * ※動的配信版は GET /client.js で取得可能。こちらは手動埋め込み用。
  *
  * <script>
  * (function() {
@@ -613,60 +618,45 @@ function tryListen(port, attempt = 1) {
  *   function sendError(entry) {
  *     fetch(SERVER + '/error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) }).catch(() => {});
  *   }
+ *   function sendSnapshot(label) {
+ *     let styles = '';
+ *     try { for (const s of document.styleSheets) { try { for (const r of s.cssRules) styles += r.cssText + '\n'; } catch(e){} } } catch(e) {}
+ *     fetch(SERVER + '/snapshot', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+ *       body: JSON.stringify({ html: document.body.innerHTML, styles, url: location.href, label: label || 'manual', timestamp: new Date().toISOString() })
+ *     }).catch(() => {});
+ *   }
  *
  *   window.onerror = function(msg, src, line, col, err) {
- *     sendError({ type: 'error', message: msg, source: src, line: line, column: col, stack: err?.stack || '' });
+ *     sendError({ type: 'error', message: msg, source: src, line, column: col, stack: err?.stack || '' });
+ *     sendSnapshot('Error: ' + msg);
  *   };
  *   window.onunhandledrejection = function(e) {
  *     sendError({ type: 'unhandledrejection', message: e.reason?.message || String(e.reason), stack: e.reason?.stack || '' });
+ *     sendSnapshot('Promise Rejection');
  *   };
  *   const origConsoleError = console.error;
  *   console.error = function(...args) {
  *     sendError({ type: 'console.error', message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') });
  *     origConsoleError.apply(console, args);
  *   };
- * 
- *   // --- Remote Control Listener ---
- *   let isRecording = false;
- *   function captureFrame() {
- *     if (!isRecording) return;
- *     const canvas = document.createElement('canvas');
- *     canvas.width = window.innerWidth;
- *     canvas.height = window.innerHeight;
- *     // Simple visualization (HTML to Canvas is limited, but we can capture at least some state)
- *     // Better approach: use html2canvas or similar if available, but for now we use eval to trigger captures.
- *   }
  *
- *   setInterval(() => {
- *     fetch(SERVER + '/input/pending').then(r => r.json()).then(data => {
- *       if (!data.hasCommand) return;
- *       const cmd = data.command;
- *       console.log('[Remote] Executing:', cmd.action);
- *       try {
- *         if (cmd.action === 'eval') {
- *           eval(cmd.code);
- *         } else if (cmd.action === 'record-start') {
- *           isRecording = true;
- *           // Capture loop
- *           const loop = () => {
- *             if (!isRecording) return;
- *             // Note: In real app, AI can trigger 'eval' to take screenshot using html2canvas or simply document.body
- *             requestAnimationFrame(loop);
- *           };
- *           loop();
- *         } else if (cmd.action === 'record-stop') {
- *           isRecording = false;
- *         } else if (cmd.action === 'click') {
- *           document.querySelector(cmd.target)?.click();
- *         } else if (cmd.action === 'type') {
+ *   // Remote control: poll for AI commands (eval / click / type)
+ *   setInterval(async () => {
+ *     try {
+ *       const data = await fetch(SERVER + '/input/pending').then(r => r.json());
+ *       if (data.hasCommand) {
+ *         const cmd = data.command;
+ *         if (cmd.action === 'eval') { await eval(cmd.code); }
+ *         else if (cmd.action === 'click') { document.querySelector(cmd.target)?.click(); }
+ *         else if (cmd.action === 'type') {
  *           const el = document.querySelector(cmd.target);
- *           if (el) { el.value = cmd.value; el.dispatchEvent(new Event('input', { bubbles: true })); }
+ *           if (el) { el.value = cmd.value; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
  *         }
- *       } catch (err) {
- *         console.error('[Remote] Execution failed:', err);
  *       }
- *     }).catch(() => {});
- *   }, 1000);
+ *       const pending = await fetch(SERVER + '/snapshot/pending').then(r => r.json());
+ *       if (pending.pending) sendSnapshot(pending.label);
+ *     } catch (e) {}
+ *   }, 500);
  * })();
  * </script>
  */

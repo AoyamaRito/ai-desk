@@ -352,6 +352,11 @@ function runApply(filePath, patchPath) {
     }
   }
 
+  if (appliedCount === 0) {
+    console.log('No patches applied. (All emblems/bridges were not found or skipped)');
+    return;
+  }
+
   if (appliedCount > 0) {
     // Destruction Fence: Emblem / Bridge どちらも対称性と件数不変を検査。
     const postEmblemStarts = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;

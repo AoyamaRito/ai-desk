@@ -477,7 +477,7 @@ function handleRequest(req, res) {
     fs.writeFileSync(LOG_FILE, '');
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"message":"Log cleared"}');
   } else if (req.method === 'GET' && urlPath === '/status') {
-    const snapshots = fs.existsSync(SNAPSHOT_DIR) ? fs.readdirSync(SNAPSHOT_DIR).filter(f => f.endsWith('.html')).length : 0;
+    const snapshots = fs.existsSync(SNAPSHOT_DIR) ? fs.readdirSync(SNAPSHOT_DIR).filter(f => f.endsWith('.html') && f.startsWith('snapshot_')).length : 0;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, port: currentPort, staticDir: path.resolve(STATIC_DIR), logFile: path.resolve(LOG_FILE), snapshotDir: path.resolve(SNAPSHOT_DIR), snapshotCount: snapshots, uptime: process.uptime() }, null, 2));
   } else if (req.method === 'POST' && urlPath === '/snapshot/request') {
@@ -578,7 +578,7 @@ function tryListen(port, attempt = 1) {
 
   server.listen(port, () => {
     currentPort = port;
-    fs.writeFileSync('eyes.port', port.toString());
+    fs.writeFileSync(path.join(__dirname, 'eyes.port'), port.toString());
     console.log(`\n✓ ai-eyes running on http://localhost:${port}`);
     console.log(`  Static:    ${path.resolve(STATIC_DIR)}`);
     console.log(`  Log:       ${path.resolve(LOG_FILE)}`);

@@ -357,8 +357,8 @@ function runApply(filePath, patchPath) {
     return;
   }
 
-  if (appliedCount > 0) {
-    // Destruction Fence: Emblem / Bridge どちらも対称性と件数不変を検査。
+  // Destruction Fence: Emblem / Bridge どちらも対称性と件数不変を検査。
+  {
     const postEmblemStarts = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;
     const postEmblemEnds   = (newCode.match(/\/\/ \[\/ai_s_emblem:/g) || []).length;
     const postBridgeStarts = (newCode.match(/\/\/ \[ai_s_bridge:/g) || []).length;
@@ -389,6 +389,7 @@ function runApply(filePath, patchPath) {
   }
 }
 // [/ai_s_emblem: Run-Apply]
+
 
 // [ai_s_emblem:#mid#logic Run-Miner]
 function runMiner(dataPath) {

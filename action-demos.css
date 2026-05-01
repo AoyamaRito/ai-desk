@@ -1,0 +1,65 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --accent: #58a6ff;
+  --warn: #f85149;
+  --highlight: #ffd33d;
+  --green: #3fb950;
+}
+* { box-sizing: border-box; margin: 0; padding: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+body { background: var(--bg); color: var(--text); }
+
+header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
+header h1 { font-size: 1.1rem; color: var(--accent); }
+header p { font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem; }
+
+main { display: grid; grid-template-columns: 220px 1fr;
+       min-height: calc(100vh - 70px); }
+
+nav { background: var(--panel); border-right: 1px solid var(--border);
+      padding: 0.75rem 0; }
+nav button {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text);
+  padding: 0.6rem 1rem; cursor: pointer; font-size: 0.85rem;
+  border-left: 3px solid transparent;
+}
+nav button:hover { background: rgba(88,166,255,0.1); }
+nav button.active {
+  background: rgba(88,166,255,0.15);
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+#playground { padding: 1.5rem; }
+#game-title { font-size: 1.3rem; color: var(--highlight); margin-bottom: 0.4rem; }
+#game-desc { opacity: 0.8; margin-bottom: 0.4rem;
+             font-size: 0.9rem; line-height: 1.5; }
+#game-controls {
+  font-size: 0.85rem; color: var(--accent);
+  margin-bottom: 0.75rem;
+  padding: 0.4rem 0.6rem; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 4px;
+  display: inline-block;
+}
+
+#game-canvas {
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+}
+#game-canvas:focus { border-color: var(--accent); }
+
+#reset-btn {
+  margin-top: 0.75rem;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 0.4rem 1rem; cursor: pointer; font-family: inherit;
+  font-size: 0.85rem;
+}
+#reset-btn:hover { background: rgba(88,166,255,0.1); border-color: var(--accent); }

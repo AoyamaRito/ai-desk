@@ -390,7 +390,6 @@ function runApply(filePath, patchPath) {
 }
 // [/ai_s_emblem: Run-Apply]
 
-
 // [ai_s_emblem:#mid#logic Run-Miner]
 function runMiner(dataPath) {
   if (!dataPath || !fs.existsSync(dataPath)) {

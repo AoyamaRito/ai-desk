@@ -15,6 +15,7 @@ const STATIC_DIR = process.env.STATIC_DIR || '.';
 const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR || './snapshots';
 const STRUCTURE_DIR = path.join(SNAPSHOT_DIR, 'structures');
 const AUTO_KILL = process.argv.includes('--kill');
+const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10MB: snapshot/frame の現実的な上限
 
 const MIME_TYPES = {
   '.html': 'text/html',

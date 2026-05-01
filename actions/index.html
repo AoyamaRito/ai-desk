@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Action Constraint Lab — Folding in motion</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Action Constraint Lab</h1>
+    <p>制約畳み込みでアクションゲームを書く実験場。1つのHTMLから複数のJSデモを切替えて確認する。</p>
+    <p class="ref">理論: <a href="ACTION_NATIVE_FOLDING_GUIDE.md">ACTION_NATIVE_FOLDING_GUIDE.md</a> / <a href="../PROMPT_constraint_folding.md">PROMPT_constraint_folding.md</a></p>
+  </header>
+  <main>
+    <nav id="demo-nav"></nav>
+    <section id="stage">
+      <h2 id="stage-title">— select a demo —</h2>
+      <p id="stage-desc"></p>
+      <p id="stage-controls"></p>
+      <div id="stage-area">
+        <canvas id="stage-canvas" width="720" height="320" tabindex="0"></canvas>
+        <aside id="stage-side"></aside>
+      </div>
+      <div id="stage-controls-row">
+        <button id="reset-btn">Reset</button>
+        <span id="stage-status"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- registry first -->
+  <script src="hub.js"></script>
+  <!-- demos register themselves on load (logic先・demo後) -->
+  <script src="demos/fighter-cancel.logic.js"></script>
+  <script src="demos/fighter-cancel.js"></script>
+  <!-- launcher last -->
+  <script>ActionLab.boot();</script>
+</body>
+</html>

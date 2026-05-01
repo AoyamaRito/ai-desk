@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Action Game Constraint Demos — Playable</title>
+  <link rel="stylesheet" href="action-demos.css">
+</head>
+<body>
+  <header>
+    <h1>Action Game Constraint Demos — Playable</h1>
+    <p>各アルゴリズムを実際に操作できるミニゲーム集。クリックでフォーカスして遊ぶ。</p>
+  </header>
+  <main>
+    <nav id="demo-list"></nav>
+    <section id="playground">
+      <h2 id="game-title"></h2>
+      <p id="game-desc"></p>
+      <p id="game-controls"></p>
+      <canvas id="game-canvas" width="720" height="320" tabindex="0"></canvas>
+      <button id="reset-btn">Reset</button>
+    </section>
+  </main>
+  <script src="action-demos.js"></script>
+  <script src="action-demos-ui.js"></script>
+</body>
+</html>

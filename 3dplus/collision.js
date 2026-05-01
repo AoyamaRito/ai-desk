@@ -130,6 +130,32 @@
     };
   }
 
+  // Ray vs Sphere
+  // 解析的二次方程式法。d·d=1 を仮定（方向は正規化済み）。
+  // 判別式 disc = (d·oc)^2 - (oc·oc - r^2)。disc < 0 → 交差なし。
+  function intersectRaySphere(ray, sphere) {
+    const EPSILON = 1e-8;
+    const ocx = ray.origin[0] - sphere.center[0];
+    const ocy = ray.origin[1] - sphere.center[1];
+    const ocz = ray.origin[2] - sphere.center[2];
+    const b = ocx * ray.direction[0] + ocy * ray.direction[1] + ocz * ray.direction[2];
+    const c = ocx*ocx + ocy*ocy + ocz*ocz - sphere.radius * sphere.radius;
+    const disc = b * b - c;
+    if (disc < 0) return null;
+    const sqrtDisc = Math.sqrt(disc);
+    let t = -b - sqrtDisc; // 近点
+    if (t < EPSILON) t = -b + sqrtDisc; // 球の内部から: 遠点を採用
+    if (t < EPSILON) return null; // 球がレイの後方
+    return {
+      t,
+      point: [
+        ray.origin[0] + ray.direction[0] * t,
+        ray.origin[1] + ray.direction[1] * t,
+        ray.origin[2] + ray.direction[2] * t
+      ]
+    };
+  }
+
   // Ray vs Triangle
   // Möller–Trumbore intersection algorithm
   function intersectRayTriangle(ray, v0, v1, v2) {
@@ -179,6 +205,7 @@
     intersectSphere,
     intersectSphereAABB,
     intersectRayAABB,
+    intersectRaySphere,
     intersectRayTriangle
   };
 });

@@ -77,6 +77,32 @@ test('Ray vs AABB - intersectRayAABB', () => {
   assert.deepStrictEqual(res3.point, [0, 1, 0]);
 });
 
+test('Ray vs Sphere - intersectRaySphere', () => {
+  const sphere = { center: [0, 0, 0], radius: 1 };
+
+  // 正面衝突: z軸上から球中心に向けて撃つ
+  const ray1 = { origin: [0, 0, 5], direction: [0, 0, -1] };
+  const res1 = collision.intersectRaySphere(ray1, sphere);
+  assert.ok(res1 !== null);
+  assert.ok(Math.abs(res1.t - 4) < 1e-9); // z=5 から z=1（球面）まで距離4
+  assert.ok(Math.abs(res1.point[2] - 1) < 1e-9);
+
+  // 外れるレイ
+  const ray2 = { origin: [2, 0, 5], direction: [0, 0, -1] };
+  assert.strictEqual(collision.intersectRaySphere(ray2, sphere), null);
+
+  // 球の内部から撃つ → 遠点を返す
+  const ray3 = { origin: [0, 0, 0], direction: [0, 0, 1] };
+  const res3 = collision.intersectRaySphere(ray3, sphere);
+  assert.ok(res3 !== null);
+  assert.ok(Math.abs(res3.t - 1) < 1e-9); // z=0 から z=1（球面）まで距離1
+  assert.ok(Math.abs(res3.point[2] - 1) < 1e-9);
+
+  // 球がレイの後方にある
+  const ray4 = { origin: [0, 0, 5], direction: [0, 0, 1] };
+  assert.strictEqual(collision.intersectRaySphere(ray4, sphere), null);
+});
+
 test('Ray vs Triangle - intersectRayTriangle', () => {
   // XY平面上の三角形 (Z=0)
   const v0 = [0, 1, 0];

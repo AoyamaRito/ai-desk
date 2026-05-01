@@ -366,6 +366,8 @@
     // ワールド点を掛けると view-space z が出る。view-space で前方は -Z なので、
     // ワールド前方向 = -(view[2], view[6], view[10])。view 行列は直交なので長さ1。
     const worldForward = [-view[2], -view[6], -view[10]];
+    const cameraEye = scene.camera.position || [0, 0, 0];
+    const isOrtho = !!scene.camera.ortho;
 
     // (5) 頂点ごとの段階別出力
     const vw = scene.viewport.width;
@@ -446,7 +448,7 @@
       });
       // (6) Triangle stage (Phase 2a): per-face データと背面カリング
       // CCW を表面とする標準規約。法線 = normalize((b-a) × (c-a))。
-      // backface = dot(worldForward, worldNormal) > 0。
+      // 透視投影: dot(centroid-eye, normal) > 0。平行投影: dot(worldForward, normal) > 0。
       const triList = (o.triangles || []).map(tri => {
         const ai = tri[0], bi = tri[1], ci = tri[2];
         const va = verts[ai], vb = verts[bi], vc = verts[ci];
@@ -476,8 +478,14 @@
         const cx3 = (va.world[0] + vb.world[0] + vc.world[0]) / 3;
         const cy3 = (va.world[1] + vb.world[1] + vc.world[1]) / 3;
         const cz3 = (va.world[2] + vb.world[2] + vc.world[2]) / 3;
-        const dot = worldForward[0] * normal[0] + worldForward[1] * normal[1] + worldForward[2] * normal[2];
-        const backface = (nlen > 0) ? (dot > 0) : false;
+        let dotVal;
+        if (isOrtho) {
+          dotVal = worldForward[0] * normal[0] + worldForward[1] * normal[1] + worldForward[2] * normal[2];
+        } else {
+          const dx = cx3 - cameraEye[0], dy = cy3 - cameraEye[1], dz = cz3 - cameraEye[2];
+          dotVal = dx * normal[0] + dy * normal[1] + dz * normal[2];
+        }
+        const backface = (nlen > 0) ? (dotVal > 0) : false;
         return {
           indices: [ai, bi, ci],
           worldNormal: normal,

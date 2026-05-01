@@ -1,6 +1,69 @@
+<!--
+  ================================================================
+  Note to AI: The HTML comment block and the "## For Human Developers"
+  section immediately below (up to the next "---" separator) are
+  human-facing guidance. If you are referencing this file for code
+  operations, patch application, or bug fixes, skip that section
+  and start reading from "# ai-desk".
+  ================================================================
+-->
+
+## For Human Developers
+
+### What is this
+
+A research repository for **AI-Native software methodology** — design principles that let AI write code without hallucinating, backed by runnable demos, a CLI tool, tests, and philosophy docs.
+
+### Recommended reading order
+
+1. **This README's "What is this"** — get the big picture
+2. **`constraint-janken.js`** — 150 lines. Minimal proof of the core pattern. Start here if you want to read code first
+3. **`AI_NATIVE_MASTER_BIBLE.md`** — the full canon. All the reasoning behind the design
+4. **`actions/demos/fighter-cancel.logic.js` + tests** — real-scale application (1920 worlds)
+
+### Getting started — copy-paste prompts
+
+**For any task, start with this one line:**
+
+```
+Read AI_ONBOARDING.en.md, then start working.
+```
+
+**Examples:**
+
+```
+Read AI_ONBOARDING.en.md, then add [feature name] to app.js.
+```
+
+```
+Read AI_ONBOARDING.en.md, then fix [bug symptom].
+ai-eyes.js is already running at localhost:3000.
+```
+
+### Glossary
+
+| Term | One-liner |
+|------|-----------|
+| **Emblem** | Comment tag that logically splits a file: `// [ai_s_emblem:#layer Name]` |
+| **Bridge** | Tag on any function that crosses layers: `// [ai_s_bridge:L3toL4 Name]` |
+| **Layer (L1–L4)** | Physical → Intent → Logic → Draw. Data flows one-way |
+| **REAL_xxx** | The single writable truth variable: `REAL_state.hp` etc. |
+| **shadow** | A throwaway derived value from REAL. Never store it in a variable |
+| **Twin** | CPU pure-function counterpart that verifies GPU output |
+| **Heavy Function** | Self-contained function with no shared helpers. Intentionally verbose |
+| **Constraint Folding** | Instead of if/else: enumerate all possible worlds → filter by constraints |
+
+### "Is this a bug?"
+
+This codebase intentionally duplicates regex across multiple locations and keeps functions long. The design rationale is in `AI_NATIVE_MASTER_BIBLE.md`.
+
+---
+
+<!-- AI: start reading here -->
+
 # ai-desk
 
-🌐 **English** | [🇯🇵 日本語](README.md)
+[🇯🇵 日本語](README.md) | 🌐 **English**
 
 > **AI-Native software methodology — a working desk for the AI to build on.**
 > Code is written by AI, and read by AI. Humans only declare intent and verify outcomes.
@@ -44,7 +107,7 @@ Many human-era best practices violate the above hypotheses and **become counterp
 - **DRY / extracting shared helpers** — "Cut out into another file for reuse" generates file-switch cost on every reference, destroying AI cognition (§3). Bible §0.1.2 "No Shared Helpers" is a frontal denial of this practice.
 - **Abstraction / encapsulation** — To humans this is "hiding complexity"; to AI it is "concealing information," and a trigger for hallucination (§4).
 - **Comment omission assuming "the reader will infer"** — Works with humans, but AI cannot infer (§4).
-- **SQL / RDBMS** — Out-of-code implicit knowledge (schemas, indexes, triggers, stored procedures, etc.) is invisible to AI, making it a hotbed of §4 missing-information hallucinations. Furthermore, it violates L3 purity, breaks reverse query, and overwrites state — a **fourfold violation**. Use JSON Event Sourcing + sequential hash chain instead (see "Persistence Strategy" section below).
+- **SQL / RDBMS** — Out-of-code implicit knowledge (schemas, indexes, triggers, stored procedures, etc.) is invisible to AI, making it a hotbed of §4 missing-information hallucinations. Furthermore, it violates L3 purity, breaks reverse query, and overwrites state — a **fourfold violation**. Use JSON Event Sourcing + sequential hash chain instead (see "Persistence Strategy" below).
 
 ### Recommended Verification Patterns
 
@@ -54,12 +117,41 @@ Many human-era best practices violate the above hypotheses and **become counterp
 
 ---
 
-## The Four Pillars
+## The Six Pillars
 
 1. **Cognitive Asymmetry** — Complexity is the human's problem; concealment is the AI's problem ([Bible §0.0](AI_NATIVE_MASTER_BIBLE.md))
 2. **Heavy Functions** — No shared helpers, inlining, Emblem boundaries ([Bible §0.1](AI_NATIVE_MASTER_BIBLE.md))
 3. **Constraint Folding** — Instead of if/else, derive results by "all possible worlds → constraint filter" ([Bible §0.15](AI_NATIVE_MASTER_BIBLE.md), [Implementation Guide](PROMPT_constraint_folding.md))
 4. **Mining-and-Verify Paradigm** — Three-stage verification: Monte Carlo + LLM law-decoding + constraint validators ([DISCUSSION](DISCUSSION_constraint_library.md))
+5. **Double-Entry Math / 3Dplus** — A transparent CPU-side pure-arithmetic twin running alongside GPU output, enabling AI to definitively diagnose "logic bug vs rendering bug" in 3D/physics/animation ([Bible §4 / §7](AI_NATIVE_MASTER_BIBLE.md))
+6. **Autonomous Observation Infrastructure (AI-Eyes)** — AI observes the screen and errors directly via a zero-dependency local server, without routing through a human ([Bible §1.5](AI_NATIVE_MASTER_BIBLE.md))
+
+---
+
+## How to Use
+
+**Have AI do everything.** You don't need to type commands.
+
+### When you want to add something new
+
+```
+Read AI_ONBOARDING.en.md, then add [what you want] to [file].
+```
+
+AI uses `skeleton` to understand structure, `focus` to read the target, and `apply` to patch it in.
+
+### When you want to fix a bug
+
+```bash
+node ai-eyes.js   # Start the observation server (the only human step)
+```
+
+```
+Read AI_ONBOARDING.en.md, then fix [bug symptom].
+ai-eyes is running at localhost:3000.
+```
+
+AI runs `eyes-e2e.js` to observe the current state, makes a fix, and repeats until exit 0.
 
 ---
 
@@ -127,6 +219,8 @@ Combined with L3 purity, "complete event history + pure reducer" makes **the sta
 
 ## 30-Second Live Proof
 
+> **🎮 [Open Playable Demo (Action Constraint Lab) in browser](https://aoyamarito.github.io/ai-desk/actions/index.html)**
+
 ```bash
 # fighter-cancel: cancel chains in a fighting game, implemented with constraint folding
 open actions/index.html
@@ -163,23 +257,35 @@ For `fighter-cancel` specifically: 1920 worlds traversed, zero contradictions, 1
 
 | File | Content |
 |---|---|
+| [`AI_ONBOARDING.en.md`](AI_ONBOARDING.en.md) | **AI work guide (start here)**. Rules, tools, syntax, and test commands in one place |
 | [`AI_NATIVE_MASTER_BIBLE.md`](AI_NATIVE_MASTER_BIBLE.md) | The full canon. Cognitive asymmetry → heavy functions → 4-layer architecture → REAL/SHADOW → 3Dplus → event sourcing → double-entry verification |
 | [`AI_UNDERSTANDING_MANIFESTO.md`](AI_UNDERSTANDING_MANIFESTO.md) | AI cognition properties (±300-line spotlight, proximity bias, file-switch cost) |
 | [`PROMPT_constraint_folding.md`](PROMPT_constraint_folding.md) | LLM-targeted application guide for the constraint folding pattern (decision criteria, templates, measurement evidence) |
 | [`DISCUSSION_constraint_library.md`](DISCUSSION_constraint_library.md) | Full explanation of the mining-and-verify paradigm (with shipping-calculation PoC) |
 | [`actions/ACTION_NATIVE_FOLDING_GUIDE.md`](actions/ACTION_NATIVE_FOLDING_GUIDE.md) | Application guide for action games (three-layer folding architecture) |
+| [`3dplus/README.md`](3dplus/README.md) | Double-entry math 3D implementation guide. cpu3d.js contract and usage |
 
 ---
 
 ## Implementation and Evidence
 
-### Tool
-- [`ai-desk.js`](ai-desk.js) — A CLI that **provides locality for the single intent of "what part of the code do I need to look at right now, and for what purpose?"** Rather than making AI read entire files repeatedly, it `focus`-extracts only the range needed for the current intent, in Emblem units, and `apply`s patches locally. Satisfies Bible §0.1 (locality maximization) and Single-Purpose Binding simultaneously.
+### Tools
+
+- **[`ai-desk.js`](ai-desk.js) (hands)** — A CLI that provides locality for the single intent of "what part of the code do I need to look at right now, and for what purpose?" Rather than making AI read entire files repeatedly, it `focus`-extracts only the range needed for the current intent, in Emblem units, and `apply`s patches locally. Satisfies Bible §0.1 (locality maximization) and Single-Purpose Binding simultaneously.
 
 ```bash
 node ai-desk.js path/to/file.js skeleton                # structure overview (table of contents only)
 node ai-desk.js path/to/file.js focus EmblemName        # local read for a single intent
 node ai-desk.js path/to/file.js apply patch.js          # partial apply (zero side effects on other emblems)
+node ai-desk.js path/to/file.js check                   # tag vocabulary + direction validation
+node ai-desk.js path/to/file.js coverage                # bridge coverage report
+```
+
+- **[`ai-eyes.js`](ai-eyes.js) (eyes)** — Zero-dependency local server that collects browser errors automatically, saves snapshots, and accepts remote control commands. AI observes the page state without routing through a human.
+
+```bash
+node ai-eyes.js           # start server (http://localhost:3000)
+node eyes-e2e.js "goal"   # compress current state to one text blob (exit 0/1)
 ```
 
 ### Minimal implementation
@@ -195,6 +301,15 @@ node ai-desk.js path/to/file.js apply patch.js          # partial apply (zero si
 ```bash
 node examples/blackbox_generator.js     # generate 50 samples
 node examples/verify_mining.js           # validate the reconstructed code against the original data
+```
+
+### Double-Entry Math / 3Dplus Verification Layer
+- [`3dplus/cpu3d.js`](3dplus/cpu3d.js) + [`3dplus/render.js`](3dplus/render.js) — CPU Twin and GPU renderer pair (same scene JSON format). When a 3D bug appears, run both and compare outputs — a mathematical mismatch is a logic bug, not a rendering bug.
+- [`3dplus/tests/`](3dplus/tests/) — 77/77 PASS
+
+```bash
+node --test 3dplus/tests/projection.test.js
+open 3dplus/examples/point-projection.html   # GPU vs CPU comparison demo
 ```
 
 ---
@@ -224,18 +339,26 @@ See `PROMPT_constraint_folding.md` §1 for full details. Summary:
 
 ```
 ai-desk/
-├── README.md                           # Japanese (primary)
-├── README.en.md                        # English
-├── LICENSE
-├── ai-desk.js                          # Emblem manipulation tool
-├── AI_NATIVE_MASTER_BIBLE.md           # The canon
-├── AI_UNDERSTANDING_MANIFESTO.md       # AI cognition properties
-├── PROMPT_constraint_folding.md        # Constraint folding guide
-├── DISCUSSION_constraint_library.md    # Mining-and-verify paradigm
-├── constraint-janken.js                # Minimal implementation
-├── action-demos.{html,css,js,-ui.js}   # 9 action-game demos
-├── examples/                           # Mining-and-verify PoC (shipping)
-└── actions/                            # New hub + fighter-cancel + 19/19 tests
+├── README.md / README.en.md
+├── CLAUDE.md / GEMINI.md           # auto-loaded by AI CLI → redirects to AI_ONBOARDING
+├── AI_ONBOARDING.md                # AI work guide (Japanese)
+├── AI_ONBOARDING.en.md             # AI work guide (English)
+├── AI_NATIVE_MASTER_BIBLE.md       # The canon
+├── AI_UNDERSTANDING_MANIFESTO.md   # AI cognition properties
+├── PROMPT_constraint_folding.md    # Constraint folding guide
+├── DISCUSSION_constraint_library.md
+├── ai-desk.js                      # Emblem manipulation tool (hands)
+├── ai-eyes.js                      # Autonomous observation / debug server (eyes)
+├── eyes-e2e.js                     # State → text compressor
+├── constraint-janken.js            # Minimal implementation
+├── action-demos.{html,css,js,-ui.js}
+├── index.html                      # Landing page
+├── examples/                       # Mining-and-verify PoC (shipping)
+├── 3dplus/                         # Double-entry math (CPU Twin + GPU Renderer)
+│   ├── cpu3d.js / render.js / render.shaders.js
+│   ├── examples/point-projection.html
+│   └── tests/projection.test.js
+└── actions/
     ├── ACTION_NATIVE_FOLDING_GUIDE.md
     ├── index.html
     ├── demos/fighter-cancel.{logic,}.js

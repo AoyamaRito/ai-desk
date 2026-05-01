@@ -1,4 +1,4 @@
-# ai-desk
+# ai-desk (v3.5)
 
 > **AI-Native software methodology — a working desk for the AI to build on.**
 > AIが書きやすく、人がデバッグしやすい設計原則・道具・実装デモをひとつにまとめた体系。

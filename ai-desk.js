@@ -39,7 +39,8 @@ Layer tags for emblems:
   #L2 / #intent      Command translation
   #L3 / #logic       Pure reducers, state
   #L4 / #draw        Rendering
-  #OutOfLayers       Explicitly outside the 4-layer model (config, utils, types)
+  #verify            Twin (検証双子) — Bible §4.5。L4直後に表示。
+  #OutOfLayers / #config  Explicitly outside the 4-layer model (config, utils, types)
 
 Bridge directions:
   L1toL2, L2toL3, L3toL4, L3toPersistent, L3toNetwork, ...
@@ -107,7 +108,8 @@ function runSkeleton(filePath) {
     else if (/#L2\b/.test(meta) || /#intent\b/.test(meta))   { sortKey = 2.0;   label = 'L2'; }
     else if (/#L3\b/.test(meta) || /#logic\b/.test(meta))    { sortKey = 3.0;   label = 'L3'; }
     else if (/#L4\b/.test(meta) || /#draw\b/.test(meta))     { sortKey = 4.0;   label = 'L4'; }
-    else if (/#OutOfLayers\b/.test(meta))                    { sortKey = 100.0; label = 'OutOfLayers'; }
+    else if (/#verify\b/.test(meta))                         { sortKey = 5.0;   label = 'Verify'; }
+    else if (/#OutOfLayers\b/.test(meta) || /#config\b/.test(meta)) { sortKey = 100.0; label = 'OutOfLayers'; }
     else                                                     { sortKey = 200.0; label = '(untagged)'; }
     items.push({ kind: 'emblem', sortKey, label, meta, name, lines });
   }

@@ -79,9 +79,9 @@ AI向けコードにおいて、ローカリティは最優先の設計原則で
 
 ### 抽出と注入 (Extract & Inject)
 AIは以下の3ステップで巨大なファイルを操作する。
-1. **構造把握 (`skeleton`)**: `node ai-desk.js <file> skeleton` で目次を確認。
+1. **構造把握 (`skeleton`)**: `node ai-desk.js <file> skeleton` で目次を確認。レイヤーおよびタグ（#logic, #verify等）に基づき自動ソートされる。
 2. **局所読込 (`focus`)**: `node ai-desk.js <file> focus <Name>` で対象セクションのみを読み出す。
-3. **部分適用 (`apply`)**: 変更したセクションだけを含むパッチファイルを作成し、`node ai-desk.js <file> apply <patch>` で安全に「注入（Injection）」する。
+3. **部分適用 (`apply`)**: 変更したセクションだけを含むパッチファイルを作成し、`node ai-desk.js <file> apply <patch>` で安全に「注入（Injection）」する。タグ構造の不変性（Tag Immutability）が自動検証される。
 
 ### エンブレムの定義
 JSファイルは必ず以下のタグでセクション（機能の塊）を区切ること。
@@ -92,8 +92,8 @@ JSファイルは必ず以下のタグでセクション（機能の塊）を区
 ```
 - **Name**: 一意でセマンティックな英数字+ハイフンの名前（日本語不可）。
 - **#Importance**: `#high` (コア/論理), `#mid` (制御/UI), `#low` (初期化/定数)
-- **#Category**: `#physical`, `#intent`, `#logic`, `#draw`, `#config`, `#verify` 等。
-  `#verify` は §4.5 Twin（検証双子）に該当するセクションを示す。
+- **#Category**: `#physical`, `#intent`, `#logic`, `#draw`, `#config`, `#verify` (Twin) 等。
+  `#config` は `OutOfLayers` へ、`#verify` は専用の `Verify` セクションへソートされる。
 
 ## 1.5 AI-Eyes 観測インフラの強制 (§AI-Eyes Protocol)
 AIは「見えない環境」で人間からの報告を待つ受け身の姿勢を捨てよ。バグを確実に潰すため、プロダクトは必ず `ai-eyes.js` による観測インフラを内包しなければならない。
@@ -101,10 +101,14 @@ AIは「見えない環境」で人間からの報告を待つ受け身の姿勢
 1. **常駐と接続の義務化 (Mandatory Connection)**:
    すべてのプロジェクトの HTML には、必ず `ai-eyes` クライアントスクリプト（`<script src="http://localhost:3000/client.js"></script>`）を埋め込むか、それに相当するスナップショット送信・コマンド待ち受けループを実装せよ。
 2. **実行の可観測性 (Forced Observability)**:
-   重要な状態遷移の直後や、エラーをキャッチした際には、必ず `ai-eyes` の `/snapshot` エンドポイントへ現在の DOM 状態や Canvas 描画結果（`frame`）を送信せよ。これにより、AI は `tail -1 error.log` や `ls snapshots/` で実行結果を自律的に確認できる。
-3. **スローモーション・デバッグ用の口 (Step-by-step Hooks)**:
+   重要な状態遷移の直後や、エラーをキャッチした際には、必ず `ai-eyes` の `/snapshot` エンドポイントへ現在の DOM 状態や Canvas 描画結果（`frame`）を送信せよ。
+3. **構造投影 (Structural Observation)**:
+   3Dや物理演算を行う場合、座標系の不整合を検知するため、`/structure` エンドポイントへ論理的な構造データ（JSON）を送信せよ。AIはこれを `cpu3d.js` 等の Twin と突合してデバッグする。
+4. **動画記録 (Recording)**:
+   連続的な挙動の不具合（カクつき、補間ミス等）を追跡するため、AIは自律的に `/record/start` および `/record/stop` を呼び出し、一連のフレームを HTML スライドショーとして記録・分析せよ。
+5. **スローモーション・デバッグ用の口 (Step-by-step Hooks)**:
    複雑なアルゴリズムや物理挙動を持つ機能（例: 迷路、衝突判定）には、AI が 1 ステップずつ実行を制御できる公開インターフェース（例: `window.step_xxx`）を意図的に残せ。AI は `curl /input` を介してこれらを呼び出し、スローモーションで状態の推移を確実に追跡・修正する。
-4. **APIキー不要の観測翻訳機 (eyes-e2e Keyless Transducer)**:
+6. **APIキー不要の観測翻訳機 (eyes-e2e Keyless Transducer)**:
    AIのデバッグループ（Observe -> Think -> Act）を回す際、ループスクリプト内にLLMのAPIキーを埋め込むような密結合は避けること。代わりに `eyes-e2e.js` のような「最新状態を最小トークンのテキストに変換して標準出力に吐き出す」単機能の翻訳機（Transducer）を用いよ。CLIエージェントはこの出力を自身の文脈で解釈し、`curl` で次のアクションを注入する（Unix哲学による疎結合）。
 
 ## 2. 4層バニラ・アーキテクチャ (§情報の環)
@@ -250,7 +254,7 @@ Twin は **Zero-Dep / Zero-Side-Effect**:
 これにより AI は「片方を編集する時、もう片方も同期更新せよ」を自動判定できる。
 
 ---
-**Version**: 2.3 (Twin Convention Edition)
+**Version**: 3.5 (Final Architecture Edition)
 **Date**: 2026-05-01
 **Author**: Hiroyuki OKINOI, Claude, Gemini CLI
 

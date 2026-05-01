@@ -170,7 +170,28 @@ test('Frustum - isSphereInFrustum', () => {
   const behind = { center:[0,0,10], radius:0.5 };
   assert.strictEqual(collision.isSphereInFrustum(behind, planes), false);
 
-  // 境界をまたぐ球（中心は外だが半径が届く）
+  // 境界をまたぐ球（中心は外だが半径が届く）→ out（半径5 < far超過量）
   const straddling = { center:[0,0,101], radius:5 };
-  assert.strictEqual(collision.isSphereInFrustum(straddling, planes), false); // 中心が far+5 の外
+  assert.strictEqual(collision.isSphereInFrustum(straddling, planes), false);
+
+  // far 平面を半径でまたぐ球（中心は far 外だが球がかかる）→ in
+  const touchingFar = { center:[0,0,-105], radius:10 };
+  assert.strictEqual(collision.isSphereInFrustum(touchingFar, planes), true);
+});
+
+test('Frustum - AABB partial intersection (straddles frustum plane)', () => {
+  const { _math } = require('../cpu3d.js');
+  const view = _math.buildViewMatrix({ position:[0,0,0], rotation:[0,0,0] });
+  const proj = _math.buildPerspective(Math.PI/2, 1, 0.1, 100);
+  const vp = _math.multiply(proj, view);
+  const planes = collision.extractFrustumPlanes(vp);
+
+  // 視錐台の左平面をまたぐ AABB（一部が外側）→ 交差なので in
+  // fov=90, aspect=1 の左平面は x=-z。z=-5 では x=-5 が境界。
+  const straddle = { min:[-8,-1,-6], max:[-3,-0.5,-4] };
+  assert.strictEqual(collision.isAABBInFrustum(straddle, planes), true);
+
+  // 左平面より完全に外の AABB → out
+  const outside = { min:[-20,-1,-6], max:[-12,-0.5,-4] };
+  assert.strictEqual(collision.isAABBInFrustum(outside, planes), false);
 });

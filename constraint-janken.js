@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 
+// [ai_s_emblem:#high#logic Janken-Knowledge]
 // Constraint Library Prototype: 3-Player Janken
 // Not a calculator. Not a function. Knowledge with constraints.
 // One pure function. No state. No side effects.
-
-// [ai_s_emblem:#high#logic Janken-Knowledge]
 function janken(constraints = {}) {
   const H = ["G", "C", "P"];
-  const LABEL = { G: "Rock", C: "Scissors", P: "Paper" };
   const BEATS = { G: "C", C: "P", P: "G" };
   const PLAYERS = ["A", "B", "C"];
 
@@ -49,8 +47,6 @@ function janken(constraints = {}) {
 
   const VARS = ["A", "B", "C", "result", "winners"];
   const ser = x => JSON.stringify(x);
-
-  // Separate determined (1 value) from free (multiple)
   const determined = {};
   const freeVars = [];
 
@@ -63,24 +59,19 @@ function janken(constraints = {}) {
     }
   }
 
-  // Fully determined → return values
   if (freeVars.length === 0) {
     return { _worlds: 1, ...determined };
   }
 
-  // Partially determined → return relationship
-  // For free variables, express as conditional on other free variables
   const relations = {};
 
   for (const v of freeVars) {
     const others = freeVars.filter(f => f !== v);
     if (others.length === 0) {
-      // No other free vars → list possible values
       relations[v] = [...new Set(worlds.map(w => ser(w[v])))].map(s => JSON.parse(s));
       continue;
     }
 
-    // Group: condition(others) → possible values of v
     const groups = {};
     for (const w of worlds) {
       const key = others.map(f => `${f}=${ser(w[f])}`).join(", ");
@@ -88,7 +79,6 @@ function janken(constraints = {}) {
       groups[key].add(ser(w[v]));
     }
 
-    // Compress: if same output for different conditions, merge them
     const reversed = {};
     for (const [cond, vals] of Object.entries(groups)) {
       const valKey = [...vals].sort().join("|");
@@ -108,11 +98,7 @@ function janken(constraints = {}) {
     relations[v] = { depends_on: others, when };
   }
 
-  return {
-    _worlds: worlds.length,
-    ...determined,
-    ...relations
-  };
+  return { _worlds: worlds.length, ...determined, ...relations };
 }
 // [/ai_s_emblem: Janken-Knowledge]
 
@@ -160,5 +146,6 @@ function demo() {
   console.log("→", JSON.stringify(r3, null, 2));
 }
 
-demo();
+if (require.main === module) { demo(); }
+module.exports = { janken };
 // [/ai_s_emblem: Demo]

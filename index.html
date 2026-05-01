@@ -8,271 +8,390 @@
     :root {
       --bg: #0d1117;
       --bg-panel: #161b22;
+      --bg-card: #1c2128;
       --fg: #c9d1d9;
       --fg-muted: #8b949e;
       --border: #30363d;
       --accent: #58a6ff;
-      --accent-hover: #3182ce;
+      --accent-glow: rgba(88, 166, 255, 0.15);
+      --purple: #a371f7;
       --danger: #f85149;
       --success: #3fb950;
-      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --container-width: 1100px;
     }
 
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       background-color: var(--bg);
       color: var(--fg);
       font-family: var(--font-sans);
-      line-height: 1.6;
+      line-height: 1.7;
+      word-break: break-word;
     }
 
-    a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-
-    header {
-      border-bottom: 1px solid var(--border);
-      padding: 2rem 1rem;
-      text-align: center;
-      background: radial-gradient(circle at 50% -20%, #1f2937 0%, var(--bg) 80%);
-    }
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: #79c0ff; text-decoration: underline; }
 
     .container {
-      max-width: 1000px;
+      max-width: var(--container-width);
       margin: 0 auto;
-      padding: 0 2rem;
+      padding: 0 24px;
     }
 
+    /* --- Navigation --- */
+    nav {
+      position: sticky;
+      top: 0;
+      background: rgba(13, 17, 23, 0.8);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 12px 0;
+    }
+    nav .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 24px;
+      margin: 0;
+      padding: 0;
+    }
+    nav a {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--fg-muted);
+    }
+    nav a:hover { color: var(--fg); text-decoration: none; }
+
+    /* --- Header --- */
+    header {
+      padding: 100px 0 80px;
+      text-align: center;
+      background: radial-gradient(circle at 50% 20%, #1c2128 0%, var(--bg) 100%);
+    }
     h1 {
-      font-size: 3rem;
-      margin: 0 0 0.5rem 0;
-      letter-spacing: -0.05em;
-      background: -webkit-linear-gradient(45deg, #58a6ff, #a371f7);
+      font-size: 4rem;
+      margin: 0;
+      letter-spacing: -0.04em;
+      background: linear-gradient(to right, #58a6ff, #a371f7);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      line-height: 1.1;
     }
-
-    .subtitle {
-      font-size: 1.25rem;
+    .tagline {
+      font-size: 1.5rem;
       color: var(--fg-muted);
-      margin-bottom: 2rem;
+      margin: 20px 0 40px;
+      font-weight: 300;
     }
 
+    .btn-group { display: flex; gap: 16px; justify-content: center; }
     .btn {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
+      padding: 12px 24px;
       font-size: 1rem;
       font-weight: 600;
-      border-radius: 6px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
       border: 1px solid var(--border);
       background: var(--bg-panel);
       color: var(--fg);
-      cursor: pointer;
-      transition: all 0.2s;
     }
-
     .btn.primary {
-      background: var(--success);
-      border-color: var(--success);
+      background: var(--accent);
       color: #fff;
+      border-color: var(--accent);
     }
-
-    .btn.primary:hover {
-      background: #2ea043;
-      text-decoration: none;
-    }
-
     .btn:hover {
-      background: var(--border);
-      text-decoration: none;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      margin-top: 2rem;
-    }
-
-    section {
-      padding: 4rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    h2 {
-      font-size: 2rem;
-      margin-top: 0;
-      margin-bottom: 1.5rem;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 2rem;
-    }
-
-    .card {
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.5rem;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
+    .btn.primary:hover { background: #4a9eff; }
 
-    .card h3 {
+    /* --- Sections --- */
+    section { padding: 100px 0; border-bottom: 1px solid var(--border); }
+    h2 {
+      font-size: 2.25rem;
       margin-top: 0;
-      color: var(--accent);
-      font-size: 1.25rem;
+      margin-bottom: 40px;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 12px;
+    }
+    h2::before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 32px;
+      background: var(--purple);
+      border-radius: 2px;
     }
 
-    code, pre {
-      font-family: var(--font-mono);
-      font-size: 0.9em;
+    /* --- Pillars & Cards --- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
     }
-
-    code {
-      background: rgba(110,118,129,0.4);
-      padding: 0.2em 0.4em;
-      border-radius: 3px;
-    }
-
-    pre {
-      background: var(--bg-panel);
+    .card {
+      background: var(--bg-card);
       border: 1px solid var(--border);
-      padding: 1rem;
-      border-radius: 6px;
-      overflow-x: auto;
+      border-radius: 12px;
+      padding: 32px;
+      height: 100%;
     }
+    .card h3 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    .card p { margin: 0; color: var(--fg-muted); font-size: 0.95rem; line-height: 1.6; }
 
-    .demo-frame {
-      width: 100%;
-      height: 600px;
+    /* --- Manifesto (Knowledge Section) --- */
+    .manifesto-box {
+      background: linear-gradient(145deg, #161b22, #0d1117);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 16px;
+      padding: 48px;
+      margin-top: 20px;
+    }
+    .manifesto-item { margin-bottom: 40px; }
+    .manifesto-item:last-child { margin-bottom: 0; }
+    .manifesto-item h4 {
+      font-size: 1.2rem;
+      margin: 0 0 12px 0;
+      color: var(--purple);
+    }
+    .manifesto-item p { margin: 0; color: var(--fg); }
+
+    /* --- Demos --- */
+    .demo-block { margin-bottom: 80px; }
+    .demo-block:last-child { margin-bottom: 0; }
+    .demo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 20px;
+    }
+    .demo-info h3 { margin: 0; font-size: 1.5rem; }
+    .demo-info p { margin: 8px 0 0; color: var(--fg-muted); }
+    
+    .iframe-wrapper {
+      position: relative;
       background: #000;
-      margin-top: 2rem;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
     }
+    .iframe-wrapper iframe {
+      width: 100%;
+      height: 700px;
+      border: none;
+      display: block;
+    }
+    .fullscreen-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      opacity: 0.6;
+    }
+    .fullscreen-btn:hover { opacity: 1; }
+
+    /* --- Code Block --- */
+    pre {
+      background: #010409;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      color: #e6edf3;
+      margin: 20px 0;
+    }
+    code { color: #79c0ff; }
 
     footer {
+      padding: 60px 0;
       text-align: center;
-      padding: 3rem 0;
       color: var(--fg-muted);
       font-size: 0.9rem;
+    }
+
+    @media (max-width: 768px) {
+      h1 { font-size: 2.5rem; }
+      .manifesto-box { padding: 24px; }
+      .iframe-wrapper iframe { height: 500px; }
     }
   </style>
 </head>
 <body>
 
+  <nav>
+    <div class="container">
+      <div style="font-weight: 700; font-size: 1.2rem; color: var(--accent);">ai-desk <span style="font-size: 0.7em; opacity: 0.6;">v3.5</span></div>
+      <ul>
+        <li><a href="#philosophy">思想</a></li>
+        <li><a href="#manifesto">マニフェスト</a></li>
+        <li><a href="#tools">ツール</a></li>
+        <li><a href="#demos">デモ</a></li>
+      </ul>
+    </div>
+  </nav>
+
   <header>
     <div class="container">
-      <h1>ai-desk</h1>
-      <p class="subtitle">AI-Native Software Methodology (v3.5)</p>
-      <p>AIが書きやすく、人がデバッグしやすい設計原則・道具・実装デモをひとつにまとめた体系。</p>
+      <h1>AI-Native Software <br> Methodology</h1>
+      <p class="tagline">AIが書きやすく、人がデバッグしやすい設計原則の集大成</p>
       
-      <div class="hero-actions">
-        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">View on GitHub</a>
-        <a href="actions/index.html" class="btn primary">Play Demos</a>
-        <a href="AI_NATIVE_MASTER_BIBLE.md" class="btn">Read the Bible</a>
+      <div class="btn-group">
+        <a href="#demos" class="btn primary">実証デモを試す</a>
+        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">
+          <svg height="20" viewBox="0 0 16 16" width="20" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+          GitHub
+        </a>
       </div>
     </div>
   </header>
 
   <main class="container">
+    
     <section id="philosophy">
-      <h2>6つの柱 (Core Philosophy)</h2>
-      <p>人間向けの「良い設計（隠蔽・カプセル化）」は、AIの推論に必要な文脈を奪う。この非対称性を前提に、AIのポテンシャルを最大化する原則です。</p>
-      
+      <h2>6つの柱 (The 6 Pillars)</h2>
       <div class="grid">
         <div class="card">
           <h3>1. 認知の非対称性</h3>
-          <p>複雑性は人の問題、隠匿はAIの問題。カプセル化を捨て、情報を平坦に展開する。</p>
+          <p>複雑性は人の問題、隠匿はAIの問題。従来の「クリーンコード」が隠していた内部情報を、AIのために平坦に展開する。</p>
         </div>
         <div class="card">
           <h3>2. 重厚関数 (Heavy Functions)</h3>
-          <p>共通ヘルパーを禁止し、関数を長く保つ（インライン化）。Emblemタグによる仮想境界で区切る。</p>
+          <p>共通ヘルパーを禁止し、関数を自己完結させる。インライン化を極大化し、AIの「視界」を最適化する。</p>
         </div>
         <div class="card">
-          <h3>3. 条件畳み込み (Constraint Folding)</h3>
-          <p>if/else の分岐ツリーを捨て、全可能世界を生成してから制約フィルターで結果を導出する。</p>
+          <h3>3. 条件畳み込み</h3>
+          <p>if/elseの分岐を「データ」に変換。全可能世界の集合を制約でフィルタリングする、宣言的ロジックへの移行。</p>
         </div>
         <div class="card">
-          <h3>4. 鉱脈採掘型開発</h3>
-          <p>ロジックを人間が書くのではなく、ランダム探索(モンテカルロ)で「正解」を掘り出し、AIが法則を合成する。</p>
+          <h3>4. 鉱脈採掘パラダイム</h3>
+          <p>ロジックを人間が設計するのをやめ、モンテカルロ探索で得た数値からAIに法則を逆合成させる。</p>
         </div>
         <div class="card">
           <h3>5. 複式数学 (3Dplus)</h3>
-          <p>GPU出力などのブラックボックスに対し、並走する純粋関数（Twin）で座標・状態を検算・証明する。</p>
+          <p>GPU出力を信じず、並走する純粋関数（Twin）で検算する。描画の不具合を論理的に証明可能にする。</p>
         </div>
         <div class="card">
           <h3>6. 自律観測 (AI-Eyes)</h3>
-          <p>AIが人間に報告を求めず、自律的に画面・エラーを観測し、ステップ実行でデバッグするインフラ。</p>
+          <p>人間を介さないデバッグ。AI自身が画面スナップショットとエラーログを自律的に監視し、修正を行う。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="manifesto">
+      <h2>AI理解の真実 (Manifesto)</h2>
+      <p style="color: var(--fg-muted);">人間の常識を捨て、AIの認知特性に最適化するためのマインドセット。</p>
+      
+      <div class="manifesto-box">
+        <div class="manifesto-item">
+          <h4>📍 「上下300行」のスポットライト</h4>
+          <p>AIは今読んでいる場所から離れた情報を急速に忘却する。重要な前提は、答えを出させる場所の「近接」に配置しなければならない。</p>
+        </div>
+        <div class="manifesto-item">
+          <h4>📂 ファイル移動という重労働</h4>
+          <p>指示を複数のファイルに跨がせることは、AIの認知を破壊する。可能な限り単一ファイル・単一スコープに情報を凝縮せよ。</p>
+        </div>
+        <div class="manifesto-item">
+          <h4>🧩 究極の非対称性</h4>
+          <p>AIは「空気を読む（推論）」のが絶望的に弱く、「目の前にある情報の計算」には神のごとき強さを持つ。人間がすべきは推論の余地を消し、情報を揃えることだ。</p>
+        </div>
+        <div class="manifesto-item">
+          <h4>📝 指示に「余白」を残す</h4>
+          <p>形式に固執する機械的なルールは、AIの計算リソースを浪費させる。前提さえ揃えれば、あとはAIの「最適な確率を見つける自由」を信じよ。</p>
         </div>
       </div>
     </section>
 
     <section id="tools">
-      <h2>提供するツール (Tools)</h2>
-      <p>AIがコードを編集する「手」と、実行結果を観測する「目」。</p>
-      
+      <h2>実装ツール (Tools)</h2>
       <div class="grid">
         <div class="card">
-          <h3>✍️ ai-desk.js (手)</h3>
-          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI ツール。</p>
-          <pre><code>node ai-desk.js file.js skeleton
-node ai-desk.js file.js focus Name
-node ai-desk.js file.js apply patch.js
-node ai-desk.js file.js check</code></pre>
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--purple); margin-bottom: 8px;">The Hand (手)</div>
+          <h3>ai-desk.js</h3>
+          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI。Tag Immutability により、AIによる構造破壊を物理的に防止する。</p>
+          <pre><code># 構造把握
+ai-desk app.js skeleton
+# 部分適用
+ai-desk app.js apply patch.js</code></pre>
         </div>
         <div class="card">
-          <h3>👁️ ai-eyes.js (目)</h3>
-          <p>エラー自動収集、HTML/Canvasスナップショット保存、動画記録、AIからのリモート操作を受け付けるゼロ依存サーバー。</p>
-          <pre><code># AIによる自律デバッグ例
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--purple); margin-bottom: 8px;">The Eye (目)</div>
+          <h3>ai-eyes.js</h3>
+          <p>ブラウザの実行状態をAIが自律的に監視するサーバー。エラーログ、HTML/Canvasスナップショット、動画記録、さらにはAIからのリモート操作（eval/click/type）に対応。</p>
+          <pre><code># AIからの操作要求
 curl -X POST localhost:3000/input \
-  -d '{"action":"eval", "code":"..."}'
-curl localhost:3000/snapshot/request</code></pre>
+  -d '{"action":"click", "target":"#btn"}'</code></pre>
         </div>
       </div>
     </section>
 
     <section id="demos">
-      <h2>インタラクティブ・デモ (Playable Demos)</h2>
-      <p>「条件畳み込み」と「複式数学（3Dplus）」の実証デモ環境です。ページ内で直接操作・確認できます。</p>
+      <h2>実証デモ (Interactive Demos)</h2>
       
-      <ul>
-        <li><a href="actions/index.html"><strong>Action Constraint Lab (v3.5)</strong></a> — キャンセル受付・先行入力・コンボ判定などを網羅したアクションゲームのラボ。</li>
-        <li><a href="action-demos.html"><strong>Action Game Constraint Demos</strong></a> — 9種類のアクションゲーム挙動をまとめたクラシックデモ。</li>
-        <li><a href="3dplus/examples/point-projection.html"><strong>3Dplus Point Projection</strong></a> — WebGL描画（GPU）とCPU側算数（Twin）の突合PoC。</li>
-      </ul>
+      <div class="demo-block">
+        <div class="demo-header">
+          <div class="demo-info">
+            <h3>1. 制約畳み込み (Action Constraint Lab)</h3>
+            <p>格闘ゲーム等のキャンセルチェーン・先行入力を「if文ゼロ」のデータ駆動で制御。逆引きデバッグを体験可能。</p>
+          </div>
+          <a href="actions/index.html" target="_blank" class="btn">別タブで開く ↗</a>
+        </div>
+        <div class="iframe-wrapper">
+          <iframe src="actions/index.html"></iframe>
+        </div>
+      </div>
 
-      <h3 style="margin-top: 3rem; color: var(--fg);">1. 制約畳み込み (Action Constraint Lab)</h3>
-      <p style="color: var(--fg-muted); font-size: 0.9rem;">if文をゼロにし、全可能世界からの絞り込みでアクションゲームの挙動を制御するデモ。</p>
-      <iframe src="actions/index.html" class="demo-frame" title="Action Constraint Lab"></iframe>
-
-      <h3 style="margin-top: 4rem; color: var(--fg);">2. 複式数学 / 3Dplus (Point Projection PoC)</h3>
-      <p style="color: var(--fg-muted); font-size: 0.9rem;">WebGLが描画する3Dの立方体に対して、CPU側の純粋関数（Twin）が算出した2Dスクリーン座標を赤いマーカー（DOM）で重ね合わせる実証実験。描画バグを論理バグとして証明するインフラ。</p>
-      <iframe src="3dplus/examples/point-projection.html" class="demo-frame" title="3Dplus Point Projection Demo"></iframe>
+      <div class="demo-block">
+        <div class="demo-header">
+          <div class="demo-info">
+            <h3>2. 複式数学 / 3Dplus (Point Projection)</h3>
+            <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明。赤いマーカーはCPUが算出した「論理的正解」の投影。</p>
+          </div>
+          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn">別タブで開く ↗</a>
+        </div>
+        <div class="iframe-wrapper">
+          <iframe src="3dplus/examples/point-projection.html"></iframe>
+        </div>
+      </div>
     </section>
+
   </main>
 
   <footer>
     <div class="container">
-      <p>Created by <a href="https://github.com/AoyamaRito">AoyamaRito</a>. MIT License.</p>
-      <p>Based on AI-Native Master Bible v3.5</p>
+      <p>© 2026 AoyamaRito | <a href="AI_NATIVE_MASTER_BIBLE.md">AI-Native Master Bible v3.5</a> 準拠</p>
+      <p style="margin-top: 10px; font-size: 0.8rem;">This methodology is built for the era of AI-Human Symbiosis.</p>
     </div>
   </footer>
 
+  <script>
+    // Smooth scroll
+    document.querySelectorAll('nav a').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+      });
+    });
+  </script>
 </body>
 </html>

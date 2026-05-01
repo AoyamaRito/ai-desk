@@ -13,9 +13,7 @@
       --fg-muted: #8b949e;
       --border: #30363d;
       --accent: #58a6ff;
-      --accent-glow: rgba(88, 166, 255, 0.15);
       --purple: #a371f7;
-      --danger: #f85149;
       --success: #3fb950;
       --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -51,23 +49,9 @@
       z-index: 100;
       padding: 12px 0;
     }
-    nav .container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    nav ul {
-      list-style: none;
-      display: flex;
-      gap: 24px;
-      margin: 0;
-      padding: 0;
-    }
-    nav a {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--fg-muted);
-    }
+    nav .container { display: flex; justify-content: space-between; align-items: center; }
+    nav ul { list-style: none; display: flex; gap: 24px; margin: 0; padding: 0; }
+    nav a { font-size: 0.9rem; font-weight: 500; color: var(--fg-muted); }
     nav a:hover { color: var(--fg); text-decoration: none; }
 
     /* --- Header --- */
@@ -85,12 +69,7 @@
       -webkit-text-fill-color: transparent;
       line-height: 1.1;
     }
-    .tagline {
-      font-size: 1.5rem;
-      color: var(--fg-muted);
-      margin: 20px 0 40px;
-      font-weight: 300;
-    }
+    .tagline { font-size: 1.5rem; color: var(--fg-muted); margin: 20px 0 40px; font-weight: 300; }
 
     .btn-group { display: flex; gap: 16px; justify-content: center; }
     .btn {
@@ -107,16 +86,9 @@
       background: var(--bg-panel);
       color: var(--fg);
     }
-    .btn.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
-    .btn.primary:hover { background: #4a9eff; }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .btn.primary:hover { background: #4a9eff; text-decoration: none; }
 
     /* --- Sections --- */
     section { padding: 100px 0; border-bottom: 1px solid var(--border); }
@@ -128,96 +100,60 @@
       align-items: center;
       gap: 12px;
     }
-    h2::before {
-      content: "";
-      display: block;
-      width: 4px;
-      height: 32px;
-      background: var(--purple);
-      border-radius: 2px;
-    }
+    h2::before { content: ""; display: block; width: 4px; height: 32px; background: var(--purple); border-radius: 2px; }
 
     /* --- Pillars & Cards --- */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 24px;
-    }
-    .card {
-      background: var(--bg-card);
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; height: 100%; }
+    .card h3 { margin-top: 0; font-size: 1.25rem; color: var(--accent); margin-bottom: 16px; }
+    .card p { margin: 0; color: var(--fg-muted); font-size: 0.95rem; }
+
+    /* --- Live Demo (Featured) --- */
+    .window {
+      background: var(--bg-panel);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 32px;
-      height: 100%;
+      overflow: hidden;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+      margin-top: 40px;
     }
-    .card h3 {
-      margin-top: 0;
-      font-size: 1.25rem;
-      color: var(--accent);
-      margin-bottom: 16px;
+    .window-header {
+      background: #21262d;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
     }
-    .card p { margin: 0; color: var(--fg-muted); font-size: 0.95rem; line-height: 1.6; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+    .window-title { margin-left: auto; margin-right: auto; font-size: 0.8rem; color: var(--fg-muted); font-family: var(--font-mono); }
+    .window-content iframe { width: 100%; height: 720px; border: none; display: block; background: #000; }
 
-    /* --- Manifesto (Knowledge Section) --- */
-    .manifesto-box {
-      background: linear-gradient(145deg, #161b22, #0d1117);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 48px;
-      margin-top: 20px;
-    }
+    .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 60px; }
+    .demo-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; transition: all 0.2s; }
+    .demo-card:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .demo-card h3 { margin-top: 0; font-size: 1.25rem; }
+    .demo-card p { color: var(--fg-muted); font-size: 0.9rem; margin-bottom: 20px; }
+
+    /* --- Manifesto --- */
+    .manifesto-box { background: linear-gradient(145deg, #161b22, #0d1117); border: 1px solid var(--border); border-radius: 16px; padding: 48px; margin-top: 20px; }
     .manifesto-item { margin-bottom: 40px; }
-    .manifesto-item:last-child { margin-bottom: 0; }
-    .manifesto-item h4 {
-      font-size: 1.2rem;
-      margin: 0 0 12px 0;
-      color: var(--purple);
-    }
+    .manifesto-item h4 { font-size: 1.2rem; margin: 0 0 12px 0; color: var(--purple); }
     .manifesto-item p { margin: 0; color: var(--fg); }
 
-    /* --- Demos --- */
-    .demo-block {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 40px;
-      margin-bottom: 32px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .demo-block:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
-      border-color: var(--accent);
-    }
-    .demo-info h3 { margin: 0 0 12px 0; font-size: 1.75rem; color: var(--fg); }
-    .demo-info p { margin: 0; color: var(--fg-muted); font-size: 1.1rem; line-height: 1.6; }
-    
     /* --- Code Block --- */
-    pre {
-      background: #010409;
-      padding: 20px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      color: #e6edf3;
-      margin: 20px 0;
-    }
+    pre { background: #010409; padding: 20px; border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; color: #e6edf3; margin: 20px 0; }
     code { color: #79c0ff; }
 
-    footer {
-      padding: 60px 0;
-      text-align: center;
-      color: var(--fg-muted);
-      font-size: 0.9rem;
-    }
+    footer { padding: 60px 0; text-align: center; color: var(--fg-muted); font-size: 0.9rem; }
 
     @media (max-width: 768px) {
       h1 { font-size: 2.5rem; }
       .manifesto-box { padding: 24px; }
-      .demo-block { padding: 24px; }
+      .window-content iframe { height: 500px; }
     }
   </style>
 </head>
@@ -228,9 +164,9 @@
       <div style="font-weight: 700; font-size: 1.2rem; color: var(--accent);">ai-desk <span style="font-size: 0.7em; opacity: 0.6;">v3.5</span></div>
       <ul>
         <li><a href="#philosophy">思想</a></li>
+        <li><a href="#live-lab">LIVEデモ</a></li>
         <li><a href="#manifesto">マニフェスト</a></li>
         <li><a href="#tools">ツール</a></li>
-        <li><a href="#demos">デモ</a></li>
       </ul>
     </div>
   </nav>
@@ -239,13 +175,9 @@
     <div class="container">
       <h1>AI-Native Software <br> Methodology</h1>
       <p class="tagline">AIが書きやすく、人がデバッグしやすい設計原則の集大成</p>
-      
       <div class="btn-group">
-        <a href="#demos" class="btn primary">実証デモを試す</a>
-        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">
-          <svg height="20" viewBox="0 0 16 16" width="20" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-          GitHub
-        </a>
+        <a href="#live-lab" class="btn primary">LIVEデモを体験</a>
+        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">GitHub</a>
       </div>
     </div>
   </header>
@@ -255,54 +187,46 @@
     <section id="philosophy">
       <h2>6つの柱 (The 6 Pillars)</h2>
       <div class="grid">
-        <div class="card">
-          <h3>1. 認知の非対称性</h3>
-          <p>複雑性は人の問題、隠匿はAIの問題。従来の「クリーンコード」が隠していた内部情報を、AIのために平坦に展開する。</p>
+        <div class="card"><h3>1. 認知の非対称性</h3><p>複雑性は人の問題、隠匿はAIの問題。カプセル化を捨て、情報を平坦に展開する。</p></div>
+        <div class="card"><h3>2. 重厚関数 (Heavy Functions)</h3><p>共通ヘルパーを禁止し、関数を自己完結させる。インライン化を極大化し、AIの「視界」を最適化する。</p></div>
+        <div class="card"><h3>3. 条件畳み込み</h3><p>if/elseの分岐を「データ」に変換。全可能世界の集合を制約でフィルタリングする宣言的ロジック。</p></div>
+        <div class="card"><h3>4. 鉱脈採掘パラダイム</h3><p>ロジックを設計せず、探索で得た数値からAIに法則を逆合成させる新パラダイム。</p></div>
+        <div class="card"><h3>5. 複式数学 (3Dplus)</h3><p>GPU出力を信じず、並走する純粋関数（Twin）で検算する。描画の不具合を論理的に証明可能にする。</p></div>
+        <div class="card"><h3>6. 自律観測 (AI-Eyes)</h3><p>人間を介さないデバッグ。AI自身が画面とエラーを自律的に監視し、修正を行う。</p></div>
+      </div>
+    </section>
+
+    <section id="live-lab">
+      <h2>Interactive Live Lab</h2>
+      <p style="color: var(--fg-muted);">「条件畳み込み」を実際のアクションゲームに適用した実働環境です。if文を排除したロジックの透明性を体験してください。</p>
+      <div class="window">
+        <div class="window-header">
+          <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+          <div class="window-title">Action Constraint Lab — v3.5</div>
         </div>
-        <div class="card">
-          <h3>2. 重厚関数 (Heavy Functions)</h3>
-          <p>共通ヘルパーを禁止し、関数を自己完結させる。インライン化を極大化し、AIの「視界」を最適化する。</p>
+        <div class="window-content"><iframe src="actions/index.html"></iframe></div>
+      </div>
+      <div class="demo-grid">
+        <div class="demo-card">
+          <h3>3Dplus Point Projection</h3>
+          <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明するデモ。</p>
+          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn">デモを開く ↗</a>
         </div>
-        <div class="card">
-          <h3>3. 条件畳み込み</h3>
-          <p>if/elseの分岐を「データ」に変換。全可能世界の集合を制約でフィルタリングする、宣言的ロジックへの移行。</p>
-        </div>
-        <div class="card">
-          <h3>4. 鉱脈採掘パラダイム</h3>
-          <p>ロジックを人間が設計するのをやめ、モンテカルロ探索で得た数値からAIに法則を逆合成させる。</p>
-        </div>
-        <div class="card">
-          <h3>5. 複式数学 (3Dplus)</h3>
-          <p>GPU出力を信じず、並走する純粋関数（Twin）で検算する。描画の不具合を論理的に証明可能にする。</p>
-        </div>
-        <div class="card">
-          <h3>6. 自律観測 (AI-Eyes)</h3>
-          <p>人間を介さないデバッグ。AI自身が画面スナップショットとエラーログを自律的に監視し、修正を行う。</p>
+        <div class="demo-card">
+          <h3>Legacy Action Demos</h3>
+          <p>9種類のアクションゲーム挙動をまとめたクラシックな実装例。</p>
+          <a href="action-demos.html" target="_blank" class="btn">デモを開く ↗</a>
         </div>
       </div>
     </section>
 
     <section id="manifesto">
       <h2>AI理解の真実 (Manifesto)</h2>
-      <p style="color: var(--fg-muted);">人間の常識を捨て、AIの認知特性に最適化するためのマインドセット。</p>
-      
       <div class="manifesto-box">
-        <div class="manifesto-item">
-          <h4>📍 「上下300行」のスポットライト</h4>
-          <p>AIは今読んでいる場所から離れた情報を急速に忘却する。重要な前提は、答えを出させる場所の「近接」に配置しなければならない。</p>
-        </div>
-        <div class="manifesto-item">
-          <h4>📂 ファイル移動という重労働</h4>
-          <p>指示を複数のファイルに跨がせることは、AIの認知を破壊する。可能な限り単一ファイル・単一スコープに情報を凝縮せよ。</p>
-        </div>
-        <div class="manifesto-item">
-          <h4>🧩 究極の非対称性</h4>
-          <p>AIは「空気を読む（推論）」のが絶望的に弱く、「目の前にある情報の計算」には神のごとき強さを持つ。人間がすべきは推論の余地を消し、情報を揃えることだ。</p>
-        </div>
-        <div class="manifesto-item">
-          <h4>📝 指示に「余白」を残す</h4>
-          <p>形式に固執する機械的なルールは、AIの計算リソースを浪費させる。前提さえ揃えれば、あとはAIの「最適な確率を見つける自由」を信じよ。</p>
-        </div>
+        <div class="manifesto-item"><h4>📍 「上下300行」のスポットライト</h4><p>AIは今読んでいる場所から離れた情報を急速に忘却する。重要な前提は、答えを出させる場所の「近接」に配置しなければならない。</p></div>
+        <div class="manifesto-item"><h4>📂 ファイル移動という重労働</h4><p>指示を複数のファイルに跨がせることは認知を破壊する。可能な限り単一ファイル・単一スコープに情報を凝縮せよ。</p></div>
+        <div class="manifesto-item"><h4>🧩 究極の非対称性</h4><p>AIは「推論」が弱く、「情報の計算」には神のごとき強さを持つ。人間がすべきは推論の余地を消し、情報を揃えることだ。</p></div>
+        <div class="manifesto-item"><h4>📝 指示に「余白」を残す</h4><p>形式に固執する機械的なルールは、計算リソースを浪費させる。前提さえ揃えれば、あとはAIの「最適な確率」を信じよ。</p></div>
       </div>
     </section>
 
@@ -310,67 +234,35 @@
       <h2>実装ツール (Tools)</h2>
       <div class="grid">
         <div class="card">
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--purple); margin-bottom: 8px;">The Hand (手)</div>
           <h3>ai-desk.js</h3>
-          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI。Tag Immutability により、AIによる構造破壊を物理的に防止する。</p>
+          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI。</p>
           <pre><code># 構造把握
 ai-desk app.js skeleton
 # 部分適用
 ai-desk app.js apply patch.js</code></pre>
         </div>
         <div class="card">
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--purple); margin-bottom: 8px;">The Eye (目)</div>
           <h3>ai-eyes.js</h3>
-          <p>ブラウザの実行状態をAIが自律的に監視するサーバー。エラーログ、HTML/Canvasスナップショット、動画記録、さらにはAIからのリモート操作（eval/click/type）に対応。</p>
+          <p>ブラウザの実行状態をAIが自律的に監視するサーバー。エラーログ、HTML/Canvasスナップショット、動画記録に対応。</p>
           <pre><code># AIからの操作要求
 curl -X POST localhost:3000/input \
   -d '{"action":"click", "target":"#btn"}'</code></pre>
         </div>
       </div>
     </section>
-
-    <section id="demos">
-      <h2>実証デモ (Interactive Demos)</h2>
-      <p style="color: var(--fg-muted); margin-bottom: 40px;">ブラウザ上で直接動作する実装デモです。別タブで全画面表示して体験してください。</p>
-      
-      <div class="demo-block">
-        <div class="demo-info">
-          <h3>1. 制約畳み込み (Action Constraint Lab)</h3>
-          <p>格闘ゲーム等のキャンセルチェーン・先行入力を「if文ゼロ」のデータ駆動で制御。逆引きデバッグを体験可能。</p>
-        </div>
-        <div>
-          <a href="actions/index.html" target="_blank" class="btn primary" style="font-size: 1.1rem; padding: 16px 32px;">デモを別タブで開く ↗</a>
-        </div>
-      </div>
-
-      <div class="demo-block">
-        <div class="demo-info">
-          <h3>2. 複式数学 / 3Dplus (Point Projection)</h3>
-          <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明。赤いマーカーはCPUが算出した「論理的正解」の投影。</p>
-        </div>
-        <div>
-          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn primary" style="font-size: 1.1rem; padding: 16px 32px;">デモを別タブで開く ↗</a>
-        </div>
-      </div>
-    </section>
-
   </main>
 
   <footer>
     <div class="container">
       <p>© 2026 AoyamaRito | <a href="AI_NATIVE_MASTER_BIBLE.md">AI-Native Master Bible v3.5</a> 準拠</p>
-      <p style="margin-top: 10px; font-size: 0.8rem;">This methodology is built for the era of AI-Human Symbiosis.</p>
     </div>
   </footer>
 
   <script>
-    // Smooth scroll
     document.querySelectorAll('nav a').forEach(anchor => {
       anchor.addEventListener('click', function(e) {
         e.preventDefault();
-        document.querySelector(this.getAttribute('href')).scrollIntoView({
-          behavior: 'smooth'
-        });
+        document.querySelector(this.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
       });
     });
   </script>

@@ -248,16 +248,22 @@ curl localhost:3000/snapshot/request</code></pre>
     </section>
 
     <section id="demos">
-      <h2>プレイアブル・デモ (Demos)</h2>
-      <p>「条件畳み込み」を実際のアクションゲーム・アルゴリズムに適用し、if文ゼロで実装されたデモ環境です。</p>
+      <h2>インタラクティブ・デモ (Playable Demos)</h2>
+      <p>「条件畳み込み」と「複式数学（3Dplus）」の実証デモ環境です。ページ内で直接操作・確認できます。</p>
       
       <ul>
-        <li><a href="actions/index.html"><strong>Action Constraint Lab (v3.5)</strong></a> — キャンセル受付・先行入力・コンボ判定などを網羅した最新ラボ。</li>
+        <li><a href="actions/index.html"><strong>Action Constraint Lab (v3.5)</strong></a> — キャンセル受付・先行入力・コンボ判定などを網羅したアクションゲームのラボ。</li>
         <li><a href="action-demos.html"><strong>Action Game Constraint Demos</strong></a> — 9種類のアクションゲーム挙動をまとめたクラシックデモ。</li>
-        <li><a href="3dplus/examples/point-projection.html"><strong>3Dplus Point Projection</strong></a> — WebGL描画とCPU側算数（Twin）の突合PoC。</li>
+        <li><a href="3dplus/examples/point-projection.html"><strong>3Dplus Point Projection</strong></a> — WebGL描画（GPU）とCPU側算数（Twin）の突合PoC。</li>
       </ul>
 
+      <h3 style="margin-top: 3rem; color: var(--fg);">1. 制約畳み込み (Action Constraint Lab)</h3>
+      <p style="color: var(--fg-muted); font-size: 0.9rem;">if文をゼロにし、全可能世界からの絞り込みでアクションゲームの挙動を制御するデモ。</p>
       <iframe src="actions/index.html" class="demo-frame" title="Action Constraint Lab"></iframe>
+
+      <h3 style="margin-top: 4rem; color: var(--fg);">2. 複式数学 / 3Dplus (Point Projection PoC)</h3>
+      <p style="color: var(--fg-muted); font-size: 0.9rem;">WebGLが描画する3Dの立方体に対して、CPU側の純粋関数（Twin）が算出した2Dスクリーン座標を赤いマーカー（DOM）で重ね合わせる実証実験。描画バグを論理バグとして証明するインフラ。</p>
+      <iframe src="3dplus/examples/point-projection.html" class="demo-frame" title="3Dplus Point Projection Demo"></iframe>
     </section>
   </main>
 

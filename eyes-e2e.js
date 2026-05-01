@@ -15,7 +15,7 @@ const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR || './snapshots';
 function getLatestSnapshot() {
   if (!fs.existsSync(SNAPSHOT_DIR)) return null;
   const files = fs.readdirSync(SNAPSHOT_DIR)
-    .filter(f => f.endsWith('.html'))
+    .filter(f => f.endsWith('.html') && f.startsWith('snapshot_'))
     .map(f => ({ name: f, time: fs.statSync(path.join(SNAPSHOT_DIR, f)).mtime.getTime() }))
     .sort((a, b) => b.time - a.time);
   

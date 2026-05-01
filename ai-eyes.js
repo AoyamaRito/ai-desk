@@ -309,8 +309,12 @@ function handleRequest(req, res) {
 
   if (req.method === 'POST' && urlPath === '/error') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) { res.writeHead(413); res.end('Payload Too Large'); return; }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (res.writableEnded) return;
       try {
         logError(JSON.parse(body));
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -321,8 +325,12 @@ function handleRequest(req, res) {
     });
   } else if (req.method === 'POST' && urlPath === '/snapshot') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) { res.writeHead(413); res.end('Payload Too Large'); return; }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (res.writableEnded) return;
       try {
         const filename = saveSnapshot(JSON.parse(body));
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -333,8 +341,12 @@ function handleRequest(req, res) {
     });
   } else if (req.method === 'POST' && urlPath === '/structure') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) { res.writeHead(413); res.end('Payload Too Large'); return; }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (res.writableEnded) return;
       try {
         const filename = saveStructure(JSON.parse(body));
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -484,8 +496,13 @@ function handleRequest(req, res) {
   } else if (req.method === 'POST' && urlPath === '/snapshot/request') {
     const url = new URL(req.url, `http://localhost`);
     const label = url.searchParams.get('label') || 'requested';
+    if (snapshotRequest) { snapshotRequest.cancel(); }
     const timeout = setTimeout(() => { if (snapshotRequest) { snapshotRequest = null; res.writeHead(408); res.end('{"ok":false,"error":"timeout"}'); } }, 5000);
-    snapshotRequest = { label, resolve: (file) => { clearTimeout(timeout); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, file })); } };
+    snapshotRequest = {
+      label,
+      resolve: (file) => { clearTimeout(timeout); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, file })); },
+      cancel: () => { clearTimeout(timeout); res.writeHead(409); res.end('{"ok":false,"error":"superseded"}'); },
+    };
   } else if (req.method === 'GET' && urlPath === '/snapshot/pending') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(snapshotRequest ? { pending: true, label: snapshotRequest.label } : { pending: false }));
@@ -501,8 +518,12 @@ function handleRequest(req, res) {
     res.end(JSON.stringify(result));
   } else if (req.method === 'POST' && urlPath === '/frame') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) { res.writeHead(413); res.end('Payload Too Large'); return; }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (res.writableEnded) return;
       try {
         const { image } = JSON.parse(body);
         saveFrame(image);
@@ -526,8 +547,12 @@ function handleRequest(req, res) {
   // --- New Input Endpoints ---
   } else if (req.method === 'POST' && urlPath === '/input') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) { res.writeHead(413); res.end('Payload Too Large'); return; }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (res.writableEnded) return;
       try {
         const id = pushInput(JSON.parse(body));
         res.writeHead(200, { 'Content-Type': 'application/json' });

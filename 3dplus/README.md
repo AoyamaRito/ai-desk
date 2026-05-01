@@ -62,7 +62,8 @@ Twin は層と直交する概念であり、新しいレイヤーではない（
   objects: [
     {
       id: 'cube',
-      vertices: [[x,y,z], ...],                       // ローカル座標
+      vertices:   [[x,y,z], ...],                     // ローカル座標
+      triangles?: [[a,b,c], ...],                     // vertices インデックス、CCW=表面
       transform: {
         position:    [x,y,z],
         rotation:    [rx,ry,rz],                      // Euler XYZ extrinsic
@@ -99,8 +100,9 @@ GPUに送るバッファとCPU検証への入力は**同じscene JSON**でなけ
 
 ```js
 {
-  view: [16],          // ビュー行列
-  projection: [16],    // 射影行列
+  view: [16],                  // ビュー行列
+  projection: [16],            // 射影行列
+  worldForward: [x,y,z],       // カメラのワールド前方向（背面カリング用）
   objects: [
     {
       id, worldMatrix: [16],
@@ -115,6 +117,16 @@ GPUに送るバッファとCPU検証への入力は**同じscene JSON**でなけ
           inFrustum: true|false
         }
       ],
+      triangles: [
+        {
+          indices:       [a,b,c],
+          worldNormal:   [x,y,z],     // 単位ベクトル。退化なら [0,0,0]
+          worldCentroid: [x,y,z],
+          area:          number,      // 世界空間
+          backface:      true|false,  // dot(worldForward, worldNormal) > 0
+          allInFrustum:  true|false   // 3頂点全てが視錐台内
+        }
+      ],
       effective: { time, alpha, visible }
     }
   ]
@@ -122,6 +134,7 @@ GPUに送るバッファとCPU検証への入力は**同じscene JSON**でなけ
 ```
 
 **段階別に出すことが重要**。「画面外に飛んだ」が world か view か clip かのどこで起きたか即特定できる。
+triangles ステージは「この面はカメラに向いているはずか」「視錐台にちゃんと入っているか」を断定するための層。
 
 ---
 
@@ -237,11 +250,19 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 - [x] `camera.lookAt` + `camera.up` 追従カメラ
 - [x] `camera.ortho` 正射影
 - [x] `assert_projectScene` 段階別突合API（Bible §7.1）
-- [x] **39/39 ネイティブテスト PASS**
 
-**Phase 2 (次)**:
-- [ ] 三角形ステージ + 背面カリング
+**Phase 2a (完了)**:
+- [x] 三角形ステージ（`objects[i].triangles`）
+- [x] 世界空間の法線・重心・面積
+- [x] 背面カリング（`backface`）— `worldForward` と `worldNormal` の内積で判定
+- [x] `allInFrustum`（3頂点 AND）
+- [x] **48/48 ネイティブテスト PASS**
+
+**Phase 2b (次)**:
 - [ ] スキニング（ボーン変換）の Twin
+  - skeleton + bindPose + per-vertex weights
+  - LBS（Linear Blend Skinning）で世界座標を確定
+  - キャラクター用途の主用途
 
 **Phase 3 (別ファイル化)**:
 - [ ] `collision.js` — AABB / 球 / Ray-Tri の Twin

@@ -510,4 +510,152 @@ test('assert: 未知の object id は mismatch として記録', () => {
   assert.equal(result.mismatches[0].objectId, 'unknown');
   assert.match(result.mismatches[0].error, /not found/);
 });
+
+// === 12. 三角形ステージ (Phase 2a) ===
+// CCW=表面の規約。カメラは原点で -Z を見ている。
+// 頂点を CCW で並べた -Z 向きの三角形は backface=false（表向き）。
+
+test('triangle: CCW で -Z を向く三角形は backface=false かつ法線が +Z（カメラ方向）', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[-1,-1,-5], [1,-1,-5], [0,1,-5]],
+      triangles: [[0,1,2]],   // CCW from +Z view
+      transform: T0, parent: null
+    }]
+  }));
+  const tri = r.objects[0].triangles[0];
+  assert.equal(tri.backface, false);
+  // -Z 軸上の三角形を CCW で並べた → 法線は +Z 方向
+  assert.ok(close(tri.worldNormal[0], 0, 1e-9));
+  assert.ok(close(tri.worldNormal[1], 0, 1e-9));
+  assert.ok(close(tri.worldNormal[2], 1, 1e-9));
+});
+
+test('triangle: CW で同じ点を並べると backface=true（法線反転）', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[-1,-1,-5], [1,-1,-5], [0,1,-5]],
+      triangles: [[0,2,1]],   // CW
+      transform: T0, parent: null
+    }]
+  }));
+  const tri = r.objects[0].triangles[0];
+  assert.equal(tri.backface, true);
+  assert.ok(close(tri.worldNormal[2], -1, 1e-9));
+});
+
+test('triangle: worldCentroid は3頂点の平均', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[0,0,-5], [3,0,-5], [0,3,-5]],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  }));
+  const c = r.objects[0].triangles[0].worldCentroid;
+  assert.ok(close(c[0], 1));
+  assert.ok(close(c[1], 1));
+  assert.ok(close(c[2], -5));
+});
+
+test('triangle: area は世界空間での三角形面積', () => {
+  // 直角三角形 (0,0)-(2,0)-(0,2) → 面積 = 2
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[0,0,-5], [2,0,-5], [0,2,-5]],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  }));
+  assert.ok(close(r.objects[0].triangles[0].area, 2, 1e-9));
+});
+
+test('triangle: 退化三角形（同一点）は area=0、worldNormal=[0,0,0]、backface=false', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[0,0,-5], [0,0,-5], [0,0,-5]],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  }));
+  const tri = r.objects[0].triangles[0];
+  assert.equal(tri.area, 0);
+  assert.equal(tri.worldNormal[0], 0);
+  assert.equal(tri.worldNormal[1], 0);
+  assert.equal(tri.worldNormal[2], 0);
+  assert.equal(tri.backface, false);
+});
+
+test('triangle: allInFrustum は3頂点全て inFrustum の AND', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [
+        [0,0,-5],         // 視錐台内
+        [1,0,-5],         // 視錐台内
+        [0,0, 5]          // カメラ背後 → 視錐台外
+      ],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  }));
+  assert.equal(r.objects[0].triangles[0].allInFrustum, false);
+});
+
+test('triangle: 親回転で法線も一緒に回る（180度回転で表裏反転）', () => {
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'tri',
+      vertices: [[-1,-1,-5], [1,-1,-5], [0,1,-5]],
+      triangles: [[0,1,2]],
+      transform: { position:[0,0,0], rotation:[Math.PI,0,0], scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  const tri = r.objects[0].triangles[0];
+  // 180度X軸回転 → 元は法線 +Z だったが、X軸回転で +Z → -Z
+  assert.ok(close(tri.worldNormal[2], -1, 1e-9));
+  assert.equal(tri.backface, true);
+});
+
+test('triangle: ortho カメラでも backface 判定が同じ向きで機能する', () => {
+  const r = projectScene({
+    camera: {
+      position:[0,0,0], rotation:[0,0,0],
+      ortho: { left:-5, right:5, bottom:-5, top:5 },
+      near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{
+      id:'tri',
+      vertices: [[-1,-1,-5], [1,-1,-5], [0,1,-5]],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  });
+  assert.equal(r.objects[0].triangles[0].backface, false);
+});
+
+test('triangle: lookAt カメラでも backface 判定が view forward に追従する', () => {
+  // カメラを反対側 (+Z 側) に置いて -Z 向き三角形を見る → backface=true（裏側を見ている）
+  const r = projectScene({
+    camera: {
+      position:[0, 0, -10], lookAt: [0, 0, 0],
+      fov: Math.PI/2, aspect: 1, near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{
+      id:'tri',
+      vertices: [[-1,-1,-5], [1,-1,-5], [0,1,-5]],
+      triangles: [[0,1,2]],
+      transform: T0, parent: null
+    }]
+  });
+  assert.equal(r.objects[0].triangles[0].backface, true);
+});
 // [/ai_s_emblem: Cpu3D-Tests]

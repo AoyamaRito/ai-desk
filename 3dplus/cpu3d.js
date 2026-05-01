@@ -240,7 +240,8 @@
   //     objects: [
   //       {
   //         id: 'cube',
-  //         vertices: [[x,y,z], ...],                  // ローカル座標
+  //         vertices:   [[x,y,z], ...],                // ローカル座標
+  //         triangles?: [[a,b,c], ...],                // vertices インデックス、CCW=表面
   //         transform: {
   //           position:   [x,y,z],
   //           rotation:   [rx,ry,rz],                  // Euler XYZ extrinsic
@@ -268,11 +269,12 @@
   //
   // 出力 result:
   //   {
-  //     view, projection,
+  //     view, projection, worldForward,
   //     objects: [
   //       {
   //         id, worldMatrix,
   //         vertices: [{ local, world, view, clip, ndc, screen, inFrustum }],
+  //         triangles: [{ indices, worldNormal, worldCentroid, area, backface, allInFrustum }],
   //         effective: { time, alpha, visible }
   //       }
   //     ]
@@ -353,6 +355,12 @@
       );
     }
 
+    // カメラのワールド前方向（背面カリング用）。
+    // view = R^T * T(-eye) のとき、view の3行目（rotation 部分）に
+    // ワールド点を掛けると view-space z が出る。view-space で前方は -Z なので、
+    // ワールド前方向 = -(view[2], view[6], view[10])。view 行列は直交なので長さ1。
+    const worldForward = [-view[2], -view[6], -view[10]];
+
     // (5) 頂点ごとの段階別出力
     const vw = scene.viewport.width;
     const vh = scene.viewport.height;
@@ -389,10 +397,55 @@
           inFrustum
         };
       });
+      // (6) Triangle stage (Phase 2a): per-face データと背面カリング
+      // CCW を表面とする標準規約。法線 = normalize((b-a) × (c-a))。
+      // backface = dot(worldForward, worldNormal) > 0。
+      const triList = (o.triangles || []).map(tri => {
+        const ai = tri[0], bi = tri[1], ci = tri[2];
+        const va = verts[ai], vb = verts[bi], vc = verts[ci];
+        if (!va || !vb || !vc) {
+          return { indices: [ai, bi, ci], error: 'invalid vertex index' };
+        }
+        // ワールド空間のエッジ
+        const ex = vb.world[0] - va.world[0];
+        const ey = vb.world[1] - va.world[1];
+        const ez = vb.world[2] - va.world[2];
+        const fx = vc.world[0] - va.world[0];
+        const fy = vc.world[1] - va.world[1];
+        const fz = vc.world[2] - va.world[2];
+        // (b-a) × (c-a)
+        let nx = ey * fz - ez * fy;
+        let ny = ez * fx - ex * fz;
+        let nz = ex * fy - ey * fx;
+        const nlen = Math.hypot(nx, ny, nz);
+        const area = nlen * 0.5;
+        let normal;
+        if (nlen > 0) {
+          normal = [nx / nlen, ny / nlen, nz / nlen];
+        } else {
+          // 退化三角形（面積0）: 法線は定義不能。0ベクトルを返し backface 判定はしない。
+          normal = [0, 0, 0];
+        }
+        const cx3 = (va.world[0] + vb.world[0] + vc.world[0]) / 3;
+        const cy3 = (va.world[1] + vb.world[1] + vc.world[1]) / 3;
+        const cz3 = (va.world[2] + vb.world[2] + vc.world[2]) / 3;
+        const dot = worldForward[0] * normal[0] + worldForward[1] * normal[1] + worldForward[2] * normal[2];
+        const backface = (nlen > 0) ? (dot > 0) : false;
+        return {
+          indices: [ai, bi, ci],
+          worldNormal: normal,
+          worldCentroid: [cx3, cy3, cz3],
+          area,
+          backface,
+          allInFrustum: !!(va.inFrustum && vb.inFrustum && vc.inFrustum)
+        };
+      });
+
       objects[i] = {
         id: o.id ?? i,
         worldMatrix: worldM[i],
         vertices: verts,
+        triangles: triList,
         effective: { time: worldT[i], alpha: worldA[i], visible: worldV[i] }
       };
     }
@@ -400,6 +453,7 @@
     return {
       view,
       projection: proj,
+      worldForward,
       objects
     };
   }

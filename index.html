@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ai-desk — AI-Native Software Methodology (v3.5)</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-panel: #161b22;
+      --fg: #c9d1d9;
+      --fg-muted: #8b949e;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --accent-hover: #3182ce;
+      --danger: #f85149;
+      --success: #3fb950;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 1rem;
+      text-align: center;
+      background: radial-gradient(circle at 50% -20%, #1f2937 0%, var(--bg) 80%);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin: 0 0 0.5rem 0;
+      letter-spacing: -0.05em;
+      background: -webkit-linear-gradient(45deg, #58a6ff, #a371f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--fg-muted);
+      margin-bottom: 2rem;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--fg);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn.primary {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      background: #2ea043;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: var(--border);
+      text-decoration: none;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+
+    section {
+      padding: 4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+
+    .card h3 {
+      margin-top: 0;
+      color: var(--accent);
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    code, pre {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+    }
+
+    code {
+      background: rgba(110,118,129,0.4);
+      padding: 0.2em 0.4em;
+      border-radius: 3px;
+    }
+
+    pre {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+
+    .demo-frame {
+      width: 100%;
+      height: 600px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #000;
+      margin-top: 2rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 3rem 0;
+      color: var(--fg-muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <h1>ai-desk</h1>
+      <p class="subtitle">AI-Native Software Methodology (v3.5)</p>
+      <p>AIが書きやすく、人がデバッグしやすい設計原則・道具・実装デモをひとつにまとめた体系。</p>
+      
+      <div class="hero-actions">
+        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">View on GitHub</a>
+        <a href="actions/index.html" class="btn primary">Play Demos</a>
+        <a href="AI_NATIVE_MASTER_BIBLE.md" class="btn">Read the Bible</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="philosophy">
+      <h2>6つの柱 (Core Philosophy)</h2>
+      <p>人間向けの「良い設計（隠蔽・カプセル化）」は、AIの推論に必要な文脈を奪う。この非対称性を前提に、AIのポテンシャルを最大化する原則です。</p>
+      
+      <div class="grid">
+        <div class="card">
+          <h3>1. 認知の非対称性</h3>
+          <p>複雑性は人の問題、隠匿はAIの問題。カプセル化を捨て、情報を平坦に展開する。</p>
+        </div>
+        <div class="card">
+          <h3>2. 重厚関数 (Heavy Functions)</h3>
+          <p>共通ヘルパーを禁止し、関数を長く保つ（インライン化）。Emblemタグによる仮想境界で区切る。</p>
+        </div>
+        <div class="card">
+          <h3>3. 条件畳み込み (Constraint Folding)</h3>
+          <p>if/else の分岐ツリーを捨て、全可能世界を生成してから制約フィルターで結果を導出する。</p>
+        </div>
+        <div class="card">
+          <h3>4. 鉱脈採掘型開発</h3>
+          <p>ロジックを人間が書くのではなく、ランダム探索(モンテカルロ)で「正解」を掘り出し、AIが法則を合成する。</p>
+        </div>
+        <div class="card">
+          <h3>5. 複式数学 (3Dplus)</h3>
+          <p>GPU出力などのブラックボックスに対し、並走する純粋関数（Twin）で座標・状態を検算・証明する。</p>
+        </div>
+        <div class="card">
+          <h3>6. 自律観測 (AI-Eyes)</h3>
+          <p>AIが人間に報告を求めず、自律的に画面・エラーを観測し、ステップ実行でデバッグするインフラ。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tools">
+      <h2>提供するツール (Tools)</h2>
+      <p>AIがコードを編集する「手」と、実行結果を観測する「目」。</p>
+      
+      <div class="grid">
+        <div class="card">
+          <h3>✍️ ai-desk.js (手)</h3>
+          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI ツール。</p>
+          <pre><code>node ai-desk.js file.js skeleton
+node ai-desk.js file.js focus Name
+node ai-desk.js file.js apply patch.js
+node ai-desk.js file.js check</code></pre>
+        </div>
+        <div class="card">
+          <h3>👁️ ai-eyes.js (目)</h3>
+          <p>エラー自動収集、HTML/Canvasスナップショット保存、動画記録、AIからのリモート操作を受け付けるゼロ依存サーバー。</p>
+          <pre><code># AIによる自律デバッグ例
+curl -X POST localhost:3000/input \
+  -d '{"action":"eval", "code":"..."}'
+curl localhost:3000/snapshot/request</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="demos">
+      <h2>プレイアブル・デモ (Demos)</h2>
+      <p>「条件畳み込み」を実際のアクションゲーム・アルゴリズムに適用し、if文ゼロで実装されたデモ環境です。</p>
+      
+      <ul>
+        <li><a href="actions/index.html"><strong>Action Constraint Lab (v3.5)</strong></a> — キャンセル受付・先行入力・コンボ判定などを網羅した最新ラボ。</li>
+        <li><a href="action-demos.html"><strong>Action Game Constraint Demos</strong></a> — 9種類のアクションゲーム挙動をまとめたクラシックデモ。</li>
+        <li><a href="3dplus/examples/point-projection.html"><strong>3Dplus Point Projection</strong></a> — WebGL描画とCPU側算数（Twin）の突合PoC。</li>
+      </ul>
+
+      <iframe src="actions/index.html" class="demo-frame" title="Action Constraint Lab"></iframe>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>Created by <a href="https://github.com/AoyamaRito">AoyamaRito</a>. MIT License.</p>
+      <p>Based on AI-Native Master Bible v3.5</p>
+    </div>
+  </footer>
+
+</body>
+</html>

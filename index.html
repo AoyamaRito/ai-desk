@@ -1,270 +1,944 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ai-desk — AI-Native Software Methodology (v3.5)</title>
-  <style>
-    :root {
-      --bg: #0d1117;
-      --bg-panel: #161b22;
-      --bg-card: #1c2128;
-      --fg: #c9d1d9;
-      --fg-muted: #8b949e;
-      --border: #30363d;
-      --accent: #58a6ff;
-      --purple: #a371f7;
-      --success: #3fb950;
-      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      --container-width: 1100px;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ai-desk · AI が書き、AI が読む</title>
+<meta name="description" content="AIネイティブ・ソフトウェア・メソドロジー。コードを書くのはAI、読むのもAI。人間は意図を宣言し、結果を検証するだけ。">
+<meta property="og:title" content="ai-desk — AI-Native Software Methodology">
+<meta property="og:description" content="AIが書き、AIが読む。人間は意図を宣言し、結果を検証するだけ。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aoyamarito.github.io/ai-desk/">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #050505;
+  --bg2: #0c0c0c;
+  --surface: #111111;
+  --line: #232323;
+  --text: #f1f1f1;
+  --body: #c8c8c8;
+  --dim: #9a9a9a;
+  --dim2: #6e6e6e;
+  --accent: #58e1ff;
+  --accent2: #ffd33d;
+  --warn: #ff5c5c;
+  --good: #44d18b;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--body);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+               "Hiragino Sans", "Noto Sans JP", "Yu Gothic", "Inter", sans-serif;
+  font-feature-settings: "palt";
+  font-size: 17px;
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
+  overflow-x: hidden;
+}
+.mono, code, pre {
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-feature-settings: "liga" 0;
+}
+a { color: inherit; text-decoration: none; }
 
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background-color: var(--bg);
-      color: var(--fg);
-      font-family: var(--font-sans);
-      line-height: 1.7;
-      word-break: break-word;
-    }
+/* ============ Dot grid bg layer ============ */
+.grid-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+  mask-image: radial-gradient(ellipse at top, rgba(0,0,0,0.9), transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at top, rgba(0,0,0,0.9), transparent 70%);
+}
 
-    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
-    a:hover { color: #79c0ff; text-decoration: underline; }
+/* ============ Top nav ============ */
+nav.top {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 32px;
+  background: rgba(5,5,5,0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.86rem;
+}
+nav.top .brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; letter-spacing: -0.02em;
+}
+nav.top .brand .dot {
+  width: 8px; height: 8px; background: var(--accent); border-radius: 50%;
+  box-shadow: 0 0 12px var(--accent);
+}
+nav.top ul {
+  display: flex; gap: 22px; list-style: none;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.78rem; letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+nav.top ul a { color: var(--dim); transition: color 0.2s; }
+nav.top ul a:hover { color: var(--text); }
+nav.top .lang { color: var(--dim); font-size: 0.78rem; }
 
-    .container {
-      max-width: var(--container-width);
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+/* ============ Layout ============ */
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
 
-    /* --- Navigation --- */
-    nav {
-      position: sticky;
-      top: 0;
-      background: rgba(13, 17, 23, 0.8);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border);
-      z-index: 100;
-      padding: 12px 0;
-    }
-    nav .container { display: flex; justify-content: space-between; align-items: center; }
-    nav ul { list-style: none; display: flex; gap: 24px; margin: 0; padding: 0; }
-    nav a { font-size: 0.9rem; font-weight: 500; color: var(--fg-muted); }
-    nav a:hover { color: var(--fg); text-decoration: none; }
+/* ============ HERO ============ */
+.hero {
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 90px;
+  position: relative;
+}
+.hero .eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+.hero .eyebrow::before {
+  content: "▌";
+  margin-right: 10px;
+  animation: blink 1.6s steps(1) infinite;
+}
+@keyframes blink { 0%,50% { opacity:1 } 51%,100% { opacity:0 } }
+.hero h1 {
+  font-size: clamp(2.4rem, 5.6vw, 4.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  margin-bottom: 36px;
+  color: var(--text);
+}
+.hero h1 .strike {
+  color: var(--dim2);
+  text-decoration: line-through;
+  text-decoration-thickness: 3px;
+  text-decoration-color: var(--warn);
+}
+.hero h1 .ai {
+  color: var(--accent);
+  font-style: italic;
+  font-feature-settings: "ss02";
+}
+.hero .lede {
+  font-size: clamp(1.05rem, 1.4vw, 1.18rem);
+  color: var(--body);
+  max-width: 640px;
+  margin-bottom: 44px;
+  line-height: 1.95;
+}
+.hero .cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn.primary:hover { background: var(--text); border-color: var(--text); color: #000; }
+.btn .arrow { font-size: 1.1em; }
 
-    /* --- Header --- */
-    header {
-      padding: 100px 0 80px;
-      text-align: center;
-      background: radial-gradient(circle at 50% 20%, #1c2128 0%, var(--bg) 100%);
-    }
-    h1 {
-      font-size: 4rem;
-      margin: 0;
-      letter-spacing: -0.04em;
-      background: linear-gradient(to right, #58a6ff, #a371f7);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      line-height: 1.1;
-    }
-    .tagline { font-size: 1.5rem; color: var(--fg-muted); margin: 20px 0 40px; font-weight: 300; }
+.hero-meta {
+  position: absolute; bottom: 40px; left: 32px; right: 32px;
+  display: flex; justify-content: space-between; align-items: end;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.74rem; color: var(--dim2);
+  letter-spacing: 0.06em;
+}
+.hero-meta .scroll-hint::after {
+  content: " ↓"; animation: bounce 1.6s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes bounce {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
 
-    .btn-group { display: flex; gap: 16px; justify-content: center; }
-    .btn {
-      padding: 12px 24px;
-      font-size: 1rem;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      border: 1px solid var(--border);
-      background: var(--bg-panel);
-      color: var(--fg);
-    }
-    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-    .btn.primary:hover { background: #4a9eff; text-decoration: none; }
+/* ============ The single-line manifesto ============ */
+.manifesto {
+  padding: 100px 0 100px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+}
+.manifesto blockquote {
+  font-size: clamp(1.5rem, 3.2vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.55;
+  letter-spacing: 0;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 32px;
+  color: var(--text);
+}
+.manifesto blockquote::before {
+  content: "“";
+  display: block;
+  font-size: 5rem;
+  color: var(--accent);
+  line-height: 0.5;
+  margin-bottom: 14px;
+}
+.manifesto blockquote em {
+  color: var(--accent2);
+  font-style: italic;
+}
+.manifesto .cite {
+  margin-top: 32px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+}
 
-    /* --- Sections --- */
-    section { padding: 100px 0; border-bottom: 1px solid var(--border); }
-    h2 {
-      font-size: 2.25rem;
-      margin-top: 0;
-      margin-bottom: 40px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    h2::before { content: ""; display: block; width: 4px; height: 32px; background: var(--purple); border-radius: 2px; }
+/* ============ Section base ============ */
+section.s {
+  padding: 88px 0;
+  border-bottom: 1px solid var(--line);
+}
+.s-head {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+.s-head .num {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+}
+.s-head h2 {
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--text);
+}
+.s-lede {
+  color: var(--body);
+  max-width: 720px;
+  margin-bottom: 44px;
+  font-size: 1.02rem;
+  line-height: 1.9;
+}
 
-    /* --- Pillars & Cards --- */
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
-    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; height: 100%; }
-    .card h3 { margin-top: 0; font-size: 1.25rem; color: var(--accent); margin-bottom: 16px; }
-    .card p { margin: 0; color: var(--fg-muted); font-size: 0.95rem; }
+/* ============ Numbers ============ */
+.nums {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.nums .n {
+  padding: 36px 28px;
+  border-right: 1px solid var(--line);
+  position: relative;
+  background: var(--bg2);
+}
+.nums .n:last-child { border-right: none; }
+.nums .n .v {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.nums .n .v.green { color: var(--good); }
+.nums .n .v.cyan { color: var(--accent); }
+.nums .n .v.yellow { color: var(--accent2); }
+.nums .n .lab {
+  font-size: 0.75rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
 
-    /* --- Live Demo (Featured) --- */
-    .window {
-      background: var(--bg-panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.6);
-      margin-top: 40px;
-    }
-    .window-header {
-      background: #21262d;
-      padding: 12px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      border-bottom: 1px solid var(--border);
-    }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot.red { background: #ff5f56; }
-    .dot.yellow { background: #ffbd2e; }
-    .dot.green { background: #27c93f; }
-    .window-title { margin-left: auto; margin-right: auto; font-size: 0.8rem; color: var(--fg-muted); font-family: var(--font-mono); }
-    .window-content iframe { width: 100%; height: 720px; border: none; display: block; background: #000; }
+/* ============ Code-as-design ============ */
+.code-block {
+  background: #000;
+  border: 1px solid var(--line);
+  padding: 28px 32px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.code-block .k { color: var(--accent); }
+.code-block .s { color: var(--accent2); }
+.code-block .c { color: var(--dim); }
+.code-block .x { color: var(--warn); text-decoration: line-through; }
+.code-block .ok { color: var(--good); }
+.code-flow {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.92rem;
+  color: var(--dim);
+  flex-wrap: wrap;
+}
+.code-flow .step {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+.code-flow .step.hl { border-color: var(--accent); color: var(--accent); }
+.code-flow .arr { color: var(--accent); font-size: 1.4rem; }
 
-    .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 60px; }
-    .demo-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; transition: all 0.2s; }
-    .demo-card:hover { border-color: var(--accent); transform: translateY(-4px); }
-    .demo-card h3 { margin-top: 0; font-size: 1.25rem; }
-    .demo-card p { color: var(--fg-muted); font-size: 0.9rem; margin-bottom: 20px; }
+/* ============ Bento (pillars) ============ */
+.bento {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.bento .cell {
+  background: var(--bg2);
+  padding: 32px 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.bento .cell.big {
+  grid-column: 1 / 2;
+  grid-row: 1 / 3;
+  background: var(--surface);
+}
+.bento .cell .tag {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.bento .cell h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
+}
+.bento .cell.big h3 {
+  font-size: clamp(1.6rem, 2.4vw, 2rem);
+  margin-bottom: 18px;
+  line-height: 1.1;
+}
+.bento .cell p {
+  color: var(--body);
+  font-size: 0.96rem;
+  line-height: 1.85;
+}
 
-    /* --- Manifesto --- */
-    .manifesto-box { background: linear-gradient(145deg, #161b22, #0d1117); border: 1px solid var(--border); border-radius: 16px; padding: 48px; margin-top: 20px; }
-    .manifesto-item { margin-bottom: 40px; }
-    .manifesto-item h4 { font-size: 1.2rem; margin: 0 0 12px 0; color: var(--purple); }
-    .manifesto-item p { margin: 0; color: var(--fg); }
+/* ============ 4-Layer Architecture (visual flow) ============ */
+.flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  position: relative;
+}
+.flow .layer {
+  border: 1px solid var(--line);
+  padding: 28px 22px;
+  background: var(--bg2);
+  position: relative;
+  text-align: center;
+}
+.flow .layer + .layer { border-left: none; }
+.flow .layer.l3 {
+  background: linear-gradient(180deg, rgba(88,225,255,0.12), rgba(88,225,255,0.04));
+  border-color: var(--accent);
+  z-index: 2;
+  transform: scale(1.06);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(88,225,255,0.18);
+}
+.flow .layer .id {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+.flow .layer.l3 .id { color: var(--accent); }
+.flow .layer h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+.flow .layer p { font-size: 0.9rem; color: var(--body); line-height: 1.7; }
+.flow .layer.l3 p { color: var(--text); font-weight: 500; }
+.flow-note {
+  margin-top: 28px;
+  padding: 22px 26px;
+  background: var(--bg2);
+  border-left: 3px solid var(--accent);
+  font-size: 0.96rem;
+  line-height: 1.85;
+  color: var(--body);
+}
+.flow-note .key { color: var(--accent2); font-weight: 700; }
 
-    /* --- Code Block --- */
-    pre { background: #010409; padding: 20px; border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; color: #e6edf3; margin: 20px 0; }
-    code { color: #79c0ff; }
+/* ============ Versus ============ */
+.versus {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.versus .side {
+  background: var(--bg2);
+  padding: 36px 32px;
+}
+.versus .side h3 {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.versus .bad h3 { color: var(--warn); }
+.versus .good h3 { color: var(--good); }
+.versus ul { list-style: none; }
+.versus li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.95rem;
+}
+.versus li:last-child { border-bottom: none; }
+.versus li .name {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 4px;
+}
+.versus li .why { color: var(--body); font-size: 0.92rem; line-height: 1.75; }
 
-    footer { padding: 60px 0; text-align: center; color: var(--fg-muted); font-size: 0.9rem; }
+/* ============ Demo CTA ============ */
+.demo-hero {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  padding: 56px 44px;
+  position: relative;
+  overflow: hidden;
+}
+.demo-hero::before {
+  content: "";
+  position: absolute;
+  top: 0; right: -10%;
+  width: 60%; height: 100%;
+  background: radial-gradient(ellipse, rgba(88,225,255,0.18), transparent 70%);
+  pointer-events: none;
+}
+.demo-hero .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.76rem;
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+.demo-hero h3 {
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+  line-height: 1.15;
+}
+.demo-hero p {
+  color: var(--body);
+  max-width: 620px;
+  margin-bottom: 28px;
+  font-size: 1rem;
+  line-height: 1.85;
+}
+.demo-hero .cmd {
+  background: #000;
+  border: 1px solid var(--line);
+  padding: 18px 22px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  margin-bottom: 28px;
+  white-space: pre-line;
+}
+.demo-hero .cmd .c { color: var(--dim); }
+.demo-hero .cmd .ok { color: var(--good); }
 
-    @media (max-width: 768px) {
-      h1 { font-size: 2.5rem; }
-      .manifesto-box { padding: 24px; }
-      .window-content iframe { height: 500px; }
-    }
-  </style>
+/* ============ Docs grid ============ */
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.docs-grid .doc {
+  background: var(--bg2);
+  padding: 26px 24px;
+  transition: background 0.2s;
+}
+.docs-grid .doc:hover { background: var(--surface); }
+.docs-grid .doc .filename {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.docs-grid .doc h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.docs-grid .doc p {
+  font-size: 0.92rem;
+  color: var(--body);
+  line-height: 1.75;
+}
+
+/* ============ Footer ============ */
+footer {
+  padding: 80px 32px 60px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+footer .wrap {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 32px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--dim);
+}
+footer .col h5 {
+  color: var(--text);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+footer .col ul { list-style: none; }
+footer .col li { padding: 4px 0; }
+footer .col a { color: var(--dim); transition: color 0.2s; }
+footer .col a:hover { color: var(--text); }
+footer .name {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  font-size: 1rem; color: var(--text); font-weight: 700;
+  margin-bottom: 6px;
+}
+footer .small { font-size: 0.74rem; }
+
+/* ============ Mobile ============ */
+@media (max-width: 760px) {
+  nav.top { padding: 12px 18px; }
+  nav.top ul { display: none; }
+  .wrap { padding: 0 22px; }
+  .hero { min-height: auto; padding: 110px 0 80px; }
+  .hero-meta { display: none; }
+  .nums { grid-template-columns: 1fr 1fr; }
+  .nums .n:nth-child(2) { border-right: none; }
+  .nums .n:nth-child(1), .nums .n:nth-child(2) { border-bottom: 1px solid var(--line); }
+  .bento { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .bento .cell.big { grid-column: 1; grid-row: auto; }
+  .flow { grid-template-columns: 1fr; }
+  .flow .layer + .layer { border-left: 1px solid var(--line); border-top: none; }
+  .flow .layer.l3 { transform: none; }
+  .versus { grid-template-columns: 1fr; }
+  .docs-grid { grid-template-columns: 1fr; }
+}
+</style>
 </head>
 <body>
 
-  <nav>
-    <div class="container">
-      <div style="font-weight: 700; font-size: 1.2rem; color: var(--accent);">ai-desk <span style="font-size: 0.7em; opacity: 0.6;">v3.5</span></div>
+<div class="grid-bg"></div>
+
+<nav class="top">
+  <div class="brand"><span class="dot"></span> ai-desk</div>
+  <ul>
+    <li><a href="#manifesto">Manifesto</a></li>
+    <li><a href="#numbers">Proof</a></li>
+    <li><a href="#code">Code</a></li>
+    <li><a href="#arch">Layers</a></li>
+    <li><a href="#versus">vs.</a></li>
+    <li><a href="actions/" target="_blank">Live</a></li>
+    <li><a href="https://github.com/AoyamaRito/ai-desk" target="_blank">Repo</a></li>
+  </ul>
+  <div class="lang"><a href="README.en.md">EN</a></div>
+</nav>
+
+<!-- ====== HERO ====== -->
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">AI-Native Software Methodology</div>
+    <h1>
+      <span class="strike">人間が書く</span><br>
+      <span class="ai">AI</span> が書き、<span class="ai">AI</span> が読む。
+    </h1>
+    <p class="lede">
+      コードを書くのも読むのも AI。<br>
+      人間は意図を宣言し、結果を検証するだけ。<br>
+      その役割分担を成立させる原則・道具・実証実験。
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="actions/" target="_blank"><span class="arrow">▶</span> Live Demo</a>
+      <a class="btn" href="https://github.com/AoyamaRito/ai-desk" target="_blank">GitHub →</a>
+      <a class="btn" href="#manifesto">Manifesto</a>
+    </div>
+  </div>
+  <div class="hero-meta">
+    <div>v0.1.0 · MIT · OKINOI / AoyamaRito</div>
+    <div class="scroll-hint">scroll</div>
+  </div>
+</header>
+
+<!-- ====== MANIFESTO ====== -->
+<section id="manifesto" class="manifesto">
+  <blockquote>
+    <em>if</em> を書く前に、可能世界を列挙できるかを問え。<br>
+    列挙できるなら、その世界集合がそのまま<em>コード</em>である。
+  </blockquote>
+  <div class="cite" style="text-align:center; max-width:880px; margin:32px auto 0; padding:0 32px;">
+    — AI-NATIVE MASTER BIBLE §0.15
+  </div>
+</section>
+
+<!-- ====== NUMBERS ====== -->
+<section id="numbers" class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 01</span>
+      <h2>数字で語る</h2>
+    </div>
+    <p class="s-lede">主張は実装と測定で裏付けられている。fighter-cancel デモは制約畳み込みで if 文ゼロ、19/19 テスト合格、1920 世界の網羅検証で矛盾ゼロ。</p>
+    <div class="nums">
+      <div class="n">
+        <div class="v green">19/19</div>
+        <div class="lab">tests passing</div>
+      </div>
+      <div class="n">
+        <div class="v cyan">1,920</div>
+        <div class="lab">worlds verified</div>
+      </div>
+      <div class="n">
+        <div class="v yellow">50–60%</div>
+        <div class="lab">action-game bugs eliminated</div>
+      </div>
+      <div class="n">
+        <div class="v">0</div>
+        <div class="lab">if statements in core logic</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== CODE-AS-DESIGN ====== -->
+<section id="code" class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 02</span>
+      <h2>条件畳み込み</h2>
+    </div>
+    <p class="s-lede">if/else のネストの代わりに「全可能世界 → 制約 filter → 結果」で導出する。データがコード、コードがデータ。逆引きが第一級になる。</p>
+
+    <div class="code-block"><span class="c">// 純粋データとして遷移を宣言</span>
+<span class="k">const</span> TRANSITIONS = [
+  { from:<span class="s">'JAB'</span>,    input:<span class="s">'C'</span>,
+    when: s =&gt; s.hit && s.frame &gt;= <span class="s">4</span> && s.frame &lt;= <span class="s">8</span>,
+    next: <span class="ok">'SPECIAL'</span> },
+  { from:<span class="s">'STRONG'</span>, input:<span class="s">'C'</span>,
+    when: s =&gt; s.hit && s.frame &gt;= <span class="s">8</span> && s.frame &lt;= <span class="s">14</span>,
+    next: <span class="ok">'SPECIAL'</span> },
+  <span class="c">// ...</span>
+];
+
+<span class="c">// 全可能世界を制約で絞るだけ。if は無い。</span>
+<span class="k">function</span> resolve(state, input) {
+  <span class="k">return</span> TRANSITIONS
+    .filter(t =&gt; t.from === state.action && t.input === input && t.when(state))
+    .sort((a,b) =&gt; b.prio - a.prio)[<span class="s">0</span>];
+}
+
+<span class="c">// 逆引きも一発。"SPECIAL に到達する全ルート" を全列挙。</span>
+TRANSITIONS.filter(t =&gt; t.next === <span class="ok">'SPECIAL'</span>);  <span class="c">// → 3 routes</span></div>
+
+    <div class="code-flow">
+      <div class="step">all worlds</div>
+      <span class="arr">→</span>
+      <div class="step">constraint filter</div>
+      <span class="arr">→</span>
+      <div class="step hl">survivors = code</div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== PILLARS BENTO ====== -->
+<section class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 03</span>
+      <h2>4本の柱</h2>
+    </div>
+    <p class="s-lede">AI 認知の4仮説（±300行スポットライト・近接バイアス・ファイル切替コスト・推測の弱さ）から導出される設計原則。</p>
+
+    <div class="bento">
+      <div class="cell big">
+        <div class="tag">§0.0 · 認知の非対称性</div>
+        <h3>複雑性は人の問題、隠匿は AI の問題。</h3>
+        <p>人間時代の「良い設計」（DRY・抽象化・カプセル化）は人間が読みやすくするためのもの。AI に対しては、情報を物理的に分散させハルシネーションを誘発する妨害行為になる。</p>
+        <p style="margin-top:14px">人間がコードを読まない時代、最適化対象は AI である。</p>
+      </div>
+      <div class="cell">
+        <div class="tag">§0.1</div>
+        <h3>重厚関数</h3>
+        <p>共有禁止・インライン化・Emblem 境界。AI が一つの関数だけで全てを把握できる。</p>
+      </div>
+      <div class="cell">
+        <div class="tag">§0.15</div>
+        <h3>条件畳み込み</h3>
+        <p>全可能世界 → 制約 filter。逆引きが第一級、変更耐性は桁違い。</p>
+      </div>
+      <div class="cell">
+        <div class="tag">§Mining</div>
+        <h3>鉱脈採掘</h3>
+        <p>モンテカルロ + LLM 法則解読 + 制約検証。50 サンプル → 100% 復元実証済。</p>
+      </div>
+      <div class="cell">
+        <div class="tag">§ai-desk</div>
+        <h3>意図 → ローカリティ</h3>
+        <p>「いま何の目的で読むか」の単一意図に対して、必要な範囲だけを Emblem 単位で焦点化する道具。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== ARCHITECTURE ====== -->
+<section id="arch" class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 04</span>
+      <h2>4層バニラ</h2>
+    </div>
+    <p class="s-lede">情報の流れは一方向。L3 Logic は <strong>純粋関数として実装することが必須</strong>。これが守られないと体系全体が崩れる。</p>
+
+    <div class="flow">
+      <div class="layer">
+        <div class="id">L1</div>
+        <h4>Physical</h4>
+        <p>DOM・イベント・外部 I/O</p>
+      </div>
+      <div class="layer">
+        <div class="id">L2</div>
+        <h4>Intent</h4>
+        <p>イベント → Command 変換</p>
+      </div>
+      <div class="layer l3">
+        <div class="id">L3 · CORE</div>
+        <h4>Logic</h4>
+        <p>(state, cmd) ⇒ newState<br><strong>pure function · 必須</strong></p>
+      </div>
+      <div class="layer">
+        <div class="id">L4</div>
+        <h4>Draw</h4>
+        <p>state を狙撃描画</p>
+      </div>
+    </div>
+
+    <div class="flow-note">
+      <span class="key">なぜ L3 が純粋でなければならないか:</span>
+      同じ入力で常に同じ出力（網羅テスト成立）。副作用ゼロ（リプレイ可能）。出力 → 入力の逆引き可能。外部状態への依存なし（隠匿問題の解消）。これらすべてが純粋性に依存している。
+    </div>
+  </div>
+</section>
+
+<!-- ====== VERSUS ====== -->
+<section id="versus" class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 05</span>
+      <h2>業界常識への正面からの否定</h2>
+    </div>
+    <p class="s-lede">人間時代のベストプラクティスの多くは、AI に対しては逆効果になる。仮説からの帰結。</p>
+
+    <div class="versus">
+      <div class="side bad">
+        <h3>✗ Antipatterns</h3>
+        <ul>
+          <li>
+            <span class="name">アテンション分散型 TDD</span>
+            <span class="why">テスト・コードのファイル分離、目的不明の増分サイクル</span>
+          </li>
+          <li>
+            <span class="name">DRY · 共通ヘルパー抽出</span>
+            <span class="why">参照先への切替コストで認知破壊</span>
+          </li>
+          <li>
+            <span class="name">抽象化 · カプセル化</span>
+            <span class="why">人間には複雑さの隠蔽、AI には情報の隠匿</span>
+          </li>
+          <li>
+            <span class="name">SQL · RDBMS</span>
+            <span class="why">暗黙知の塊・逆引き不能・状態破壊（四重違反）</span>
+          </li>
+          <li>
+            <span class="name">「読み手が推測する」前提のコメント省略</span>
+            <span class="why">AI は推測できない</span>
+          </li>
+        </ul>
+      </div>
+      <div class="side good">
+        <h3>✓ Recommended</h3>
+        <ul>
+          <li>
+            <span class="name">E2E テスト</span>
+            <span class="why">目的の単一性が構造的に保証される</span>
+          </li>
+          <li>
+            <span class="name">網羅型テスト群</span>
+            <span class="why">全可能世界を1ファイルに集約</span>
+          </li>
+          <li>
+            <span class="name">JSON Event Sourcing + 直列ハッシュ</span>
+            <span class="why">履歴不滅・暗号学的整合性・任意時点再現</span>
+          </li>
+          <li>
+            <span class="name">Emblem 境界 + ai-desk</span>
+            <span class="why">意図に対するローカリティ提供</span>
+          </li>
+          <li>
+            <span class="name">重厚関数 · インライン展開</span>
+            <span class="why">一つの関数で完結、AI が迷わない</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DEMO ====== -->
+<section class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 06</span>
+      <h2>触れる証拠</h2>
+    </div>
+
+    <div class="demo-hero">
+      <div class="label">Live · 30 seconds</div>
+      <h3>fighter-cancel — 制約畳み込みで<br>格闘ゲームのキャンセルチェーン</h3>
+      <p>キャンセル受付・先行入力・hit確認をすべて <code>if</code> ゼロ・データだけで宣言。サイドペインに「現在状態に到達する全ルート」を逆引きで常時表示。</p>
+      <div class="cmd"><span class="c"># 1920世界の網羅検証を node のみで実行</span>
+git clone https://github.com/AoyamaRito/ai-desk
+cd ai-desk
+node --test actions/tests/fighter-cancel.test.js
+<span class="ok">→ 19/19 pass · 0 contradictions</span></div>
+      <a class="btn primary" href="actions/" target="_blank"><span class="arrow">▶</span> Open Lab</a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== DOCS ====== -->
+<section class="s">
+  <div class="wrap">
+    <div class="s-head">
+      <span class="num">// 07</span>
+      <h2>体系の正典</h2>
+    </div>
+    <p class="s-lede">5本のドキュメントで体系全体が読める。Bible が正典、Manifesto が認知特性、Prompt が制約畳み込み実装ガイド、Discussion が鉱脈採掘パラダイム、Action Guide がアクションゲーム適用。</p>
+
+    <div class="docs-grid">
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/AI_NATIVE_MASTER_BIBLE.md" target="_blank">
+        <div class="filename">AI_NATIVE_MASTER_BIBLE.md</div>
+        <h4>正典</h4>
+        <p>認知非対称性 → 重厚関数 → 4層 → REAL/SHADOW → 3Dplus → イベントソーシング → 複式数学</p>
+      </a>
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/AI_UNDERSTANDING_MANIFESTO.md" target="_blank">
+        <div class="filename">AI_UNDERSTANDING_MANIFESTO.md</div>
+        <h4>AI 認知特性</h4>
+        <p>±300行スポットライト・近接バイアス・ファイル切替コスト・推測の弱さ vs 複雑計算への強さ</p>
+      </a>
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/PROMPT_constraint_folding.md" target="_blank">
+        <div class="filename">PROMPT_constraint_folding.md</div>
+        <h4>制約畳み込み実装ガイド</h4>
+        <p>適用判定・テンプレート・測定エビデンス・LLM への具体的指示まで完備</p>
+      </a>
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/DISCUSSION_constraint_library.md" target="_blank">
+        <div class="filename">DISCUSSION_constraint_library.md</div>
+        <h4>鉱脈採掘パラダイム</h4>
+        <p>送料計算 PoC: 50 サンプル → 100% 法則復元の実証実験</p>
+      </a>
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/actions/ACTION_NATIVE_FOLDING_GUIDE.md" target="_blank">
+        <div class="filename">actions/ACTION_NATIVE_FOLDING_GUIDE.md</div>
+        <h4>アクションゲーム適用</h4>
+        <p>三層畳み込み（Physics × Action × Attribute）でバグを物理的に絶滅</p>
+      </a>
+      <a class="doc" href="https://github.com/AoyamaRito/ai-desk/blob/master/README.md" target="_blank">
+        <div class="filename">README.md</div>
+        <h4>全体サマリ</h4>
+        <p>本サイトの主張の完全版。アンチパターン詳細・SQL 批判・永続化戦略を含む</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ====== FOOTER ====== -->
+<footer>
+  <div class="wrap">
+    <div class="col">
+      <div class="name">ai-desk</div>
+      <div class="small">AI-Native Software Methodology</div>
+      <div class="small" style="margin-top:14px">© 2026 沖井広行 (Hiroyuki OKINOI)<br>/ AoyamaRito (蒼山りと)</div>
+      <div class="small" style="margin-top:8px">MIT License</div>
+    </div>
+    <div class="col">
+      <h5>System</h5>
       <ul>
-        <li><a href="#philosophy">思想</a></li>
-        <li><a href="#live-lab">LIVEデモ</a></li>
-        <li><a href="#manifesto">マニフェスト</a></li>
-        <li><a href="#tools">ツール</a></li>
+        <li><a href="https://github.com/AoyamaRito/ai-desk" target="_blank">GitHub Repo</a></li>
+        <li><a href="actions/" target="_blank">Live Lab</a></li>
+        <li><a href="action-demos.html" target="_blank">9 Action Demos</a></li>
       </ul>
     </div>
-  </nav>
-
-  <header>
-    <div class="container">
-      <h1>AI-Native Software <br> Methodology</h1>
-      <p class="tagline">AIが書きやすく、人がデバッグしやすい設計原則の集大成</p>
-      <div class="btn-group">
-        <a href="#live-lab" class="btn primary">LIVEデモを体験</a>
-        <a href="https://github.com/AoyamaRito/ai-desk" class="btn">GitHub</a>
-      </div>
+    <div class="col">
+      <h5>Docs</h5>
+      <ul>
+        <li><a href="https://github.com/AoyamaRito/ai-desk/blob/master/AI_NATIVE_MASTER_BIBLE.md" target="_blank">Bible</a></li>
+        <li><a href="https://github.com/AoyamaRito/ai-desk/blob/master/AI_UNDERSTANDING_MANIFESTO.md" target="_blank">Manifesto</a></li>
+        <li><a href="https://github.com/AoyamaRito/ai-desk/blob/master/README.md" target="_blank">README (JP)</a></li>
+        <li><a href="README.en.md">README (EN)</a></li>
+      </ul>
     </div>
-  </header>
-
-  <main class="container">
-    
-    <section id="philosophy">
-      <h2>6つの柱 (The 6 Pillars)</h2>
-      <div class="grid">
-        <div class="card"><h3>1. 認知の非対称性</h3><p>複雑性は人の問題、隠匿はAIの問題。カプセル化を捨て、情報を平坦に展開する。</p></div>
-        <div class="card"><h3>2. 重厚関数 (Heavy Functions)</h3><p>共通ヘルパーを禁止し、関数を自己完結させる。インライン化を極大化し、AIの「視界」を最適化する。</p></div>
-        <div class="card"><h3>3. 条件畳み込み</h3><p>if/elseの分岐を「データ」に変換。全可能世界の集合を制約でフィルタリングする宣言的ロジック。</p></div>
-        <div class="card"><h3>4. 鉱脈採掘パラダイム</h3><p>ロジックを設計せず、探索で得た数値からAIに法則を逆合成させる新パラダイム。</p></div>
-        <div class="card"><h3>5. 複式数学 (3Dplus)</h3><p>GPU出力を信じず、並走する純粋関数（Twin）で検算する。描画の不具合を論理的に証明可能にする。</p></div>
-        <div class="card"><h3>6. 自律観測 (AI-Eyes)</h3><p>人間を介さないデバッグ。AI自身が画面とエラーを自律的に監視し、修正を行う。</p></div>
-      </div>
-    </section>
-
-    <section id="live-lab">
-      <h2>Interactive Live Lab</h2>
-      <p style="color: var(--fg-muted);">「条件畳み込み」を実際のアクションゲームに適用した実働環境です。if文を排除したロジックの透明性を体験してください。</p>
-      <div class="window">
-        <div class="window-header">
-          <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
-          <div class="window-title">Action Constraint Lab — v3.5</div>
-        </div>
-        <div class="window-content"><iframe src="actions/index.html"></iframe></div>
-      </div>
-      <div class="demo-grid">
-        <div class="demo-card">
-          <h3>3Dplus Point Projection</h3>
-          <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明するデモ。</p>
-          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn">デモを開く ↗</a>
-        </div>
-        <div class="demo-card">
-          <h3>Legacy Action Demos</h3>
-          <p>9種類のアクションゲーム挙動をまとめたクラシックな実装例。</p>
-          <a href="action-demos.html" target="_blank" class="btn">デモを開く ↗</a>
-        </div>
-      </div>
-    </section>
-
-    <section id="manifesto">
-      <h2>AI理解の真実 (Manifesto)</h2>
-      <div class="manifesto-box">
-        <div class="manifesto-item"><h4>📍 「上下300行」のスポットライト</h4><p>AIは今読んでいる場所から離れた情報を急速に忘却する。重要な前提は、答えを出させる場所の「近接」に配置しなければならない。</p></div>
-        <div class="manifesto-item"><h4>📂 ファイル移動という重労働</h4><p>指示を複数のファイルに跨がせることは認知を破壊する。可能な限り単一ファイル・単一スコープに情報を凝縮せよ。</p></div>
-        <div class="manifesto-item"><h4>🧩 究極の非対称性</h4><p>AIは「推論」が弱く、「情報の計算」には神のごとき強さを持つ。人間がすべきは推論の余地を消し、情報を揃えることだ。</p></div>
-        <div class="manifesto-item"><h4>📝 指示に「余白」を残す</h4><p>形式に固執する機械的なルールは、計算リソースを浪費させる。前提さえ揃えれば、あとはAIの「最適な確率」を信じよ。</p></div>
-      </div>
-    </section>
-
-    <section id="tools">
-      <h2>実装ツール (Tools)</h2>
-      <div class="grid">
-        <div class="card">
-          <h3>ai-desk.js</h3>
-          <p>巨大ファイルを Emblem タグで仮想分割し、AIがコンテキストを失わずに局所更新するための CLI。</p>
-          <pre><code># 構造把握
-ai-desk app.js skeleton
-# 部分適用
-ai-desk app.js apply patch.js</code></pre>
-        </div>
-        <div class="card">
-          <h3>ai-eyes.js</h3>
-          <p>ブラウザの実行状態をAIが自律的に監視するサーバー。エラーログ、HTML/Canvasスナップショット、動画記録に対応。</p>
-          <pre><code># AIからの操作要求
-curl -X POST localhost:3000/input \
-  -d '{"action":"click", "target":"#btn"}'</code></pre>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="container">
-      <p>© 2026 AoyamaRito | <a href="AI_NATIVE_MASTER_BIBLE.md">AI-Native Master Bible v3.5</a> 準拠</p>
+    <div class="col">
+      <h5>Cite</h5>
+      <ul>
+        <li>AoyamaRito (2026)</li>
+        <li>ai-desk: AI-Native</li>
+        <li>Software Methodology</li>
+        <li><a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a></li>
+      </ul>
     </div>
-  </footer>
+  </div>
+</footer>
 
-  <script>
-    document.querySelectorAll('nav a').forEach(anchor => {
-      anchor.addEventListener('click', function(e) {
-        e.preventDefault();
-        document.querySelector(this.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
-      });
-    });
-  </script>
 </body>
 </html>

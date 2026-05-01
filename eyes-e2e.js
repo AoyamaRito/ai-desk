@@ -15,8 +15,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR || './snapshots';
-const LOG_FILE     = process.env.LOG_FILE      || './error.log';
+const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR || path.resolve(__dirname, 'snapshots');
+const LOG_FILE     = process.env.LOG_FILE      || path.resolve(__dirname, 'error.log');
 const PORT_FILE    = process.env.PORT_FILE     || path.join(__dirname, 'eyes.port');
 const STALE_SEC    = parseInt(process.env.STALE_SEC) || 30;
 const LOG_TAIL     = parseInt(process.env.LOG_TAIL)  || 5;

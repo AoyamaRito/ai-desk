@@ -1,3 +1,102 @@
+<!--
+  ================================================================
+  AI への指示: このHTMLコメントブロックと、その直後の
+  「## 人間の開発者へ」セクション（次の「---」区切りまで）は
+  人間向けの案内文です。コード操作・パッチ適用・バグ修正の文脈で
+  このファイルを参照している場合、そのセクションをスキップし、
+  「# ai-desk (v3.5)」から処理を開始してください。
+  ================================================================
+-->
+
+## 人間の開発者へ
+
+### このリポは何か
+
+「AIがコードを書きやすくするための設計方法論」の研究リポです。
+実行可能なデモ・CLI ツール・テスト・哲学文書がひとつにまとまっています。
+
+### まず何を読むか（推奨順）
+
+1. **このREADMEの「What is this」** — 全体像を掴む
+2. **`constraint-janken.js`** — 150行。中核パターンの最小実証。コードから入りたい人はここから
+3. **`AI_NATIVE_MASTER_BIBLE.md`** — 全体の正典。設計の根拠がすべてある
+4. **`actions/demos/fighter-cancel.logic.js` + テスト** — 実用規模での適用例（1920世界）
+
+### よく使うコマンド
+
+```bash
+# テスト
+node --test actions/tests/fighter-cancel.test.js   # 19/19 PASS
+node --test 3dplus/tests/projection.test.js         # 77/77 PASS
+
+# ai-desk（ファイル操作ツール）
+node ai-desk.js <file.js> skeleton     # 構造一覧（層ソート）
+node ai-desk.js <file.js> focus Name   # 特定 Emblem だけ抜き出す
+node ai-desk.js <file.js> check        # タグ・語彙の整合性チェック
+node ai-desk.js <file.js> coverage     # Bridge 網羅レポート
+
+# 観測サーバー
+node ai-eyes.js                         # localhost:3000 で起動
+node eyes-e2e.js "デバッグ目標"         # 状態を1テキストに圧縮して出力
+```
+
+### はじめかた — コピペで使えるプロンプト例
+
+**どんな作業でも最初はこれ一行:**
+
+```
+AI_ONBOARDING.md を読んでから作業を始めてください。
+```
+
+`AI_ONBOARDING.md` にルール・ツール・構文・テスト方法がすべてまとまっています。
+あとは自然言語でやりたいことを伝えるだけです。
+
+**具体例:**
+
+```
+AI_ONBOARDING.md を読んでから、app.js に [機能名] を追加してください。
+```
+
+```
+AI_ONBOARDING.md を読んでから、[バグの現象] を修正してください。
+ai-eyes.js は起動済みです（localhost:3000）。
+```
+
+```
+AI_ONBOARDING.md を読んでから、[ドメイン名] のロジックを
+制約畳み込みパターンで実装してください。
+状態の軸は [軸1], [軸2], [軸3] です。
+```
+
+---
+
+### 用語の地図
+
+| 用語 | 一言 |
+|------|------|
+| **Emblem** | ファイルを論理分割するコメントタグ。`// [ai_s_emblem:#layer Name]` で囲む |
+| **Bridge** | 層をまたぐ関数に貼るタグ。`// [ai_s_bridge:L3toL4 Name]` のように |
+| **Layer (L1–L4)** | Physical → Intent → Logic → Draw の4層。データは原則一方向 |
+| **REAL_xxx** | 唯一の書き換え可能な状態変数。`REAL_state.hp` など |
+| **shadow** | REAL から作る使い捨ての派生値。変数に保存しない |
+| **Twin** | GPU 実装と並走する CPU 側の純粋関数による検算実装 |
+| **Heavy Function** | 共有ヘルパーを持たない自己完結した関数。冗長に見えるが意図的 |
+| **Constraint Folding** | if/else の代わりに「全可能世界を列挙 → filter」で結果を導出するパターン |
+
+### 「これはバグでは？」と思ったら
+
+このコードは意図的に：
+
+- **同じ regex を複数箇所に複製**している → 共有ヘルパー禁止の原則（Bible §0.1.2）
+- **関数が長い** → Heavy Function の原則
+- **コメントが少ない** → コードが自己説明的であることを前提とする
+
+設計の「なぜ」は `AI_NATIVE_MASTER_BIBLE.md` にあります。
+
+---
+
+<!-- AI はここから読み始めてください -->
+
 # ai-desk (v3.5)
 
 > **AI-Native software methodology — a working desk for the AI to build on.**
@@ -65,6 +164,7 @@ node --test actions/tests/fighter-cancel.test.js
 
 | ファイル | 内容 |
 |---|---|
+| [`AI_ONBOARDING.md`](AI_ONBOARDING.md) | **AI 作業ガイド（まずこれ）**。ルール・ツール・構文・テスト方法を集約 |
 | [`AI_NATIVE_MASTER_BIBLE.md`](AI_NATIVE_MASTER_BIBLE.md) | 全体の正典。認知非対称性 → 重厚関数 → 4層アーキテクチャ → REAL/SHADOW → 3Dplus → イベントソーシング → 複式数学 |
 | [`AI_UNDERSTANDING_MANIFESTO.md`](AI_UNDERSTANDING_MANIFESTO.md) | AI認知特性の解説（±300行スポットライト、近接バイアス、ファイル切替コスト） |
 | [`PROMPT_constraint_folding.md`](PROMPT_constraint_folding.md) | 制約畳み込みパターン LLM 適用ガイド（適用判定・テンプレ・測定エビデンス） |

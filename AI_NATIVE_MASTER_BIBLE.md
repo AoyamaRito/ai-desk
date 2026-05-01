@@ -131,6 +131,18 @@ AIは「見えない環境」で人間からの報告を待つ受け身の姿勢
 - **shadow(REAL, 用途)**: REAL から作る使い捨ての派生値。**「保持（変数への保存）禁止」**。使う瞬間に生成し、使い終わったら捨てる。
 - **一方向変換**: REAL → SHADOW への変換のみを許可。
 
+```js
+// REAL_state: L3 が唯一書き換える
+const REAL_state = { hp: 100, x: 0 };
+
+// L4: 描画のたびにその場で生成して即捨て（変数に保存しない）
+renderHpBar(REAL_state.hp / 100);          // ← shadow（使い捨て）
+renderSprite(REAL_state.x * PIXEL_SCALE);  // ← shadow（使い捨て）
+
+// NG: shadow を変数に保持する → 同期漏れの温床
+const shadow_hp = REAL_state.hp / 100;    // 次フレームで REAL が変わっても古いまま
+```
+
 ## 4. 3Dplus 時空座標系 (§因果の投影)
 次元に依存しない、親子関係における状態投影の枠組み。
 - **純粋一方向変換**: 「ローカル座標」と「ワールド座標」を絶対に混ぜない。

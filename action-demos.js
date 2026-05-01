@@ -61,6 +61,44 @@ function meta(upper, lower) {
 }
 // [/ai_s_emblem: Compose-Core]
 
+// [ai_s_emblem:#high#logic Lazy-Core]
+// 世界爆発対策。Cartesian積をジェネレータで遅延生成し、_takeで早期終了する。
+// 使い分け: 軸の総積が ~10万 を超える / _take:1 で「存在確認」するとき → lazy。
+// 小規模ドメイン(< 1万) は Eager の方が読みやすく速い。
+
+function* lazyCartesian(axisMap) {
+  const entries = Object.entries(axisMap);
+  function* gen(i, curr) {
+    if (i === entries.length) { yield { ...curr }; return; }
+    const [key, vals] = entries[i];
+    for (const v of vals) {
+      curr[key] = v;
+      yield* gen(i + 1, curr);
+    }
+  }
+  yield* gen(0, {});
+}
+
+function filterLazy(genFn, derive, constraints, opts = {}) {
+  // _take: metadata key (skipped as filter field). Sets early-exit limit — stop after N matches.
+  const take = (constraints._take != null) ? constraints._take : (opts.take || Infinity);
+  const results = [];
+  for (const base of genFn()) {
+    const world = derive ? { ...base, ...derive(base) } : base;
+    let match = true;
+    for (const [k, v] of Object.entries(constraints)) {
+      if (k.startsWith('_')) continue;
+      if (world[k] !== v) { match = false; break; }
+    }
+    if (match) {
+      results.push(world);
+      if (results.length >= take) break;
+    }
+  }
+  return results;
+}
+// [/ai_s_emblem: Lazy-Core]
+
 // [ai_s_emblem:#high#logic Hitbox-Collision]
 // デモ1: 攻撃者位置 × 防御者位置 × フレーム の可能世界から、
 // 「攻撃判定が出ているフレーム × 距離が射程内」の世界だけ残す。
@@ -95,6 +133,36 @@ function hitbox(constraints = {}) {
   return { _worlds: worlds.length, _worlds_raw: worlds };
 }
 // [/ai_s_emblem: Hitbox-Collision]
+
+// [ai_s_emblem:#high#logic Hitbox-Lazy]
+// デモ1の遅延版。同一ロジック・同一制約インターフェース。
+// _take:N で N件見つかり次第ストップ。_take:1 で「この状態は hit可能か?」を O(1) に近い速度で確認。
+// 逆引き { hit: true, _take: 1 } → 最初のヒット世界だけ返す（全175世界を走査しない）。
+function hitboxLazy(constraints = {}) {
+  const ATTACK_FRAMES = [3, 4, 5];
+  const RANGE = 15;
+
+  const worlds = filterLazy(
+    () => lazyCartesian({
+      attacker: [0, 10, 20, 30, 40],
+      defender: [0, 10, 20, 30, 40],
+      frame:    [1, 2, 3, 4, 5, 6, 7]
+    }),
+    ({ attacker, defender, frame }) => {
+      const attacking = ATTACK_FRAMES.includes(frame);
+      const distance  = Math.abs(attacker - defender);
+      const inRange   = distance <= RANGE;
+      return { attacking, distance, inRange, hit: attacking && inRange };
+    },
+    constraints
+  );
+
+  if (worlds.length === 0) {
+    return { _contradiction: true, _message: `Hitbox-Lazy: no world for ${JSON.stringify(constraints)}` };
+  }
+  return { _worlds: worlds.length, _worlds_raw: worlds, _lazy: true };
+}
+// [/ai_s_emblem: Hitbox-Lazy]
 
 // [ai_s_emblem:#high#logic Invincibility]
 // デモ2: フレーム × 攻撃の有無 × 無敵の有無 から damage = attack ∧ ¬invincible。
@@ -474,6 +542,12 @@ function runDemos() {
   line('Demo 9: Combo Finder');
   show('LP始動→HAD終わり', { starter: 'LP', ender: 'HAD' }, comboFinder);
   show('MP始動→HAD終わり', { starter: 'MP', ender: 'HAD' }, comboFinder);
+
+  line('Lazy Demo: Hitbox-Lazy vs Hitbox (世界爆発対策)');
+  show('Lazy: 全ヒット世界 (遅延生成)', { hit: true }, hitboxLazy);
+  show('Lazy: _take:1 で最初の1件だけ', { hit: true, _take: 1 }, hitboxLazy);
+  show('Lazy: 矛盾 (距離40でヒット?)', { distance: 40, hit: true }, hitboxLazy);
+  show('Eager: 同等クエリ (比較用)', { hit: true }, hitbox);
 
   line('All demos completed.');
 }

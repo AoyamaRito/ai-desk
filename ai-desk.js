@@ -22,6 +22,7 @@ Modes:
   focus <Name>       Extract the exact source of the specified emblem or bridge.
   apply <patch>      Replace emblems/bridges in target matching the patch's names.
   check              Verify emblem/bridge integrity (nesting, uniqueness, completeness).
+  coverage           Bridge coverage report. Which layer transitions have bridges declared.
   miner <data.json>  [AI-Only] Extract logic (laws) from data and synthesize code.
 
 Format (emblem):
@@ -76,6 +77,7 @@ switch (mode) {
   case 'focus':    runFocus(filePath, extraArgs[0]); break;
   case 'apply':    runApply(filePath, extraArgs[0]); break;
   case 'check':    runCheck(filePath); break;
+  case 'coverage': runCoverage(filePath); break;
   case 'miner':    runMiner(extraArgs[0]); break;
   default:
     console.error(`Unknown mode: ${mode}`);
@@ -203,6 +205,14 @@ function runCheck(filePath) {
   const code = fs.readFileSync(filePath, 'utf8');
 
   let errors = 0;
+  let warnings = 0;
+
+  const KNOWN_TAGS = new Set([
+    '#high', '#mid', '#low',
+    '#L1', '#L2', '#L3', '#L4',
+    '#physical', '#intent', '#logic', '#draw',
+    '#verify', '#OutOfLayers', '#config'
+  ]);
 
   // Emblem 検査（既存ロジックそのまま）。
   const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
@@ -219,6 +229,12 @@ function runCheck(filePath) {
       errors++;
     }
     emblemNames.add(name);
+    for (const tag of (m[1].match(/#\w+/g) || [])) {
+      if (!KNOWN_TAGS.has(tag)) {
+        console.warn(`  Warning: emblem '${name}' has unrecognized tag '${tag}' — possible typo.`);
+        warnings++;
+      }
+    }
     parsedEmblems++;
   }
   const emblemStarts = (code.match(/\/\/ \[ai_s_emblem:/g) || []).length;
@@ -233,18 +249,23 @@ function runCheck(filePath) {
   }
 
   // Bridge 検査（独立 regex / 独立カウンタ §0.1.2 共有禁止）。
-  // 方向の妥当性 (LxtoLy 等) はチェックしない: 原則は強制しない。構造のみ守る。
+  // 方向は原則強制しないが、非標準パターンは警告する（typo検知）。
   const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+  const CANONICAL_DIR_RE = /^L[1-4]to(L[1-4]|Persistent|Network|Verify)$/;
   let parsedBridges = 0;
   const bridgeNames = new Set();
   while ((m = BRIDGE_RE.exec(code)) !== null) {
-    const name = m[2];
+    const dir = m[1], name = m[2];
     if (m[3].includes('// [ai_s_emblem:') || m[3].includes('// [ai_s_bridge:')) {
       console.warn(`Warning: Potential nested tag detected inside bridge '${name}'. Tags should be flat.`);
     }
     if (bridgeNames.has(name)) {
       console.error(`Error: Duplicate bridge name found: '${name}'`);
       errors++;
+    }
+    if (!CANONICAL_DIR_RE.test(dir)) {
+      console.warn(`  Warning: bridge '${name}' has non-canonical direction '${dir}' — expected L[1-4]to(L[1-4]|Persistent|Network|Verify).`);
+      warnings++;
     }
     bridgeNames.add(name);
     parsedBridges++;
@@ -261,13 +282,86 @@ function runCheck(filePath) {
   }
 
   if (errors === 0) {
-    console.log(`✓ All ${parsedEmblems} emblems and ${parsedBridges} bridges are valid and unique.`);
+    const warnSuffix = warnings > 0 ? ` ⚠ ${warnings} tag/direction warning(s).` : '';
+    console.log(`✓ All ${parsedEmblems} emblems and ${parsedBridges} bridges are valid and unique.${warnSuffix}`);
   } else {
-    console.log(`✗ Found ${errors} error(s) in tag structure.`);
+    const warnNote = warnings > 0 ? ` (+ ${warnings} warning(s))` : '';
+    console.log(`✗ Found ${errors} error(s) in tag structure.${warnNote}`);
     process.exit(1);
   }
 }
 // [/ai_s_emblem: Run-Check]
+
+// [ai_s_emblem:#high#logic Run-Coverage]
+function runCoverage(filePath) {
+  const code = fs.readFileSync(filePath, 'utf8');
+  const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
+  const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+
+  const layerCounts = { L1: 0, L2: 0, L3: 0, L4: 0, Verify: 0 };
+  let m;
+  while ((m = EMBLEM_RE.exec(code)) !== null) {
+    const meta = m[1];
+    if      (/#L1\b|#physical\b/.test(meta))  layerCounts.L1++;
+    else if (/#L2\b|#intent\b/.test(meta))    layerCounts.L2++;
+    else if (/#L3\b|#logic\b/.test(meta))     layerCounts.L3++;
+    else if (/#L4\b|#draw\b/.test(meta))      layerCounts.L4++;
+    else if (/#verify\b/.test(meta))          layerCounts.Verify++;
+  }
+
+  const bridges = new Map();
+  while ((m = BRIDGE_RE.exec(code)) !== null) {
+    const dir = m[1];
+    if (!bridges.has(dir)) bridges.set(dir, []);
+    bridges.get(dir).push(m[2]);
+  }
+
+  const layerSummary = Object.entries(layerCounts)
+    .filter(([, n]) => n > 0)
+    .map(([l, n]) => `${l}(${n})`)
+    .join('  ');
+  const bridgeSummary = bridges.size > 0
+    ? [...bridges.entries()].map(([d, ns]) => `${d}(${ns.join(',')})`).join('  ')
+    : '(none)';
+
+  console.log(`[Coverage] ${filePath}\n`);
+  console.log(`Layer emblems: ${layerSummary || '(none)'}`);
+  console.log(`Bridges:       ${bridgeSummary}\n`);
+
+  const CORE_TRANSITIONS = [
+    { dir: 'L1toL2', from: 'L1', to: 'L2' },
+    { dir: 'L2toL3', from: 'L2', to: 'L3' },
+    { dir: 'L3toL4', from: 'L3', to: 'L4' },
+    { dir: 'L4toVerify', from: 'L4', to: 'Verify' },
+  ];
+
+  let warnings = 0;
+  console.log('Transition check:');
+  for (const { dir, from, to } of CORE_TRANSITIONS) {
+    const fromPresent = layerCounts[from] > 0;
+    const toPresent   = layerCounts[to]   > 0;
+    if (!fromPresent || !toPresent) continue;
+    if (bridges.has(dir)) {
+      console.log(`  OK   ${from} → ${to}  [${bridges.get(dir).join(', ')}]`);
+    } else {
+      console.log(`  WARN ${from} → ${to}  (no bridge — both layers present)`);
+      warnings++;
+    }
+  }
+
+  const extraBridges = [...bridges.keys()].filter(d => !CORE_TRANSITIONS.find(t => t.dir === d));
+  if (extraBridges.length > 0) {
+    console.log(`  OK   extra bridges: ${extraBridges.join(', ')}`);
+  }
+
+  console.log('');
+  if (warnings === 0) {
+    console.log(`✓ No missing bridges detected.`);
+  } else {
+    console.log(`⚠ ${warnings} potential gap(s). (Informational — Bible §2: 原則は強制しない)`);
+  }
+}
+// [/ai_s_emblem: Run-Coverage]
 
 // [ai_s_emblem:#high#logic Run-Apply]
 function runApply(filePath, patchPath) {

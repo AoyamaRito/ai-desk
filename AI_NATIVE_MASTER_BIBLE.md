@@ -74,6 +74,65 @@ AI向けコードにおいて、ローカリティは最優先の設計原則で
 
 これを大きく超える `style.css` は、要素固有のスタイルが侵入している兆候。inline へ戻すリファクタリングを検討せよ。
 
+## 0.3 Canvas 2D UI パターン (§Canvas UI)
+
+DOM ではなく Canvas でゲームUIを構築する場合の4層適用ルール。最小実証は `canvas-ui-sample.js`。
+
+### 層への割り当て
+
+| 要素 | 層 | 理由 |
+|---|---|---|
+| マウス座標取得・ヒットテスト | **L2 Intent** | 座標を Command JSON に変換して完結させる。L3 に座標を渡さない |
+| 画面遷移（title/playing/pause/gameover） | **L3 Logic（constraint folding）** | 有限離散状態 → 全遷移をデータで宣言、if/else ゼロ |
+| HP・スコアなどのゲーム状態 | **L3 Logic（applyCommand）** | 純粋 Reducer。同じ入力は同じ出力 |
+| ボタン・ゲージ・テキストの描画 | **L4 Draw** | `REAL_state` を受け取り Canvas に書く。状態を変えない |
+
+### REAL_state の構造
+```js
+const REAL_state = {
+  screen: 'title',          // 'title' | 'playing' | 'pause' | 'gameover'
+  score: 0,
+  hp: 100,
+  ui: { hoveredId: null },  // ホバー状態のみUI層が持つ
+};
+```
+
+### ボタン定義はデータ
+ボタンの座標・ラベル・所属画面をオブジェクトとして宣言する。描画とヒットテストの両方がこのデータを参照する（共有ヘルパーではなくデータの共有）。
+
+```js
+const BUTTONS = {
+  title_start: { x: 220, y: 260, w: 200, h: 50, label: 'START', screen: 'title' },
+  // ...
+};
+```
+
+### 画面遷移は constraint folding
+```js
+const SCREEN_TRANSITIONS = [
+  { from: 'title',   input: 'start',  to: 'playing' },
+  { from: 'playing', input: 'pause',  to: 'pause'   },
+  { from: 'playing', input: 'die',    to: 'gameover'},
+  // ...
+];
+// if/else ゼロ。無効な遷移は _contradiction で弾く
+function reduceScreen(constraints = {}) { ... }
+```
+
+### shadow の扱い（Canvas 版）
+Canvas 描画でよく現れる派生値（比率・座標計算）は shadow である。変数に保存しない。
+
+```js
+// OK: 描画の瞬間にその場で計算
+ctx.fillRect(20, 52, 200 * (state.hp / 100), 18);
+
+// NG: 変数に保存 → 次フレームで REAL_state が変わっても古いまま
+const hpRatio = state.hp / 100;
+```
+
+### 共有ヘルパー禁止（Draw 関数）
+`drawTitle` / `drawPlaying` / `drawPause` / `drawGameover` は互いにヘルパーを共有しない。ボタン描画コードが似ていても、各関数にインライン展開する。
+
 ## 1. ai-desk 協働プロトコル (§Emblem Management)
 物理的なファイル分割を禁止する代償として、`ai-desk` ツールと `Emblem` タグを用いて「仮想的な認知境界」を運用する。
 

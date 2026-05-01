@@ -176,39 +176,25 @@
     .manifesto-item p { margin: 0; color: var(--fg); }
 
     /* --- Demos --- */
-    .demo-block { margin-bottom: 80px; }
-    .demo-block:last-child { margin-bottom: 0; }
-    .demo-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      margin-bottom: 20px;
-    }
-    .demo-info h3 { margin: 0; font-size: 1.5rem; }
-    .demo-info p { margin: 8px 0 0; color: var(--fg-muted); }
-    
-    .iframe-wrapper {
-      position: relative;
-      background: #000;
-      border-radius: 12px;
-      overflow: hidden;
+    .demo-block {
+      background: var(--bg-card);
       border: 1px solid var(--border);
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      border-radius: 12px;
+      padding: 40px;
+      margin-bottom: 32px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
     }
-    .iframe-wrapper iframe {
-      width: 100%;
-      height: 700px;
-      border: none;
-      display: block;
+    .demo-block:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+      border-color: var(--accent);
     }
-    .fullscreen-btn {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      opacity: 0.6;
-    }
-    .fullscreen-btn:hover { opacity: 1; }
-
+    .demo-info h3 { margin: 0 0 12px 0; font-size: 1.75rem; color: var(--fg); }
+    .demo-info p { margin: 0; color: var(--fg-muted); font-size: 1.1rem; line-height: 1.6; }
+    
     /* --- Code Block --- */
     pre {
       background: #010409;
@@ -231,7 +217,7 @@
     @media (max-width: 768px) {
       h1 { font-size: 2.5rem; }
       .manifesto-box { padding: 24px; }
-      .iframe-wrapper iframe { height: 500px; }
+      .demo-block { padding: 24px; }
     }
   </style>
 </head>
@@ -345,30 +331,25 @@ curl -X POST localhost:3000/input \
 
     <section id="demos">
       <h2>実証デモ (Interactive Demos)</h2>
+      <p style="color: var(--fg-muted); margin-bottom: 40px;">ブラウザ上で直接動作する実装デモです。別タブで全画面表示して体験してください。</p>
       
       <div class="demo-block">
-        <div class="demo-header">
-          <div class="demo-info">
-            <h3>1. 制約畳み込み (Action Constraint Lab)</h3>
-            <p>格闘ゲーム等のキャンセルチェーン・先行入力を「if文ゼロ」のデータ駆動で制御。逆引きデバッグを体験可能。</p>
-          </div>
-          <a href="actions/index.html" target="_blank" class="btn">別タブで開く ↗</a>
+        <div class="demo-info">
+          <h3>1. 制約畳み込み (Action Constraint Lab)</h3>
+          <p>格闘ゲーム等のキャンセルチェーン・先行入力を「if文ゼロ」のデータ駆動で制御。逆引きデバッグを体験可能。</p>
         </div>
-        <div class="iframe-wrapper">
-          <iframe src="actions/index.html"></iframe>
+        <div>
+          <a href="actions/index.html" target="_blank" class="btn primary" style="font-size: 1.1rem; padding: 16px 32px;">デモを別タブで開く ↗</a>
         </div>
       </div>
 
       <div class="demo-block">
-        <div class="demo-header">
-          <div class="demo-info">
-            <h3>2. 複式数学 / 3Dplus (Point Projection)</h3>
-            <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明。赤いマーカーはCPUが算出した「論理的正解」の投影。</p>
-          </div>
-          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn">別タブで開く ↗</a>
+        <div class="demo-info">
+          <h3>2. 複式数学 / 3Dplus (Point Projection)</h3>
+          <p>GPU描画(WebGL)とCPU側算数(Twin)の完全一致を証明。赤いマーカーはCPUが算出した「論理的正解」の投影。</p>
         </div>
-        <div class="iframe-wrapper">
-          <iframe src="3dplus/examples/point-projection.html"></iframe>
+        <div>
+          <a href="3dplus/examples/point-projection.html" target="_blank" class="btn primary" style="font-size: 1.1rem; padding: 16px 32px;">デモを別タブで開く ↗</a>
         </div>
       </div>
     </section>

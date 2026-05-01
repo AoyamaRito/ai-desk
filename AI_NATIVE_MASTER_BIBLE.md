@@ -92,7 +92,8 @@ JSファイルは必ず以下のタグでセクション（機能の塊）を区
 ```
 - **Name**: 一意でセマンティックな英数字+ハイフンの名前（日本語不可）。
 - **#Importance**: `#high` (コア/論理), `#mid` (制御/UI), `#low` (初期化/定数)
-- **#Category**: `#physical`, `#intent`, `#logic`, `#draw`, `#config` 等。
+- **#Category**: `#physical`, `#intent`, `#logic`, `#draw`, `#config`, `#verify` 等。
+  `#verify` は §4.5 Twin（検証双子）に該当するセクションを示す。
 
 ## 2. 4層バニラ・アーキテクチャ (§情報の環)
 すべての情報の流れは、以下の4層を一方向にのみ流れること。
@@ -119,6 +120,27 @@ JSファイルは必ず以下のタグでセクション（機能の塊）を区
 - **純粋一方向変換**: 「ローカル座標」と「ワールド座標」を絶対に混ぜない。
 - **Level-based Projection**: 再帰を禁止し、深さ0（親）から順にループでワールド状態を確定させる。
 - **投影要素**: 位置・回転だけでなく、時間(t)、透明度(Alpha)、生存(Visibility)も「座標」として投影する。
+
+## 4.5 Twin 規約 (§Verification Twin)
+任意の層は **Twin（検証双子）** を持てる。Twin は元層と同じ入力を取り、純粋関数でJSONを返す検証実装である。複式数学（§7）の実装単位はこの Twin である。
+
+1. **直交概念**:
+   Twin は層（L1〜L4）と直交する。新しい層ではなく、層に付随する性質である。`L1〜L4` がデータフローの方向を定義するのに対し、Twin は「効率実装」と「検算実装」のペア性を定義する。
+2. **表記**:
+   `L<n>*` または `<name>_twin` と書く。例: `L4*`、`render_twin()`、`cpu3d.js (L4 twin)`。
+3. **共通契約**:
+   - 元層と**同じ入力JSON**を取る（二重定義禁止）
+   - **純粋関数**である（DOM/GPU/I/O/乱数/時刻に触れない）
+   - **段階別JSON**を返す（どの段で乖離したかを特定可能にする）
+   - 元層との**突合関数**（`assert_xxx`）が独立に存在する
+4. **典型的なTwin**:
+   - **L4\* (Draw twin)**: GPU/Canvas描画と並走するCPU側の透明な算数（`3dplus/cpu3d.js`）
+   - **L3\* (Logic twin)**: 物理エンジン・複雑Reducerの結果を別実装で検算
+   - L1/L2 の Twin は稀（DOM/Intentは比較的薄いため通常不要）
+5. **Twin と SHADOW の違い**（§3との混同を避ける）:
+   - SHADOW: REALから派生する**表示・操作用の派生値**。一方向変換の結果。
+   - Twin: 元層と並走する**検算実装**。突合のために存在する。
+   両者は別の概念であり、`SHADOW_xxx` と `xxx_twin` を混同してはならない。
 
 ## 5. データ永続化と証明 (§Persistence & Cryptography)
 サーバーのDBに依存せず、データの信頼性と歴史をローカルで担保するための原則。
@@ -148,19 +170,75 @@ AI-Native 開発において、Emblem は「地図」である。地図のない
 
 ## 7. AI専用の複式数学 (§Double-Entry Verification)
 
-ブラックボックス化しやすい外部システム（GPU/WebGL, 物理エンジン, 外部API）に対して、AIは以下の「複式数学」による検証を行わなければならない。
+ブラックボックス化しやすい外部システム（GPU/WebGL, 物理エンジン, 外部API）に対して、AIは以下の「複式数学」による検証を行わなければならない。実装単位は §4.5 の **Twin** である。
 
 1. **効率層 (Execution Layer)**:
    通常の開発では、書きやすさと実行効率を優先し、既存のライブラリやGPU機能を活用せよ。ここでの「隠蔽」は実行速度のために許容される。
-2. **検証層 (Validation Layer / 3Dplus)**:
-   「バグが疑われる箇所」や「論理的な核心部分」において、AIは自身の認知が及ぶ「透明な重厚関数（ベタ書きされた純粋な算数）」を一時的に注入せよ。
+2. **検証層 = Twin (§4.5)**:
+   「バグが疑われる箇所」や「論理的な核心部分」において、AIは自身の認知が及ぶ「透明な重厚関数（ベタ書きされた純粋な算数）」を Twin として並走させよ。
 3. **数値による証明**:
-   ブラックボックスの出力を信じるな。検証層で算出した純粋な数学的座標（JSON）と、実際の挙動を突き合わせよ。数学的に正しい座標が画面外を指していれば、それは「描画のバグ」ではなく「論理のバグ」であるとAI自ら確信を持って断定できる。
+   ブラックボックスの出力を信じるな。Twin が算出した純粋な数学的座標（JSON）と、実際の挙動を突き合わせよ。数学的に正しい座標が画面外を指していれば、それは「描画のバグ」ではなく「論理のバグ」であるとAI自ら確信を持って断定できる。
 
 この「効率的な実行」と「透明な検算」の分離こそが、複雑な3D/物理システムにおけるAIデバッグの最終解である。
 
+### 7.1 命名規則 (Pair Naming)
+
+```
+効率層:   xxx()             // 実装は何でも可（GPU/物理エンジン/Three.js等）
+Twin:    xxx_twin(input)   // 純粋関数。同入力JSONを取りJSONを返す
+突合:    assert_xxx(e, t)  // 矛盾を投げる/返す。Zero-Dep
+```
+
+モジュール単位でペアにする場合（3dplus型）:
+```
+effective:  render.js, physics.js
+twin:       render.twin.js, cpu3d.js (= L4 twin), physics.twin.js
+```
+
+### 7.2 入力契約（同一性の強制）
+
+効率層と Twin は**同じ入力JSON**を受け取らなければならない。二重定義は規約違反である（同じ数学を二度書いたら検算にならない）。
+
+### 7.3 出力契約（段階別JSON）
+
+```js
+xxx_twin(input) → {
+  stages: { stage1: ..., stage2: ..., stage3: ... },
+  result: ...
+}
+```
+
+「どこで壊れたか」を特定可能にする。`projectScene` の `local→world→view→clip→ndc→screen` がこのテンプレ。
+
+### 7.4 純度規約
+
+Twin は **Zero-Dep / Zero-Side-Effect**:
+- DOM / GPU / Canvas / I/O / 乱数 / 時刻に触れない
+- 入力JSON → 出力JSON のみ
+- 外部ライブラリ依存禁止（自身がブラックボックスを呼んだら検算にならない）
+
+### 7.5 Emblem 拡張
+
+`#verify` を `#Category` の正式な値として追加する（§1 Emblemの定義参照）:
+
+```javascript
+// [ai_s_emblem:#high#verify ProjectScene]
+// [ai_s_emblem:#high#draw    WebGLRenderer]
+```
+
+### 7.6 ペア宣言
+
+ファイル冒頭または関数JSDocで、効率層と Twin の対応を明示する:
+
+```js
+// @effective: ../my_webgl/render.js
+// @twin:      cpu3d.js
+```
+
+これにより AI は「片方を編集する時、もう片方も同期更新せよ」を自動判定できる。
+
 ---
-**Version**: 2.2 (Verification-Focused Edition)
-**Date**: 2026-04-26
+**Version**: 2.3 (Twin Convention Edition)
+**Date**: 2026-05-01
 **Author**: Hiroyuki OKINOI, Claude, Gemini CLI
 

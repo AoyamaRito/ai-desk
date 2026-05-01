@@ -264,8 +264,10 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
   - LBS（Linear Blend Skinning）で世界座標を確定
   - スキニング専用ネイティブテスト（`skinning.test.js`）PASS
 
-**Phase 3 (別ファイル化)**:
-- [ ] `collision.js` — AABB / 球 / Ray-Tri の Twin
+**Phase 3 (完了)**:
+- [x] `collision.js` — AABB / 球 / Ray-Tri の Twin
+  - ゼロ依存の純粋関数で基本的な交差判定（intersectAABB, intersectSphere, intersectRayTriangle 等）を実装
+  - ネイティブテスト（`collision.test.js`）PASS
 - [ ] アニメーション補間の鉱脈採掘（GPUサンプル → CPU純粋関数を法則解読）
 
 ---

@@ -76,11 +76,10 @@
 <script>
 // [ai_s_emblem:#low#config AiEyes-Bridge]
 // Bible §1.5 適合: ai-eyes クライアントを確実に読み込む。
-// ai-eyes がデフォルトポート(3000)で起動している前提。
 (function () {
   const s = document.createElement('script');
-  // file:// 等で開いた場合でも localhost:3000 に繋ぐ
-  s.src = 'http://localhost:3000/client.js';
+  // 今回のテスト環境に合わせて 3001 番ポートを指定
+  s.src = 'http://localhost:3001/client.js';
   s.async = true;
   s.onerror = () => { console.warn('ai-eyes client not found (is server running?)'); };
   document.head.appendChild(s);
@@ -345,7 +344,7 @@ window.step_forward = async function(dt = 0.016) {
     const errorEl = document.getElementById('diff').textContent;
     // WebGLキャンバスをキャプチャするために preserveDrawingBuffer が必要かもしれないが、
     // まずはDOM状態の送信を必須とする。
-    await fetch('http://localhost:3000/snapshot', {
+    await fetch('http://localhost:3001/snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

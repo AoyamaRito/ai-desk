@@ -1,91 +1,65 @@
 #!/usr/bin/env node
 
 // [ai_s_emblem:#high#logic Eyes-E2E-Runner]
-// Bible §1.5 適合: AI自律デバッグランナー (eyes-e2e)
-//   Observe -> Think (Short-term Prompt) -> Act -> Wait のループを回す。
-//   人間を介さず、AIがブラウザの実行状態を直接制御・修正するための心臓部。
+// Bible §1.5 適合: APIキー不要の観測翻訳機 (Keyless Transducer)
+//   人間を介さず、AI(CLIエージェント等)がブラウザの実行状態を把握するためのインターフェース。
+//   最新のスナップショットを読み込み、不要なDOM要素を削ぎ落として
+//   AIが「次の一手」を決定するための【最小トークンの短期プロンプト】を標準出力に返す。
+//   外部API通信やLLMの内包は行わない（Zero-Dependency / Unix Philosophy）。
 
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const API = process.env.AI_EYES_URL || 'http://localhost:3000';
-const SNAPSHOT_DIR = './snapshots';
+const SNAPSHOT_DIR = process.env.SNAPSHOT_DIR || './snapshots';
 
-async function request(endpoint, method = 'GET', body = null) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(endpoint, API);
-    const options = {
-      method,
-      headers: body ? { 'Content-Type': 'application/json' } : {}
-    };
-    const req = http.request(url, options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, data }));
-    });
-    req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
-}
-
-async function getLatestSnapshot() {
+function getLatestSnapshot() {
+  if (!fs.existsSync(SNAPSHOT_DIR)) return null;
   const files = fs.readdirSync(SNAPSHOT_DIR)
     .filter(f => f.endsWith('.html'))
     .map(f => ({ name: f, time: fs.statSync(path.join(SNAPSHOT_DIR, f)).mtime.getTime() }))
     .sort((a, b) => b.time - a.time);
   
   if (files.length === 0) return null;
-  return fs.readFileSync(path.join(SNAPSHOT_DIR, files[0].name), 'utf8');
+  return {
+    filename: files[0].name,
+    html: fs.readFileSync(path.join(SNAPSHOT_DIR, files[0].name), 'utf8')
+  };
 }
 
-async function runLoop(goal, maxSteps = 10) {
-  console.log(`\n🚀 Starting eyes-e2e session: "${goal}"`);
+function observe(goal) {
+  const snapshot = getLatestSnapshot();
+  if (!snapshot) {
+    console.log('[SHORT-TERM PROMPT]\nStatus: No snapshots found. Run ai-eyes and trigger an initial render.\n[/SHORT-TERM PROMPT]');
+    process.exit(0);
+  }
+
+  // DOMから重要な情報を抽出（ここでは簡易的に id="diff" や id="status" を探す）
+  const html = snapshot.html;
+  const diffMatch = html.match(/id="diff"[^>]*>([\s\S]*?)<\/pre>/);
+  const statusMatch = html.match(/id="status"[^>]*>([\s\S]*?)<\/span>/);
+  const errorMatch = html.match(/class="error"[^>]*>([\s\S]*?)<\/div>/);
   
-  for (let step = 1; step <= maxSteps; step++) {
-    console.log(`\n--- Step ${step}/${maxSteps} ---`);
-    
-    // 1. Observe: 最新のスナップショットを取得
-    const html = await getLatestSnapshot();
-    if (!html) {
-      console.log('Waiting for initial snapshot...');
-      await new Promise(r => setTimeout(r, 1000));
-      continue;
-    }
+  const diffText = diffMatch ? diffMatch[1].trim() : 'No data';
+  const statusText = statusMatch ? statusMatch[1].trim() : 'Unknown';
+  const errorText = errorMatch ? errorMatch[1].trim() : 'None';
 
-    // 2. Think: 短期プロンプトの構成
-    // DOMから重要な情報を抽出（ここでは簡易的に id="diff" や id="status" を探す）
-    const diffMatch = html.match(/id="diff"[^>]*>([\s\S]*?)<\/pre>/);
-    const statusMatch = html.match(/id="status"[^>]*>([\s\S]*?)<\/span>/);
-    const diffText = diffMatch ? diffMatch[1].trim() : 'No data';
-    const statusText = statusMatch ? statusMatch[1].trim() : 'Unknown';
+  // CLIエージェント（親プロセス）に読ませるための短期プロンプトを出力
+  console.log(`[SHORT-TERM PROMPT]
+Context: Goal "${goal}"
+Snapshot: ${snapshot.filename}
 
-    console.log(`[Observation] Status: ${statusText}, Diff: ${diffText}`);
-
-    // AI への短期プロンプト出力
-    // この出力を見た AI (エージェント) が次のアクションを決定する。
-    console.log(`\n[SHORT-TERM PROMPT]
-Context: Step ${step} of goal "${goal}"
 Current Observation:
   - Browser Status: ${statusText}
   - Engine Diff: ${diffText}
-Instruction:
-  Decide the next action (eval code) to move closer to the goal.
-  Example: window.step_forward(0.016)
-  Format: ACTION: <code>
-[/SHORT-TERM PROMPT]\n`);
+  - Errors: ${errorText}
 
-    // 3. Act: AIからの入力を待つ (今回はデモとしてエージェントの次のターンに委ねる)
-    // 実際の自動化では、ここで LLM API を呼ぶ。
-    console.log('Waiting for AI ACTION input via tool or next turn...');
-    
-    // ※ ここでは実装の器として、一旦停止して入力を待つ（または AI がツールでこの続きを書く）
-    // とりあえず今回は「AIへのヒント」を出して1ステップ分で終了させる。
-    return;
-  }
+Instruction:
+  Based on the observation above, use 'curl' to send the next action to ai-eyes (/input) 
+  or use 'ai-desk' to fix the code.
+  Example Action: curl -X POST localhost:3000/input -d '{"action":"eval", "code":"window.step_forward()"}'
+[/SHORT-TERM PROMPT]`);
 }
 
-const goal = process.argv[2] || "Verify 3D projection is error-free";
-runLoop(goal).catch(console.error);
+const goal = process.argv[2] || "Autonomous Debugging";
+observe(goal);
 // [/ai_s_emblem: Eyes-E2E-Runner]

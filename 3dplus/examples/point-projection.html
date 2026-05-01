@@ -29,7 +29,7 @@
 <header>
   <h1>3Dplus / point-projection — GPU vs CPU 複式数学PoC</h1>
   <div class="sub">
-    GPU(WebGL)が描いた立方体の各頂点に、CPU側 <code>projectScene()</code> が予測した画面座標のマーカーを重ねる。<br>
+    GPU(WebGL2)が描いた立方体の各頂点に、CPU側 <code>projectScene()</code> が予測した画面座標のマーカーを重ねる。<br>
     ズレ無く重なれば「同じ数学」。1pxでもズレれば論理バグの証拠（複式数学 §7）。
   </div>
 </header>
@@ -73,12 +73,12 @@
 </main>
 
 <script src="../cpu3d.js"></script>
+<script src="../render.shaders.js"></script>
+<script src="../render.js"></script>
 <script>
 // [ai_s_emblem:#low#config AiEyes-Bridge]
-// Bible §1.5 適合: ai-eyes クライアントを確実に読み込む。
 (function () {
   const s = document.createElement('script');
-  // 今回のテスト環境に合わせて 3001 番ポートを指定
   s.src = 'http://localhost:3001/client.js';
   s.async = true;
   s.onerror = () => { console.warn('ai-eyes client not found (is server running?)'); };
@@ -87,10 +87,16 @@
 // [/ai_s_emblem: AiEyes-Bridge]
 
 // [ai_s_emblem:#mid#draw GpuCpu-Comparison]
-// 同じシーンを GPU と CPU の両方に流し、結果を画面で突合する。
+// Render3D.frame(scene) が GPU描画と CPU Twin を同時に実行。
+// Twin の screen 座標をオーバーレイに重ねてズレを目視確認する。
 
-// === 立方体のジオメトリ（ローカル座標） ===
-// 8頂点、12エッジ、12三角形。
+const glCanvas = document.getElementById('gl');
+const ovCanvas = document.getElementById('overlay');
+const ov = ovCanvas.getContext('2d');
+
+Render3D.init(glCanvas);
+
+// 立方体ジオメトリ（ローカル座標）
 const cubeVerts = [
   [-1,-1,-1], [ 1,-1,-1], [ 1, 1,-1], [-1, 1,-1],
   [-1,-1, 1], [ 1,-1, 1], [ 1, 1, 1], [-1, 1, 1]
@@ -100,104 +106,31 @@ const cubeEdges = [
   [4,5],[5,6],[6,7],[7,4],
   [0,4],[1,5],[2,6],[3,7]
 ];
-const cubeTris = [
-  // -Z
-  0,1,2, 0,2,3,
-  // +Z
-  4,6,5, 4,7,6,
-  // -Y
-  0,5,1, 0,4,5,
-  // +Y
-  3,2,6, 3,6,7,
-  // -X
-  0,3,7, 0,7,4,
-  // +X
-  1,5,6, 1,6,2
+// 三角形リスト（Render3D の scene 形式: [[a,b,c], ...]）
+const cubeTriList = [
+  [0,1,2],[0,2,3],
+  [4,6,5],[4,7,6],
+  [0,5,1],[0,4,5],
+  [3,2,6],[3,6,7],
+  [0,3,7],[0,7,4],
+  [1,5,6],[1,6,2]
 ];
 
-// === WebGLセットアップ ===
-const glCanvas = document.getElementById('gl');
-const ovCanvas = document.getElementById('overlay');
-const ov = ovCanvas.getContext('2d');
-const gl = glCanvas.getContext('webgl');
-
-const VS = `
-  attribute vec3 aPos;
-  uniform mat4 uModel;
-  uniform mat4 uView;
-  uniform mat4 uProj;
-  varying vec3 vLocal;
-  void main() {
-    vLocal = aPos;
-    gl_Position = uProj * uView * uModel * vec4(aPos, 1.0);
-  }
-`;
-const FS = `
-  precision mediump float;
-  varying vec3 vLocal;
-  void main() {
-    // 面の方向で色分け（局所座標から擬似法線）
-    vec3 c = abs(normalize(vLocal));
-    gl_FragColor = vec4(c * 0.7 + 0.2, 1.0);
-  }
-`;
-
-function compile(type, src) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    throw new Error(gl.getShaderInfoLog(s));
-  }
-  return s;
-}
-const prog = gl.createProgram();
-gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
-gl.linkProgram(prog);
-gl.useProgram(prog);
-
-// VBO（頂点）
-const vbo = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cubeVerts.flat()), gl.STATIC_DRAW);
-const aPos = gl.getAttribLocation(prog, 'aPos');
-gl.enableVertexAttribArray(aPos);
-gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
-
-// IBO（三角形インデックス）
-const ibo = gl.createBuffer();
-gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeTris), gl.STATIC_DRAW);
-
-const uModel = gl.getUniformLocation(prog, 'uModel');
-const uView  = gl.getUniformLocation(prog, 'uView');
-const uProj  = gl.getUniformLocation(prog, 'uProj');
-
-gl.enable(gl.DEPTH_TEST);
-gl.viewport(0, 0, glCanvas.width, glCanvas.height);
-
-// === Phase 1 トグル状態 ===
+// Phase 1 トグル状態
 let mode = {
-  rotation: 'euler',     // 'euler' | 'quat'
-  camera:   'euler',     // 'euler' | 'lookat'
-  projection: 'persp'    // 'persp' | 'ortho'
+  rotation:   'euler',
+  camera:     'euler',
+  projection: 'persp'
 };
 
-// === シーン定義（CPU と GPU で共有する単一の真実） ===
+// シーン定義（GPU と CPU で共有する単一の真実）
 function buildScene(t) {
-  // 立方体の回転: Euler とクォータニオンを切替
   const rx = t * 0.5, ry = t * 0.7, rz = 0;
-  const transform = {
-    position: [0, 0, -6],
-    rotation: [rx, ry, rz],
-    scale: [1, 1, 1]
-  };
+  const transform = { position: [0, 0, -6], rotation: [rx, ry, rz], scale: [1, 1, 1] };
   if (mode.rotation === 'quat') {
     transform.quaternion = Cpu3D._math.quatFromEuler(rx, ry, rz);
   }
 
-  // カメラ: Euler / lookAt 切替。lookAt は立方体周りを軌道する。
   const cam = {
     position: [0, 0, 0],
     rotation: [0, 0, 0],
@@ -212,27 +145,29 @@ function buildScene(t) {
     cam.lookAt = [0, 0, -6];
     cam.up = [0, 1, 0];
   }
-
-  // 投影: 透視 / 正射影 切替
   if (mode.projection === 'ortho') {
     const halfH = 3;
-    const halfW = halfH * cam.aspect;
-    cam.ortho = { left: -halfW, right: halfW, bottom: -halfH, top: halfH };
+    cam.ortho = { left: -halfH * cam.aspect, right: halfH * cam.aspect, bottom: -halfH, top: halfH };
   }
 
   return {
-    objects: [
-      { id: 'cube', vertices: cubeVerts, transform, parent: null }
-    ],
-    camera: cam,
+    objects: [{
+      id: 'cube',
+      vertices:  cubeVerts,
+      triangles: cubeTriList,
+      transform,
+      parent: null,
+      material: { color: [0.5, 0.6, 0.9] }
+    }],
+    camera:   cam,
     viewport: { width: glCanvas.width, height: glCanvas.height }
   };
 }
 
-// === 描画ループ ===
-let animating = true;
+// 描画ループ
+let animating  = true;
 let showOverlay = true;
-let t0 = performance.now();
+let t0   = performance.now();
 let lastT = 0;
 
 function frame(now) {
@@ -240,22 +175,13 @@ function frame(now) {
   const t = lastT;
   const scene = buildScene(t);
 
-  // CPU側: 全段階の数値を取得
-  const cpu = Cpu3D.projectScene(scene);
-  const obj = cpu.objects[0];
-
-  // GPU側: 同じシーンの数学を渡して描画
-  gl.clearColor(0.086, 0.106, 0.133, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.uniformMatrix4fv(uModel, false, obj.worldMatrix);
-  gl.uniformMatrix4fv(uView,  false, cpu.view);
-  gl.uniformMatrix4fv(uProj,  false, cpu.projection);
-  gl.drawElements(gl.TRIANGLES, cubeTris.length, gl.UNSIGNED_SHORT, 0);
+  // GPU描画 + CPU Twin（Render3D が Cpu3D.projectScene を内部呼び出し）
+  const twin = Render3D.frame(scene);
+  const obj  = twin.objects[0];
 
   // オーバーレイ: CPU が予測した頂点位置を描く
   ov.clearRect(0, 0, ovCanvas.width, ovCanvas.height);
   if (showOverlay) {
-    // エッジ
     ov.strokeStyle = 'rgba(63, 185, 80, 0.5)';
     ov.lineWidth = 1;
     for (const [a, b] of cubeEdges) {
@@ -266,7 +192,6 @@ function frame(now) {
       ov.lineTo(vb.screen[0], vb.screen[1]);
       ov.stroke();
     }
-    // 頂点マーカー
     for (let i = 0; i < obj.vertices.length; i++) {
       const v = obj.vertices[i];
       ov.fillStyle = v.inFrustum ? '#58a6ff' : '#f85149';
@@ -279,14 +204,11 @@ function frame(now) {
     }
   }
 
-  // 突合: GPUのclip座標を独自に再計算し、CPUのclip座標と差分を取る
-  // GPU側の uProj * uView * uModel と CPU側の cpu.projection・view・worldMatrix は完全同一の行列なので、
-  // ここでの突合は「行列演算の数値再現性」と「shader内 mat4*vec4 の規約一致」の確認になる。
+  // 突合: 同じ行列を JS で再計算し CPU Twin の clip 座標と一致するか確認
   let maxDiff = 0;
   for (const v of obj.vertices) {
     const local = [v.local[0], v.local[1], v.local[2], 1];
-    // 同じ行列を使った同じ計算を JS でもう一度回し、CPUの clip と一致するか
-    const wm = obj.worldMatrix, vm = cpu.view, pm = cpu.projection;
+    const wm = obj.worldMatrix, vm = twin.view, pm = twin.projection;
     const w0 = mul4(wm, local);
     const v0 = mul4(vm, w0);
     const c0 = mul4(pm, v0);
@@ -298,11 +220,11 @@ function frame(now) {
   diffEl.textContent = `mode: ${mode.rotation}/${mode.camera}/${mode.projection}\nclip max diff: ${maxDiff.toExponential(3)}\n${maxDiff < 1e-6 ? '✓ CPU路線とCPU路線（再計算）は同一' : '✗ 数値の不一致を検出'}`;
   diffEl.className = maxDiff < 1e-6 ? 'ok' : 'ng';
 
-  // assert_projectScene の動作確認: Twin 出力を期待値として再投入 → 完全一致するはず
+  // assert_projectScene の動作確認
   const expected = {
     objects: [{ id: 'cube', vertices: obj.vertices.map(v => v.screen.slice()) }]
   };
-  const ar = Cpu3D.assert_projectScene(cpu, expected, { stage: 'screen', eps: 1e-9 });
+  const ar = Cpu3D.assert_projectScene(twin, expected, { stage: 'screen', eps: 1e-9 });
   const aEl = document.getElementById('assert');
   aEl.textContent = `stage=${ar.stage}  eps=${ar.eps}\nok=${ar.ok}  maxError=${ar.maxError}\nmismatches=${ar.mismatches.length}`;
   aEl.className = ar.ok ? 'ok' : 'ng';
@@ -315,42 +237,32 @@ function frame(now) {
     effective: obj.effective
   }, (k, x) => typeof x === 'number' ? Number(x.toFixed(4)) : x, 2);
 
-  if (animating) {
-    requestAnimationFrame(frame);
-  }
+  if (animating) requestAnimationFrame(frame);
 }
 
-// === Bible §1.5: AI-Eyes Step-by-step Hooks ===
+// Bible §1.5: AI-Eyes Step-by-step Hooks
 window.pause = function() {
   animating = false;
   document.getElementById('toggle-anim').textContent = '▶ 再生';
   console.log('[AI-Eyes] Paused. Use window.step_forward() to advance.');
 };
-
 window.resume = function() {
   animating = true;
   document.getElementById('toggle-anim').textContent = '▮▮ 一時停止';
   t0 = performance.now() - lastT * 1000;
   requestAnimationFrame(frame);
 };
-
 window.step_forward = async function(dt = 0.016) {
   if (animating) window.pause();
   lastT += dt;
   frame(performance.now());
-  
-  // 観測可能性: 1フレーム進めた直後の画面状態とDOMを ai-eyes に送信
   try {
-    const errorEl = document.getElementById('diff').textContent;
-    // WebGLキャンバスをキャプチャするために preserveDrawingBuffer が必要かもしれないが、
-    // まずはDOM状態の送信を必須とする。
     await fetch('http://localhost:3001/snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         html: document.body.innerHTML,
         url: location.href,
-        error: errorEl.includes('ERROR') ? errorEl : null, // 誤差NGがあればエラー扱い
         label: `step_t_${lastT.toFixed(3)}`
       })
     });
@@ -363,52 +275,42 @@ window.step_forward = async function(dt = 0.016) {
 function mul4(m, v) {
   const out = [0,0,0,0];
   for (let r = 0; r < 4; r++) {
-    out[r] = m[r] * v[0] + m[r+4] * v[1] + m[r+8] * v[2] + m[r+12] * v[3];
+    out[r] = m[r]*v[0] + m[r+4]*v[1] + m[r+8]*v[2] + m[r+12]*v[3];
   }
   return out;
 }
 
 document.getElementById('toggle-anim').addEventListener('click', (e) => {
-  if (animating) {
-    animating = false;
-    e.target.textContent = '▶ 再開';
-  } else {
-    animating = true;
-    t0 = performance.now() - lastT * 1000;
-    e.target.textContent = '▮▮ 一時停止';
-  }
+  if (animating) { animating = false; e.target.textContent = '▶ 再開'; }
+  else { animating = true; t0 = performance.now() - lastT * 1000; e.target.textContent = '▮▮ 一時停止'; requestAnimationFrame(frame); }
 });
-document.getElementById('toggle-overlay').addEventListener('click', () => {
-  showOverlay = !showOverlay;
-});
+document.getElementById('toggle-overlay').addEventListener('click', () => { showOverlay = !showOverlay; });
 
 function highlight(group, active) {
   for (const id of group) {
-    const el = document.getElementById(id);
-    el.style.background = (id === active) ? '#1f6feb' : '#21262d';
+    document.getElementById(id).style.background = (id === active) ? '#1f6feb' : '#21262d';
   }
 }
 const ROT = ['rot-euler', 'rot-quat'];
 const CAM = ['cam-euler', 'cam-lookat'];
 const PROJ = ['proj-persp', 'proj-ortho'];
 function applyMode() {
-  highlight(ROT,  mode.rotation === 'quat'  ? 'rot-quat'  : 'rot-euler');
-  highlight(CAM,  mode.camera   === 'lookat'? 'cam-lookat': 'cam-euler');
-  highlight(PROJ, mode.projection === 'ortho' ? 'proj-ortho' : 'proj-persp');
+  highlight(ROT,  mode.rotation   === 'quat'   ? 'rot-quat'   : 'rot-euler');
+  highlight(CAM,  mode.camera     === 'lookat' ? 'cam-lookat' : 'cam-euler');
+  highlight(PROJ, mode.projection === 'ortho'  ? 'proj-ortho' : 'proj-persp');
 }
-document.getElementById('rot-euler').onclick   = () => { mode.rotation = 'euler';   applyMode(); };
-document.getElementById('rot-quat').onclick    = () => { mode.rotation = 'quat';    applyMode(); };
-document.getElementById('cam-euler').onclick   = () => { mode.camera = 'euler';     applyMode(); };
-document.getElementById('cam-lookat').onclick  = () => { mode.camera = 'lookat';    applyMode(); };
-document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp'; applyMode(); };
-document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho'; applyMode(); };
+document.getElementById('rot-euler').onclick   = () => { mode.rotation   = 'euler';   applyMode(); };
+document.getElementById('rot-quat').onclick    = () => { mode.rotation   = 'quat';    applyMode(); };
+document.getElementById('cam-euler').onclick   = () => { mode.camera     = 'euler';   applyMode(); };
+document.getElementById('cam-lookat').onclick  = () => { mode.camera     = 'lookat';  applyMode(); };
+document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp';   applyMode(); };
+document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho';   applyMode(); };
 applyMode();
 
-// === 観測者契約 (Bible §6 ドラフト): window.REAL_* と dispatch を晒す ===
-// ai-eyes が eval で叩ける制御API。ローカル開発時のみ有効。本番でも安全。
-window.REAL_mode    = mode;
-window.REAL_state   = { lastT: 0, paused: false, lastTwin: null, lastClipMaxDiff: 0 };
-window.dispatch = function (cmd) {
+// 観測者契約 (Bible §6): window.REAL_* と dispatch
+window.REAL_mode  = mode;
+window.REAL_state = { lastT: 0, paused: false };
+window.dispatch = function(cmd) {
   if (!cmd || typeof cmd !== 'object') return { ok:false, error:'cmd must be object' };
   switch (cmd.type) {
     case 'setMode':
@@ -417,28 +319,15 @@ window.dispatch = function (cmd) {
       if (cmd.projection) mode.projection = cmd.projection;
       applyMode();
       return { ok:true, mode: { ...mode } };
-    case 'pause':
-      animating = false;
-      return { ok:true, paused:true };
-    case 'resume':
-      animating = true;
-      t0 = performance.now() - lastT * 1000;
-      return { ok:true, paused:false };
-    case 'setT':
-      lastT = +cmd.t;
-      animating = false;
-      return { ok:true, lastT };
-    case 'snapshot':
-      // ai-eyes は別経路（/snapshot/request）で撮るが、ここでは現スナップを返す
-      return { ok:true, mode: { ...mode }, lastT, lastClipMaxDiff: window.REAL_state.lastClipMaxDiff };
-    default:
-      return { ok:false, error: `unknown cmd.type: ${cmd.type}` };
+    case 'pause':  animating = false; return { ok:true, paused:true };
+    case 'resume': animating = true; t0 = performance.now() - lastT * 1000; return { ok:true, paused:false };
+    case 'setT':   lastT = +cmd.t; animating = false; return { ok:true, lastT };
+    case 'snapshot': return { ok:true, mode: { ...mode }, lastT };
+    default: return { ok:false, error:`unknown cmd.type: ${cmd.type}` };
   }
 };
 
-if (animating) {
-  requestAnimationFrame(frame);
-}
+requestAnimationFrame(frame);
 // [/ai_s_emblem: GpuCpu-Comparison]
 </script>
 </body>

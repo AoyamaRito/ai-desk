@@ -4,7 +4,7 @@
 // 複式数学（Bible §7）の Twin 実装。GPU出力と突合してロジックバグを断定する装置。
 // 3Dplus（Bible §4）に従い、空間(x,y,z)・時間(t)・透明度(α)・生存(visibility)を同じ投影パイプラインに乗せる。
 //
-// @effective: ../my_webgl/render.js (and any WebGL/Three.js renderer)
+// @effective: ./render.js (and any WebGL/Three.js renderer)
 // @twin:      this file
 //
 // 走らせ方:

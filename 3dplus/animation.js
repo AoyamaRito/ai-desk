@@ -81,7 +81,6 @@
     if (dot < 0) { bx=-bx; by=-by; bz=-bz; bw=-bw; dot=-dot; }
     if (dot > 0.9995) {
       // ほぼ同じ → 線形補間で十分
-      const len = Math.hypot(a[0]+bx*(1-t) - a[0]*t + a[0], 1); // avoid NaN
       const rx = a[0] + (bx - a[0]) * t;
       const ry = a[1] + (by - a[1]) * t;
       const rz = a[2] + (bz - a[2]) * t;

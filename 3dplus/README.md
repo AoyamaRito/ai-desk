@@ -50,7 +50,7 @@ Twin は層と直交する概念であり、新しいレイヤーではない（
 | パス | 役割 |
 |---|---|
 | `cpu3d.js` | L4 Twin 本体。`projectScene(scene)` 一本の重厚関数。Emblem `#high#verify`。Zero-Dep。 |
-| `tests/projection.test.js` | 21/21 PASS。行列・階層・3Dplus軸の網羅検証。 |
+| `tests/projection.test.js` | 55/55 PASS。行列・階層・3Dplus軸・逆行列・unproject の網羅検証。 |
 | `examples/point-projection.html` | WebGL描画と Twin 予測位置を画面で突合するPoC（複式数学の実演） |
 
 ---
@@ -256,7 +256,7 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 - [x] 世界空間の法線・重心・面積
 - [x] 背面カリング（`backface`）— `worldForward` と `worldNormal` の内積で判定
 - [x] `allInFrustum`（3頂点 AND）
-- [x] 48/48 ネイティブテスト PASS
+- [x] 55/55 ネイティブテスト PASS（invertMatrix・normalMatrix・unproject・透視backface修正含む）
 
 **Phase 2b (完了)**:
 - [x] スキニング（ボーン変換）の Twin
@@ -268,6 +268,7 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 - [x] `collision.js` — AABB / 球 / Ray-Tri の Twin
   - ゼロ依存の純粋関数で基本的な交差判定（intersectAABB, intersectSphere, intersectRayTriangle 等）を実装
   - ネイティブテスト（`collision.test.js`）PASS
+- [x] `animation.js` — evaluateScalar / evaluateVec3 / evaluateQuat（Slerp）。10/10 テスト PASS
 - [ ] アニメーション補間の鉱脈採掘（GPUサンプル → CPU純粋関数を法則解読）
 
 ---

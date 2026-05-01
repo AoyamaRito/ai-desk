@@ -74,6 +74,19 @@
 
 <script src="../cpu3d.js"></script>
 <script>
+// [ai_s_emblem:#low#config AiEyes-Bridge]
+// Bible §1.5 適合: ai-eyes クライアントを確実に読み込む。
+// ai-eyes がデフォルトポート(3000)で起動している前提。
+(function () {
+  const s = document.createElement('script');
+  // file:// 等で開いた場合でも localhost:3000 に繋ぐ
+  s.src = 'http://localhost:3000/client.js';
+  s.async = true;
+  s.onerror = () => { console.warn('ai-eyes client not found (is server running?)'); };
+  document.head.appendChild(s);
+})();
+// [/ai_s_emblem: AiEyes-Bridge]
+
 // [ai_s_emblem:#mid#draw GpuCpu-Comparison]
 // 同じシーンを GPU と CPU の両方に流し、結果を画面で突合する。
 
@@ -303,8 +316,50 @@ function frame(now) {
     effective: obj.effective
   }, (k, x) => typeof x === 'number' ? Number(x.toFixed(4)) : x, 2);
 
-  requestAnimationFrame(frame);
+  if (animating) {
+    requestAnimationFrame(frame);
+  }
 }
+
+// === Bible §1.5: AI-Eyes Step-by-step Hooks ===
+window.pause = function() {
+  animating = false;
+  document.getElementById('toggle-anim').textContent = '▶ 再生';
+  console.log('[AI-Eyes] Paused. Use window.step_forward() to advance.');
+};
+
+window.resume = function() {
+  animating = true;
+  document.getElementById('toggle-anim').textContent = '▮▮ 一時停止';
+  t0 = performance.now() - lastT * 1000;
+  requestAnimationFrame(frame);
+};
+
+window.step_forward = async function(dt = 0.016) {
+  if (animating) window.pause();
+  lastT += dt;
+  frame(performance.now());
+  
+  // 観測可能性: 1フレーム進めた直後の画面状態とDOMを ai-eyes に送信
+  try {
+    const errorEl = document.getElementById('diff').textContent;
+    // WebGLキャンバスをキャプチャするために preserveDrawingBuffer が必要かもしれないが、
+    // まずはDOM状態の送信を必須とする。
+    await fetch('http://localhost:3000/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        html: document.body.innerHTML,
+        url: location.href,
+        error: errorEl.includes('ERROR') ? errorEl : null, // 誤差NGがあればエラー扱い
+        label: `step_t_${lastT.toFixed(3)}`
+      })
+    });
+    console.log(`[AI-Eyes] Stepped to t=${lastT.toFixed(3)} and snapshot sent.`);
+  } catch(e) {
+    console.warn('[AI-Eyes] Failed to send snapshot.', e);
+  }
+};
 
 function mul4(m, v) {
   const out = [0,0,0,0];
@@ -337,17 +392,54 @@ function highlight(group, active) {
 const ROT = ['rot-euler', 'rot-quat'];
 const CAM = ['cam-euler', 'cam-lookat'];
 const PROJ = ['proj-persp', 'proj-ortho'];
-document.getElementById('rot-euler').onclick   = () => { mode.rotation = 'euler';  highlight(ROT, 'rot-euler'); };
-document.getElementById('rot-quat').onclick    = () => { mode.rotation = 'quat';   highlight(ROT, 'rot-quat'); };
-document.getElementById('cam-euler').onclick   = () => { mode.camera = 'euler';    highlight(CAM, 'cam-euler'); };
-document.getElementById('cam-lookat').onclick  = () => { mode.camera = 'lookat';   highlight(CAM, 'cam-lookat'); };
-document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp'; highlight(PROJ, 'proj-persp'); };
-document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho'; highlight(PROJ, 'proj-ortho'); };
-highlight(ROT, 'rot-euler');
-highlight(CAM, 'cam-euler');
-highlight(PROJ, 'proj-persp');
+function applyMode() {
+  highlight(ROT,  mode.rotation === 'quat'  ? 'rot-quat'  : 'rot-euler');
+  highlight(CAM,  mode.camera   === 'lookat'? 'cam-lookat': 'cam-euler');
+  highlight(PROJ, mode.projection === 'ortho' ? 'proj-ortho' : 'proj-persp');
+}
+document.getElementById('rot-euler').onclick   = () => { mode.rotation = 'euler';   applyMode(); };
+document.getElementById('rot-quat').onclick    = () => { mode.rotation = 'quat';    applyMode(); };
+document.getElementById('cam-euler').onclick   = () => { mode.camera = 'euler';     applyMode(); };
+document.getElementById('cam-lookat').onclick  = () => { mode.camera = 'lookat';    applyMode(); };
+document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp'; applyMode(); };
+document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho'; applyMode(); };
+applyMode();
 
-requestAnimationFrame(frame);
+// === 観測者契約 (Bible §6 ドラフト): window.REAL_* と dispatch を晒す ===
+// ai-eyes が eval で叩ける制御API。ローカル開発時のみ有効。本番でも安全。
+window.REAL_mode    = mode;
+window.REAL_state   = { lastT: 0, paused: false, lastTwin: null, lastClipMaxDiff: 0 };
+window.dispatch = function (cmd) {
+  if (!cmd || typeof cmd !== 'object') return { ok:false, error:'cmd must be object' };
+  switch (cmd.type) {
+    case 'setMode':
+      if (cmd.rotation)   mode.rotation   = cmd.rotation;
+      if (cmd.camera)     mode.camera     = cmd.camera;
+      if (cmd.projection) mode.projection = cmd.projection;
+      applyMode();
+      return { ok:true, mode: { ...mode } };
+    case 'pause':
+      animating = false;
+      return { ok:true, paused:true };
+    case 'resume':
+      animating = true;
+      t0 = performance.now() - lastT * 1000;
+      return { ok:true, paused:false };
+    case 'setT':
+      lastT = +cmd.t;
+      animating = false;
+      return { ok:true, lastT };
+    case 'snapshot':
+      // ai-eyes は別経路（/snapshot/request）で撮るが、ここでは現スナップを返す
+      return { ok:true, mode: { ...mode }, lastT, lastClipMaxDiff: window.REAL_state.lastClipMaxDiff };
+    default:
+      return { ok:false, error: `unknown cmd.type: ${cmd.type}` };
+  }
+};
+
+if (animating) {
+  requestAnimationFrame(frame);
+}
 // [/ai_s_emblem: GpuCpu-Comparison]
 </script>
 </body>

@@ -256,13 +256,13 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 - [x] 世界空間の法線・重心・面積
 - [x] 背面カリング（`backface`）— `worldForward` と `worldNormal` の内積で判定
 - [x] `allInFrustum`（3頂点 AND）
-- [x] **48/48 ネイティブテスト PASS**
+- [x] 48/48 ネイティブテスト PASS
 
-**Phase 2b (次)**:
-- [ ] スキニング（ボーン変換）の Twin
+**Phase 2b (完了)**:
+- [x] スキニング（ボーン変換）の Twin
   - skeleton + bindPose + per-vertex weights
   - LBS（Linear Blend Skinning）で世界座標を確定
-  - キャラクター用途の主用途
+  - スキニング専用ネイティブテスト（`skinning.test.js`）PASS
 
 **Phase 3 (別ファイル化)**:
 - [ ] `collision.js` — AABB / 球 / Ray-Tri の Twin

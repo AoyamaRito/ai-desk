@@ -251,7 +251,13 @@
   //         parent: null | 'parentId' | parentIndex,
   //         time?:    { offset: 0 },                   // 親時刻 + offset
   //         alpha?:   1.0,                             // 親α × self
-  //         visible?: true                             // 親 AND self
+  //         visible?: true,                            // 親 AND self
+  //         skin?: {                                   // Linear Blend Skinning
+  //           bones: ['bone1', 'bone2'],               // parentId と同様の解決を行う
+  //           bindPoses: [ [16], [16] ],               // 各 bone の Inverse Bind Matrix
+  //           boneIndices: [ [0,1,0,0], ... ],         // 頂点ごとの影響 bone index (max 4)
+  //           weights:     [ [0.8,0.2,0,0], ... ]      // 頂点ごとの影響度 (max 4)
+  //         }
   //       }
   //     ],
   //     camera: {
@@ -367,9 +373,50 @@
     const objects = new Array(N);
     for (let i = 0; i < N; i++) {
       const o = scene.objects[i];
-      const verts = (o.vertices || []).map(v => {
+      
+      // スキニング（LBS）の準備
+      let skinBones = null;
+      if (o.skin && Array.isArray(o.skin.bones)) {
+        skinBones = o.skin.bones.map(b => {
+          if (typeof b === 'number') return b;
+          const bi = idToIdx[b];
+          if (bi == null) throw new Error(`unknown bone: ${b}`);
+          return bi;
+        });
+      }
+
+      const verts = (o.vertices || []).map((v, vIdx) => {
         const localV = [v[0], v[1], v[2], 1];
-        const worldV = transformVec4(worldM[i], localV);
+        let worldV;
+
+        if (skinBones && o.skin.boneIndices && o.skin.weights) {
+          // LBS (Linear Blend Skinning)
+          // W(v) = Σ (weight_j * WorldMatrix[bone_j] * BindPose[bone_j] * localV)
+          const bIdxs = o.skin.boneIndices[vIdx] || [0,0,0,0];
+          const wts = o.skin.weights[vIdx] || [1,0,0,0];
+          worldV = [0, 0, 0, 0];
+          for (let j = 0; j < 4; j++) {
+            const w = wts[j];
+            if (w === 0) continue;
+            const b = skinBones[bIdxs[j]];
+            const bindPose = o.skin.bindPoses[bIdxs[j]];
+            const boneWorld = worldM[b];
+            
+            // localV を bindPose (逆行列) でボーンローカル空間に戻す
+            const localBoneV = transformVec4(bindPose, localV);
+            // そのボーンの現在のワールド行列で変換
+            const posedWorldV = transformVec4(boneWorld, localBoneV);
+            
+            worldV[0] += posedWorldV[0] * w;
+            worldV[1] += posedWorldV[1] * w;
+            worldV[2] += posedWorldV[2] * w;
+            worldV[3] += posedWorldV[3] * w;
+          }
+        } else {
+          // Static mesh
+          worldV = transformVec4(worldM[i], localV);
+        }
+
         const viewV  = transformVec4(view,    worldV);
         const clipV  = transformVec4(proj,    viewV);
         const w = clipV[3];

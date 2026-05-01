@@ -6,7 +6,7 @@
 //      数値が正しいことが言えるということは、GPUと突合する資格があるということ。
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { projectScene, assert_projectScene, _math } = require('../cpu3d.js');
+const { projectScene, assert_projectScene, _math, unproject } = require('../cpu3d.js');
 
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
@@ -672,5 +672,69 @@ test('triangle: 透視投影で視錐台側面の三角形を正しく backface 
     }]
   }));
   assert.equal(r.objects[0].triangles[0].backface, true);
+});
+// === 13. invertMatrix ===
+test('invertMatrix: 単位行列の逆行列は単位行列', () => {
+  const I = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+  const inv = _math.invertMatrix(I);
+  assert.ok(inv !== null);
+  for (let i = 0; i < 16; i++) assert.ok(close(inv[i], I[i], 1e-10));
+});
+
+test('invertMatrix: 平行移動行列の逆行列は反転した平行移動', () => {
+  // T(2,3,5) の逆は T(-2,-3,-5)
+  const T = [1,0,0,0, 0,1,0,0, 0,0,1,0, 2,3,5,1];
+  const inv = _math.invertMatrix(T);
+  assert.ok(inv !== null);
+  assert.ok(close(inv[12], -2, 1e-10));
+  assert.ok(close(inv[13], -3, 1e-10));
+  assert.ok(close(inv[14], -5, 1e-10));
+});
+
+test('invertMatrix × 元行列 = 単位行列', () => {
+  const m = _math.buildPerspective(Math.PI/3, 1.5, 0.1, 100);
+  const inv = _math.invertMatrix(m);
+  assert.ok(inv !== null);
+  const prod = _math.multiply(m, inv);
+  // 対角成分が1、非対角成分が0
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      assert.ok(close(prod[r + c*4], r === c ? 1 : 0, 1e-8));
+    }
+  }
+});
+
+// === 14. normalMatrix ===
+test('normalMatrix: 均一スケールの法線行列は 1/scale の行列', () => {
+  // scale=2 の場合、法線変換は 1/2 になるはず（向きを保持するため）
+  const world = _math.buildModelMatrix({ position:[0,0,0], rotation:[0,0,0], scale:[2,2,2] });
+  const nm = _math.normalMatrix(world);
+  // 対角成分は 0.5 に近いはず
+  assert.ok(close(nm[0], 0.5, 1e-10));
+  assert.ok(close(nm[4], 0.5, 1e-10));
+  assert.ok(close(nm[8], 0.5, 1e-10));
+});
+
+// === 15. unproject ===
+test('unproject: 画面中央から -Z 方向のレイが出る', () => {
+  const scene = baseScene({});
+  const r = projectScene(scene);
+  const ray = unproject(400, 300, r.view, r.projection, { width: 800, height: 600 });
+  assert.ok(ray !== null);
+  // 画面中央 (400,300) は NDC(0,0) → レイ方向は -Z
+  assert.ok(close(ray.direction[0], 0, 1e-5));
+  assert.ok(close(ray.direction[1], 0, 1e-5));
+  assert.ok(ray.direction[2] < 0); // -Z 方向
+});
+
+test('unproject → intersectRayAABB でピッキング可能', () => {
+  const collision = require('../collision.js');
+  const scene = baseScene({});
+  const r = projectScene(scene);
+  // 原点を貫く AABB
+  const ray = unproject(400, 300, r.view, r.projection, { width: 800, height: 600 });
+  const aabb = { min: [-0.5,-0.5,-5.5], max: [0.5,0.5,-4.5] };
+  const hit = collision.intersectRayAABB(ray, aabb);
+  assert.ok(hit !== null); // 画面中央のレイが AABB にヒットする
 });
 // [/ai_s_emblem: Cpu3D-Tests]

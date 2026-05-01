@@ -131,3 +131,46 @@ test('Ray vs Triangle - intersectRayTriangle', () => {
   const res4 = collision.intersectRayTriangle(ray4, v0, v1, v2);
   assert.strictEqual(res4, null);
 });
+
+test('Frustum - extractFrustumPlanes + isAABBInFrustum', () => {
+  // cpu3d.js の透視行列を使って視錐台平面を抽出し、AABBのin/outを検証
+  const { _math } = require('../cpu3d.js');
+  const view = _math.buildViewMatrix({ position:[0,0,0], rotation:[0,0,0] });
+  const proj = _math.buildPerspective(Math.PI/2, 1, 0.1, 100);
+  const vp = _math.multiply(proj, view);
+
+  const planes = collision.extractFrustumPlanes(vp);
+  assert.strictEqual(planes.length, 6);
+
+  // 視錐台の中央にある AABB → in
+  const inside = { min:[-0.5,-0.5,-5.5], max:[0.5,0.5,-4.5] };
+  assert.strictEqual(collision.isAABBInFrustum(inside, planes), true);
+
+  // カメラ後方にある AABB → out
+  const behind = { min:[-1,-1, 5], max:[1,1, 10] };
+  assert.strictEqual(collision.isAABBInFrustum(behind, planes), false);
+
+  // far 平面より遠い AABB → out
+  const farOut = { min:[-1,-1,-200], max:[1,1,-150] };
+  assert.strictEqual(collision.isAABBInFrustum(farOut, planes), false);
+});
+
+test('Frustum - isSphereInFrustum', () => {
+  const { _math } = require('../cpu3d.js');
+  const view = _math.buildViewMatrix({ position:[0,0,0], rotation:[0,0,0] });
+  const proj = _math.buildPerspective(Math.PI/2, 1, 0.1, 100);
+  const vp = _math.multiply(proj, view);
+  const planes = collision.extractFrustumPlanes(vp);
+
+  // 視錐台内の球
+  const inside = { center:[0,0,-5], radius:0.5 };
+  assert.strictEqual(collision.isSphereInFrustum(inside, planes), true);
+
+  // 視錐台外の球（後方）
+  const behind = { center:[0,0,10], radius:0.5 };
+  assert.strictEqual(collision.isSphereInFrustum(behind, planes), false);
+
+  // 境界をまたぐ球（中心は外だが半径が届く）
+  const straddling = { center:[0,0,101], radius:5 };
+  assert.strictEqual(collision.isSphereInFrustum(straddling, planes), false); // 中心が far+5 の外
+});

@@ -198,6 +198,49 @@
     return null;
   }
 
+  // ===== 視錐台 (Frustum) =====
+  // Gribb-Hartmann 法: 結合行列 VP (column-major) の行から6平面を抽出する。
+  // 各平面は { normal:[a,b,c], d } で、a*x+b*y+c*z+d >= 0 が「視錐台の内側」を意味する。
+  // normalは正規化済み。
+  function extractFrustumPlanes(vp) {
+    // column-majorの行: row[i] = [vp[i], vp[i+4], vp[i+8], vp[i+12]]
+    function plane(a, b, c, d) {
+      const len = Math.hypot(a, b, c);
+      return len > 0 ? { normal: [a/len, b/len, c/len], d: d/len } : { normal: [0,0,0], d: 0 };
+    }
+    return [
+      plane(vp[3]+vp[0], vp[7]+vp[4], vp[11]+vp[8],  vp[15]+vp[12]), // Left:   row3+row0
+      plane(vp[3]-vp[0], vp[7]-vp[4], vp[11]-vp[8],  vp[15]-vp[12]), // Right:  row3-row0
+      plane(vp[3]+vp[1], vp[7]+vp[5], vp[11]+vp[9],  vp[15]+vp[13]), // Bottom: row3+row1
+      plane(vp[3]-vp[1], vp[7]-vp[5], vp[11]-vp[9],  vp[15]-vp[13]), // Top:    row3-row1
+      plane(vp[3]+vp[2], vp[7]+vp[6], vp[11]+vp[10], vp[15]+vp[14]), // Near:   row3+row2
+      plane(vp[3]-vp[2], vp[7]-vp[6], vp[11]-vp[10], vp[15]-vp[14]), // Far:    row3-row2
+    ];
+  }
+
+  // AABB vs 視錐台: false なら完全に視錐台の外（カリング可）。true なら交差または内部。
+  // "positive vertex" 法: 各平面の法線方向で最遠の頂点が外側にあれば確定カリング。
+  function isAABBInFrustum(aabb, planes) {
+    for (let i = 0; i < planes.length; i++) {
+      const { normal, d } = planes[i];
+      const px = normal[0] >= 0 ? aabb.max[0] : aabb.min[0];
+      const py = normal[1] >= 0 ? aabb.max[1] : aabb.min[1];
+      const pz = normal[2] >= 0 ? aabb.max[2] : aabb.min[2];
+      if (normal[0]*px + normal[1]*py + normal[2]*pz + d < 0) return false;
+    }
+    return true;
+  }
+
+  // 球 vs 視錐台: false なら完全に視錐台の外。true なら交差または内部。
+  function isSphereInFrustum(sphere, planes) {
+    const [cx, cy, cz] = sphere.center;
+    for (let i = 0; i < planes.length; i++) {
+      const { normal, d } = planes[i];
+      if (normal[0]*cx + normal[1]*cy + normal[2]*cz + d < -sphere.radius) return false;
+    }
+    return true;
+  }
+
   return {
     computeAABB,
     intersectAABB,
@@ -206,7 +249,10 @@
     intersectSphereAABB,
     intersectRayAABB,
     intersectRaySphere,
-    intersectRayTriangle
+    intersectRayTriangle,
+    extractFrustumPlanes,
+    isAABBInFrustum,
+    isSphereInFrustum
   };
 });
 // [/ai_s_emblem: Cpu3D-Collision]

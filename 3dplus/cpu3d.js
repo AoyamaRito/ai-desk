@@ -234,6 +234,69 @@
     return out;
   }
 
+  // ===== 行列逆行列 (4x4 column-major) =====
+  // MESA gluInvertMatrix 方式。特異行列（行列式≈0）の場合は null を返す。
+  function invertMatrix(m) {
+    const inv = new Array(16);
+    inv[0]  =  m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
+    inv[4]  = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
+    inv[8]  =  m[4]*m[9]*m[15]  - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9];
+    inv[12] = -m[4]*m[9]*m[14]  + m[4]*m[10]*m[13] + m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9];
+    inv[1]  = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10];
+    inv[5]  =  m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10];
+    inv[9]  = -m[0]*m[9]*m[15]  + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9];
+    inv[13] =  m[0]*m[9]*m[14]  - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9];
+    inv[2]  =  m[1]*m[6]*m[15]  - m[1]*m[7]*m[14]  - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7]  - m[13]*m[3]*m[6];
+    inv[6]  = -m[0]*m[6]*m[15]  + m[0]*m[7]*m[14]  + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7]  + m[12]*m[3]*m[6];
+    inv[10] =  m[0]*m[5]*m[15]  - m[0]*m[7]*m[13]  - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7]  - m[12]*m[3]*m[5];
+    inv[14] = -m[0]*m[5]*m[14]  + m[0]*m[6]*m[13]  + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6]  + m[12]*m[2]*m[5];
+    inv[3]  = -m[1]*m[6]*m[11]  + m[1]*m[7]*m[10]  + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7]   + m[9]*m[3]*m[6];
+    inv[7]  =  m[0]*m[6]*m[11]  - m[0]*m[7]*m[10]  - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7]   - m[8]*m[3]*m[6];
+    inv[11] = -m[0]*m[5]*m[11]  + m[0]*m[7]*m[9]   + m[4]*m[1]*m[11] - m[4]*m[3]*m[9]  - m[8]*m[1]*m[7]   + m[8]*m[3]*m[5];
+    inv[15] =  m[0]*m[5]*m[10]  - m[0]*m[6]*m[9]   - m[4]*m[1]*m[10] + m[4]*m[2]*m[9]  + m[8]*m[1]*m[6]   - m[8]*m[2]*m[5];
+    const det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
+    if (Math.abs(det) < 1e-15) return null;
+    const invDet = 1.0 / det;
+    return inv.map(v => v * invDet);
+  }
+
+  // ===== 法線行列 (Normal Matrix) =====
+  // 頂点法線をワールド空間に変換するための 3x3 行列 = transpose(inverse(worldMatrix の左上3x3))。
+  // スケール変形があるとき、法線を worldMatrix でそのまま変換すると向きがズレる。
+  // 戻り値: column-major 9要素。特異行列の場合は単位行列を返す。
+  function normalMatrix(worldMatrix) {
+    const inv = invertMatrix(worldMatrix);
+    if (!inv) return [1,0,0, 0,1,0, 0,0,1];
+    // transpose of upper-left 3x3 of inv (column-major 4x4 → column-major 3x3)
+    return [inv[0], inv[4], inv[8], inv[1], inv[5], inv[9], inv[2], inv[6], inv[10]];
+  }
+
+  // ===== Unproject: スクリーン座標 → ワールド空間レイ =====
+  // マウスピッキングなど、スクリーン上の点をワールド空間に逆投影する。
+  // px, py: スクリーン座標（Y=0がトップ）
+  // view, proj: projectScene の戻り値から取得
+  // viewport: { width, height }
+  // 戻り値: { origin: [x,y,z], direction: [x,y,z] } ※ direction は正規化済み
+  function unproject(px, py, view, proj, viewport) {
+    const ndcX = (2 * px / viewport.width) - 1;
+    const ndcY = 1 - (2 * py / viewport.height); // Y反転（スクリーンY=0がトップ）
+    const vp = multiply(proj, view);
+    const vpInv = invertMatrix(vp);
+    if (!vpInv) return null;
+    const nearClip = transformVec4(vpInv, [ndcX, ndcY, -1, 1]);
+    const farClip  = transformVec4(vpInv, [ndcX, ndcY,  1, 1]);
+    const nw = nearClip[3];
+    const fw = farClip[3];
+    const nx = nearClip[0]/nw, ny = nearClip[1]/nw, nz = nearClip[2]/nw;
+    const fx = farClip[0]/fw,  fy = farClip[1]/fw,  fz = farClip[2]/fw;
+    const dx = fx - nx, dy = fy - ny, dz = fz - nz;
+    const len = Math.hypot(dx, dy, dz);
+    return {
+      origin: [nx, ny, nz],
+      direction: len > 0 ? [dx/len, dy/len, dz/len] : [0, 0, -1]
+    };
+  }
+
   // ===== メイン: projectScene =====
   // 入力 scene:
   //   {
@@ -607,10 +670,11 @@
       rotationX, rotationY, rotationZ,
       scaleM, buildModelMatrix, buildViewMatrix,
       buildPerspective, buildOrthographic, buildLookAt,
-      transformVec4,
+      transformVec4, invertMatrix, normalMatrix,
       quatIdentity, quatFromAxisAngle, quatFromEuler,
       quatMul, quatNormalize, quatConjugate, quatToMatrix, quatSlerp
-    }
+    },
+    unproject
   };
 });
 // [/ai_s_emblem: Cpu3D-Projection]

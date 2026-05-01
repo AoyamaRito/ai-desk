@@ -50,36 +50,153 @@
     return [sx,0,0,0, 0,sy,0,0, 0,0,sz,0, 0,0,0,1];
   }
 
-  // M = T * Rz * Ry * Rx * S （適用順は S → Rx → Ry → Rz → T）
+  // ===== クォータニオン =====
+  // 表現: [x, y, z, w] (XYZW順)。単位クォータニオンは [0,0,0,1]。
+  // ジンバルロック耐性とアニメ補間（slerp）のために導入。Eulerより数値が安定する。
+
+  function quatIdentity() { return [0, 0, 0, 1]; }
+
+  function quatFromAxisAngle(axis, angle) {
+    const len = Math.hypot(axis[0], axis[1], axis[2]);
+    const ax = axis[0] / (len || 1);
+    const ay = axis[1] / (len || 1);
+    const az = axis[2] / (len || 1);
+    const half = angle * 0.5;
+    const s = Math.sin(half);
+    return [ax * s, ay * s, az * s, Math.cos(half)];
+  }
+
+  // Euler XYZ extrinsic（buildModelMatrix の Rz*Ry*Rx と一致）
+  // → 等価のクォータニオンは qz * qy * qx。手で展開せず、quatMul に任せて間違いを排する。
+  function quatFromEuler(rx, ry, rz) {
+    const qx = quatFromAxisAngle([1, 0, 0], rx);
+    const qy = quatFromAxisAngle([0, 1, 0], ry);
+    const qz = quatFromAxisAngle([0, 0, 1], rz);
+    return quatMul(qz, quatMul(qy, qx));
+  }
+
+  function quatMul(a, b) {
+    return [
+      a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+      a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+      a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+      a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2]
+    ];
+  }
+
+  function quatNormalize(q) {
+    const len = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
+    return [q[0]/len, q[1]/len, q[2]/len, q[3]/len];
+  }
+
+  function quatConjugate(q) { return [-q[0], -q[1], -q[2], q[3]]; }
+
+  function quatToMatrix(q) {
+    const x = q[0], y = q[1], z = q[2], w = q[3];
+    const xx = x*x, yy = y*y, zz = z*z;
+    const xy = x*y, xz = x*z, yz = y*z;
+    const wx = w*x, wy = w*y, wz = w*z;
+    // Column-major
+    return [
+      1 - 2*(yy + zz),   2*(xy + wz),       2*(xz - wy),       0,
+      2*(xy - wz),       1 - 2*(xx + zz),   2*(yz + wx),       0,
+      2*(xz + wy),       2*(yz - wx),       1 - 2*(xx + yy),   0,
+      0,                 0,                 0,                 1
+    ];
+  }
+
+  function quatSlerp(a, b, t) {
+    let dot = a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3];
+    let bb = b;
+    if (dot < 0) { bb = [-b[0], -b[1], -b[2], -b[3]]; dot = -dot; }
+    if (dot > 0.9995) {
+      // ほぼ平行: 線形補間で十分（数値安定）
+      return quatNormalize([
+        a[0] + (bb[0] - a[0]) * t,
+        a[1] + (bb[1] - a[1]) * t,
+        a[2] + (bb[2] - a[2]) * t,
+        a[3] + (bb[3] - a[3]) * t
+      ]);
+    }
+    const theta = Math.acos(dot);
+    const sinTheta = Math.sin(theta);
+    const sa = Math.sin((1 - t) * theta) / sinTheta;
+    const sb = Math.sin(t * theta) / sinTheta;
+    return [
+      sa * a[0] + sb * bb[0],
+      sa * a[1] + sb * bb[1],
+      sa * a[2] + sb * bb[2],
+      sa * a[3] + sb * bb[3]
+    ];
+  }
+
+  // M = T * R * S。R は transform.quaternion 優先、無ければ Euler から組み立てる。
   function buildModelMatrix(t) {
+    const T = translation(t.position[0], t.position[1], t.position[2]);
+    let R;
+    if (Array.isArray(t.quaternion) && t.quaternion.length === 4) {
+      R = quatToMatrix(t.quaternion);
+    } else {
+      const r = t.rotation || [0, 0, 0];
+      R = multiply(rotationZ(r[2]), multiply(rotationY(r[1]), rotationX(r[0])));
+    }
+    const S = scaleM(t.scale[0], t.scale[1], t.scale[2]);
+    return multiply(T, multiply(R, S));
+  }
+
+  // ビュー行列の構築。優先順位:
+  //   1. cam.lookAt があれば lookAt ビューを使う（ゲームの追従カメラ向け）
+  //   2. cam.quaternion があればそれを反転して使う
+  //   3. 無ければ Euler の符号反転で組む（既存後方互換）
+  function buildViewMatrix(cam) {
+    if (Array.isArray(cam.lookAt) && cam.lookAt.length === 3) {
+      return buildLookAt(cam.position, cam.lookAt, cam.up || [0, 1, 0]);
+    }
+    if (Array.isArray(cam.quaternion) && cam.quaternion.length === 4) {
+      const Rinv = quatToMatrix(quatConjugate(cam.quaternion));
+      return multiply(Rinv, translation(-cam.position[0], -cam.position[1], -cam.position[2]));
+    }
+    const r = cam.rotation || [0, 0, 0];
     return multiply(
-      translation(t.position[0], t.position[1], t.position[2]),
+      rotationX(-r[0]),
       multiply(
-        rotationZ(t.rotation[2]),
+        rotationY(-r[1]),
         multiply(
-          rotationY(t.rotation[1]),
-          multiply(
-            rotationX(t.rotation[0]),
-            scaleM(t.scale[0], t.scale[1], t.scale[2])
-          )
+          rotationZ(-r[2]),
+          translation(-cam.position[0], -cam.position[1], -cam.position[2])
         )
       )
     );
   }
 
-  // View行列はカメラのワールド変換の逆行列。R^T * T(-pos) と等価で、
-  // 軸ごとに「角度の符号反転 + 順序反転」で組み立てれば逆になる。
-  function buildViewMatrix(cam) {
-    return multiply(
-      rotationX(-cam.rotation[0]),
-      multiply(
-        rotationY(-cam.rotation[1]),
-        multiply(
-          rotationZ(-cam.rotation[2]),
-          translation(-cam.position[0], -cam.position[1], -cam.position[2])
-        )
-      )
-    );
+  // 右手系 lookAt。view = R^T * T(-eye) と等価で、列優先で書き下した形。
+  // 軸: forward = normalize(target - eye)、xAxis = normalize(forward × up)、yAxis = xAxis × forward
+  // ビュー空間では camera が -Z を見るので、3列目は -forward。
+  function buildLookAt(eye, target, up) {
+    const fx = target[0] - eye[0];
+    const fy = target[1] - eye[1];
+    const fz = target[2] - eye[2];
+    const flen = Math.hypot(fx, fy, fz) || 1;
+    const fwdX = fx / flen, fwdY = fy / flen, fwdZ = fz / flen;
+    // s = forward × up
+    let sX = fwdY * up[2] - fwdZ * up[1];
+    let sY = fwdZ * up[0] - fwdX * up[2];
+    let sZ = fwdX * up[1] - fwdY * up[0];
+    const slen = Math.hypot(sX, sY, sZ) || 1;
+    sX /= slen; sY /= slen; sZ /= slen;
+    // u = s × forward
+    const uX = sY * fwdZ - sZ * fwdY;
+    const uY = sZ * fwdX - sX * fwdZ;
+    const uZ = sX * fwdY - sY * fwdX;
+    const dse = sX * eye[0] + sY * eye[1] + sZ * eye[2];
+    const due = uX * eye[0] + uY * eye[1] + uZ * eye[2];
+    const dfe = fwdX * eye[0] + fwdY * eye[1] + fwdZ * eye[2];
+    return [
+      sX,  uX, -fwdX, 0,
+      sY,  uY, -fwdY, 0,
+      sZ,  uZ, -fwdZ, 0,
+     -dse, -due, dfe, 1
+    ];
   }
 
   // 透視投影行列（OpenGL右手系・Z=-1〜+1のNDC）。WebGLと同じ規約で、
@@ -92,6 +209,20 @@
       0, f, 0, 0,
       0, 0, (far + near) * nf, -1,
       0, 0, 2 * far * near * nf, 0
+    ];
+  }
+
+  // 正射影行列（OpenGL右手系）。UI/2Dオーバーレイ・デバッグビュー向け。
+  // GLの glOrtho と同じ規約。
+  function buildOrthographic(left, right, bottom, top, near, far) {
+    const lr = 1 / (left - right);
+    const bt = 1 / (bottom - top);
+    const nf = 1 / (near - far);
+    return [
+      -2 * lr, 0, 0, 0,
+      0, -2 * bt, 0, 0,
+      0, 0, 2 * nf, 0,
+      (left + right) * lr, (top + bottom) * bt, (far + near) * nf, 1
     ];
   }
 
@@ -109,21 +240,35 @@
   //     objects: [
   //       {
   //         id: 'cube',
-  //         vertices: [[x,y,z], ...],            // ローカル座標
-  //         transform: { position, rotation, scale },  // 各 [x,y,z]
+  //         vertices: [[x,y,z], ...],                  // ローカル座標
+  //         transform: {
+  //           position:   [x,y,z],
+  //           rotation:   [rx,ry,rz],                  // Euler XYZ extrinsic
+  //           quaternion: [x,y,z,w],                   // optional, あれば rotation を上書き
+  //           scale:      [sx,sy,sz]
+  //         },
   //         parent: null | 'parentId' | parentIndex,
-  //         time?:    { offset: 0 },              // 親時刻 + offset
-  //         alpha?:   1.0,                        // 親α × self
-  //         visible?: true                        // 親 AND self
+  //         time?:    { offset: 0 },                   // 親時刻 + offset
+  //         alpha?:   1.0,                             // 親α × self
+  //         visible?: true                             // 親 AND self
   //       }
   //     ],
-  //     camera: { position, rotation, fov, aspect, near, far },
+  //     camera: {
+  //       position:   [x,y,z],
+  //       rotation:   [rx,ry,rz],                      // Euler、または
+  //       quaternion: [x,y,z,w],                       // あれば優先、または
+  //       lookAt:     [x,y,z],                         // あれば最優先（追従カメラ）
+  //       up?:        [x,y,z],                         // lookAt 用、default [0,1,0]
+  //       fov, aspect, near, far,                      // 透視投影用
+  //       ortho?: { left, right, bottom, top }         // あれば正射影に切替
+  //     },
   //     viewport: { width, height },
   //     worldTime?: 0
   //   }
   //
   // 出力 result:
   //   {
+  //     view, projection,
   //     objects: [
   //       {
   //         id, worldMatrix,
@@ -198,9 +343,15 @@
 
     // (4) ビュー・プロジェクション行列
     const view = buildViewMatrix(scene.camera);
-    const proj = buildPerspective(
-      scene.camera.fov, scene.camera.aspect, scene.camera.near, scene.camera.far
-    );
+    let proj;
+    if (scene.camera.ortho) {
+      const o = scene.camera.ortho;
+      proj = buildOrthographic(o.left, o.right, o.bottom, o.top, scene.camera.near, scene.camera.far);
+    } else {
+      proj = buildPerspective(
+        scene.camera.fov, scene.camera.aspect, scene.camera.near, scene.camera.far
+      );
+    }
 
     // (5) 頂点ごとの段階別出力
     const vw = scene.viewport.width;
@@ -253,14 +404,103 @@
     };
   }
 
+  // ===== 突合: assert_projectScene (Bible §7.1) =====
+  // Twin の出力と「期待値」を段階別に比較する突合関数。
+  //
+  // 入力:
+  //   twin     : projectScene の出力
+  //   expected : { objects: [{ id, vertices: [[..stage次元..], ...] }] }
+  //              vertices の各要素は比較したい段階の数値配列
+  //                stage='screen' なら [px, py]
+  //                stage='ndc'    なら [x, y, z]
+  //                stage='world'  なら [x, y, z]
+  //                stage='clip'   なら [x, y, z, w]
+  //   opts     : { eps: number=1e-6, stage: 'screen'|'world'|'view'|'ndc'|'clip'='screen' }
+  //
+  // 出力:
+  //   {
+  //     ok: bool,                            // 全頂点が eps 以内に収まったか
+  //     stage, eps,
+  //     maxError: number,                    // 全比較中の最大成分誤差（絶対値）
+  //     mismatches: [{ objectId, vertexIndex, expected, actual, delta, error? }],
+  //     firstFailure: 最初の不一致 | null
+  //   }
+  //
+  // Zero-Dep。投げない（呼び出し側で `if (!result.ok) throw ...` する）。
+  function assert_projectScene(twin, expected, opts) {
+    const eps = (opts && typeof opts.eps === 'number') ? opts.eps : 1e-6;
+    const stage = (opts && opts.stage) ? opts.stage : 'screen';
+    const mismatches = [];
+    let maxError = 0;
+    let firstFailure = null;
+
+    for (const expObj of expected.objects) {
+      const twinObj = twin.objects.find(o => o.id === expObj.id);
+      if (!twinObj) {
+        const m = { objectId: expObj.id, error: 'not found in twin' };
+        mismatches.push(m);
+        if (!firstFailure) firstFailure = m;
+        continue;
+      }
+      const expVerts = expObj.vertices || [];
+      for (let i = 0; i < expVerts.length; i++) {
+        const e = expVerts[i];
+        const tv = twinObj.vertices[i];
+        if (!tv) {
+          const m = { objectId: expObj.id, vertexIndex: i, error: 'vertex not in twin' };
+          mismatches.push(m);
+          if (!firstFailure) firstFailure = m;
+          continue;
+        }
+        const a = tv[stage];
+        if (!Array.isArray(a)) {
+          const m = { objectId: expObj.id, vertexIndex: i, error: `unknown stage '${stage}'` };
+          mismatches.push(m);
+          if (!firstFailure) firstFailure = m;
+          continue;
+        }
+        let delta = 0;
+        for (let k = 0; k < e.length; k++) {
+          const d = Math.abs(a[k] - e[k]);
+          if (d > delta) delta = d;
+        }
+        if (delta > maxError) maxError = delta;
+        if (delta > eps) {
+          const m = {
+            objectId: expObj.id,
+            vertexIndex: i,
+            expected: e.slice(),
+            actual: a.slice(0, e.length),
+            delta
+          };
+          mismatches.push(m);
+          if (!firstFailure) firstFailure = m;
+        }
+      }
+    }
+
+    return {
+      ok: mismatches.length === 0,
+      stage,
+      eps,
+      maxError,
+      mismatches,
+      firstFailure
+    };
+  }
+
   return {
     projectScene,
-    // 検証・テスト用に行列基礎も公開する（鉱脈採掘の入口）
+    assert_projectScene,
+    // 検証・テスト・鉱脈採掘の入口として行列とクォータニオンを公開する
     _math: {
       multiply, translation,
       rotationX, rotationY, rotationZ,
-      scaleM, buildModelMatrix, buildViewMatrix, buildPerspective,
-      transformVec4
+      scaleM, buildModelMatrix, buildViewMatrix,
+      buildPerspective, buildOrthographic, buildLookAt,
+      transformVec4,
+      quatIdentity, quatFromAxisAngle, quatFromEuler,
+      quatMul, quatNormalize, quatConjugate, quatToMatrix, quatSlerp
     }
   };
 });

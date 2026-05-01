@@ -10,8 +10,9 @@
   .sub { color:#8b949e; font-size: 12px; margin-top:4px; }
   main { display: grid; grid-template-columns: 1fr 380px; gap: 0; }
   .stage { position: relative; }
-  canvas { display:block; background: #161b22; }
-  #overlay { position:absolute; left:0; top:0; pointer-events:none; }
+  canvas { display:block; }
+  #gl      { background: #161b22; }
+  #overlay { position:absolute; left:0; top:0; pointer-events:none; background: transparent; }
   aside { padding: 16px 20px; border-left: 1px solid #30363d; min-height: 600px; }
   pre { background:#161b22; border:1px solid #30363d; padding:10px; font-size:11px; overflow:auto; max-height:240px; }
   .ok { color:#3fb950; }
@@ -43,9 +44,26 @@
       <button id="toggle-anim">▮▮ 一時停止</button>
       <button id="toggle-overlay">マーカー切替</button>
     </div>
+    <div class="label">回転 (Phase 1)</div>
+    <div class="row">
+      <button id="rot-euler">Euler</button>
+      <button id="rot-quat">Quaternion</button>
+    </div>
+    <div class="label">カメラ (Phase 1)</div>
+    <div class="row">
+      <button id="cam-euler">Euler</button>
+      <button id="cam-lookat">lookAt</button>
+    </div>
+    <div class="label">投影 (Phase 1)</div>
+    <div class="row">
+      <button id="proj-persp">Perspective</button>
+      <button id="proj-ortho">Ortho</button>
+    </div>
     <div class="label">突合結果（max誤差 px）</div>
     <pre id="diff">—</pre>
-    <div class="label">cpu3d output (object#1, 頂点0)</div>
+    <div class="label">assert_projectScene (twin self vs twin)</div>
+    <pre id="assert">—</pre>
+    <div class="label">cpu3d output (頂点0)</div>
     <pre id="dump">—</pre>
     <div class="label">凡例</div>
     <div class="row"><span style="color:#58a6ff;">●</span> CPU予測位置（in frustum）</div>
@@ -147,29 +165,54 @@ const uProj  = gl.getUniformLocation(prog, 'uProj');
 gl.enable(gl.DEPTH_TEST);
 gl.viewport(0, 0, glCanvas.width, glCanvas.height);
 
+// === Phase 1 トグル状態 ===
+let mode = {
+  rotation: 'euler',     // 'euler' | 'quat'
+  camera:   'euler',     // 'euler' | 'lookat'
+  projection: 'persp'    // 'persp' | 'ortho'
+};
+
 // === シーン定義（CPU と GPU で共有する単一の真実） ===
 function buildScene(t) {
+  // 立方体の回転: Euler とクォータニオンを切替
+  const rx = t * 0.5, ry = t * 0.7, rz = 0;
+  const transform = {
+    position: [0, 0, -6],
+    rotation: [rx, ry, rz],
+    scale: [1, 1, 1]
+  };
+  if (mode.rotation === 'quat') {
+    transform.quaternion = Cpu3D._math.quatFromEuler(rx, ry, rz);
+  }
+
+  // カメラ: Euler / lookAt 切替。lookAt は立方体周りを軌道する。
+  const cam = {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    fov: Math.PI / 3,
+    aspect: glCanvas.width / glCanvas.height,
+    near: 0.1,
+    far: 100
+  };
+  if (mode.camera === 'lookat') {
+    const r = 8;
+    cam.position = [Math.sin(t * 0.3) * r, 1.5, Math.cos(t * 0.3) * r - 6];
+    cam.lookAt = [0, 0, -6];
+    cam.up = [0, 1, 0];
+  }
+
+  // 投影: 透視 / 正射影 切替
+  if (mode.projection === 'ortho') {
+    const halfH = 3;
+    const halfW = halfH * cam.aspect;
+    cam.ortho = { left: -halfW, right: halfW, bottom: -halfH, top: halfH };
+  }
+
   return {
     objects: [
-      {
-        id: 'cube',
-        vertices: cubeVerts,
-        transform: {
-          position: [0, 0, -6],
-          rotation: [t * 0.5, t * 0.7, 0],
-          scale: [1, 1, 1]
-        },
-        parent: null
-      }
+      { id: 'cube', vertices: cubeVerts, transform, parent: null }
     ],
-    camera: {
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      fov: Math.PI / 3,
-      aspect: glCanvas.width / glCanvas.height,
-      near: 0.1,
-      far: 100
-    },
+    camera: cam,
     viewport: { width: glCanvas.width, height: glCanvas.height }
   };
 }
@@ -240,8 +283,17 @@ function frame(now) {
     }
   }
   const diffEl = document.getElementById('diff');
-  diffEl.textContent = `clip max diff: ${maxDiff.toExponential(3)}\n${maxDiff < 1e-6 ? '✓ CPU路線とCPU路線（再計算）は同一' : '✗ 数値の不一致を検出'}`;
+  diffEl.textContent = `mode: ${mode.rotation}/${mode.camera}/${mode.projection}\nclip max diff: ${maxDiff.toExponential(3)}\n${maxDiff < 1e-6 ? '✓ CPU路線とCPU路線（再計算）は同一' : '✗ 数値の不一致を検出'}`;
   diffEl.className = maxDiff < 1e-6 ? 'ok' : 'ng';
+
+  // assert_projectScene の動作確認: Twin 出力を期待値として再投入 → 完全一致するはず
+  const expected = {
+    objects: [{ id: 'cube', vertices: obj.vertices.map(v => v.screen.slice()) }]
+  };
+  const ar = Cpu3D.assert_projectScene(cpu, expected, { stage: 'screen', eps: 1e-9 });
+  const aEl = document.getElementById('assert');
+  aEl.textContent = `stage=${ar.stage}  eps=${ar.eps}\nok=${ar.ok}  maxError=${ar.maxError}\nmismatches=${ar.mismatches.length}`;
+  aEl.className = ar.ok ? 'ok' : 'ng';
 
   // ダンプ
   const v0 = obj.vertices[0];
@@ -275,6 +327,25 @@ document.getElementById('toggle-anim').addEventListener('click', (e) => {
 document.getElementById('toggle-overlay').addEventListener('click', () => {
   showOverlay = !showOverlay;
 });
+
+function highlight(group, active) {
+  for (const id of group) {
+    const el = document.getElementById(id);
+    el.style.background = (id === active) ? '#1f6feb' : '#21262d';
+  }
+}
+const ROT = ['rot-euler', 'rot-quat'];
+const CAM = ['cam-euler', 'cam-lookat'];
+const PROJ = ['proj-persp', 'proj-ortho'];
+document.getElementById('rot-euler').onclick   = () => { mode.rotation = 'euler';  highlight(ROT, 'rot-euler'); };
+document.getElementById('rot-quat').onclick    = () => { mode.rotation = 'quat';   highlight(ROT, 'rot-quat'); };
+document.getElementById('cam-euler').onclick   = () => { mode.camera = 'euler';    highlight(CAM, 'cam-euler'); };
+document.getElementById('cam-lookat').onclick  = () => { mode.camera = 'lookat';   highlight(CAM, 'cam-lookat'); };
+document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp'; highlight(PROJ, 'proj-persp'); };
+document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho'; highlight(PROJ, 'proj-ortho'); };
+highlight(ROT, 'rot-euler');
+highlight(CAM, 'cam-euler');
+highlight(PROJ, 'proj-persp');
 
 requestAnimationFrame(frame);
 // [/ai_s_emblem: GpuCpu-Comparison]

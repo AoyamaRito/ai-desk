@@ -62,19 +62,35 @@ Twin は層と直交する概念であり、新しいレイヤーではない（
   objects: [
     {
       id: 'cube',
-      vertices: [[x,y,z], ...],                    // ローカル座標
-      transform: { position:[x,y,z], rotation:[rx,ry,rz], scale:[sx,sy,sz] },
+      vertices: [[x,y,z], ...],                       // ローカル座標
+      transform: {
+        position:    [x,y,z],
+        rotation:    [rx,ry,rz],                      // Euler XYZ extrinsic
+        quaternion?: [x,y,z,w],                       // 任意。あれば rotation を上書き
+        scale:       [sx,sy,sz]
+      },
       parent: null | 'parentId' | parentIndex,
-      time?:    { offset: 0 },                     // 親時刻 + offset
-      alpha?:   1.0,                               // 親α × self
-      visible?: true                               // 親 AND self
+      time?:    { offset: 0 },                        // 親時刻 + offset
+      alpha?:   1.0,                                  // 親α × self
+      visible?: true                                  // 親 AND self
     }
   ],
-  camera: { position, rotation, fov, aspect, near, far },
+  camera: {
+    position:    [x,y,z],
+    rotation:    [rx,ry,rz],                          // Euler、または
+    quaternion?: [x,y,z,w],                           // あれば優先、または
+    lookAt?:     [x,y,z],                             // あれば最優先（追従カメラ）
+    up?:         [x,y,z],                             // lookAt 用、default [0,1,0]
+    fov, aspect, near, far,                           // 透視投影用
+    ortho?:      { left, right, bottom, top }         // あれば正射影に切替
+  },
   viewport: { width, height },
   worldTime?: 0
 }
 ```
+
+**カメラ規約の優先順位**: `lookAt` > `quaternion` > `rotation`。
+**投影規約**: `camera.ortho` があれば正射影、無ければ透視投影（`fov`/`aspect`必須）。
 
 GPUに送るバッファとCPU検証への入力は**同じscene JSON**でなければならない。
 二重定義は複式数学を成立させない（同じ数学を二度書いたら検算にならない）。
@@ -114,19 +130,71 @@ GPUに送るバッファとCPU検証への入力は**同じscene JSON**でなけ
 ```js
 const scene = { /* ... */ };
 
-// CPU検証層
-const cpu = Cpu3D.projectScene(scene);
+// CPU検証層 (Twin)
+const twin = Cpu3D.projectScene(scene);
 
 // GPU効率層（同じ行列を渡す）
-gl.uniformMatrix4fv(uView,  false, cpu.view);
-gl.uniformMatrix4fv(uProj,  false, cpu.projection);
-for (const obj of cpu.objects) {
+gl.uniformMatrix4fv(uView,  false, twin.view);
+gl.uniformMatrix4fv(uProj,  false, twin.projection);
+for (const obj of twin.objects) {
   gl.uniformMatrix4fv(uModel, false, obj.worldMatrix);
   gl.drawElements(...);
 }
 
 // 突合：例えば「敵Aは画面に映っているはずか」をCPUの inFrustum で断定
-assert(cpu.objects[1].vertices[0].inFrustum === expectedVisible);
+assert(twin.objects[1].vertices[0].inFrustum === expectedVisible);
+```
+
+### `assert_projectScene` による段階別突合 (Bible §7.1)
+
+GPU/手計算で得られた期待値と Twin の段階別出力を突き合わせる:
+
+```js
+const { projectScene, assert_projectScene } = require('./cpu3d.js');
+
+const twin = projectScene(scene);
+
+// 期待値（GPU readback / 手計算 / 旧実装からの値）
+const expected = {
+  objects: [
+    { id: 'enemy', vertices: [[400, 300], [432, 280]] }    // screen pixels
+  ]
+};
+
+const result = assert_projectScene(twin, expected, { stage: 'screen', eps: 0.5 });
+//   { ok: bool, stage, eps, maxError,
+//     mismatches: [{ objectId, vertexIndex, expected, actual, delta }],
+//     firstFailure: 最初の不一致 | null }
+
+if (!result.ok) {
+  console.error(`stage=${result.stage} maxError=${result.maxError}`);
+  console.error(result.firstFailure);
+}
+```
+
+`stage` は `'screen' | 'world' | 'view' | 'ndc' | 'clip'` から選ぶ。
+ズレた段階を変えながら呼ぶことで「どの段で論理が壊れたか」を二分探索できる。
+
+### クォータニオン・lookAt・正射影の例
+
+```js
+const { _math } = require('./cpu3d.js');
+
+// クォータニオン（ジンバルロックを避ける）
+const q = _math.quatFromAxisAngle([0,1,0], Math.PI/2);
+scene.objects[0].transform.quaternion = q;
+
+// 追従カメラ
+scene.camera.lookAt = [enemy.x, enemy.y, enemy.z];
+scene.camera.up = [0, 1, 0];
+
+// UI/2Dオーバーレイ用の正射影
+scene.camera.ortho = { left: -10, right: 10, bottom: -7.5, top: 7.5 };
+
+// アニメーション補間
+const qStart = _math.quatFromAxisAngle([0,1,0], 0);
+const qEnd   = _math.quatFromAxisAngle([0,1,0], Math.PI);
+scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 ```
 
 ---
@@ -156,14 +224,27 @@ assert(cpu.objects[1].vertices[0].inFrustum === expectedVisible);
 
 ## ロードマップ
 
+**Phase 0 (完了)**:
 - [x] 静止メッシュの頂点投影（5段パイプライン）
 - [x] 親子ツリーの level-based 投影
 - [x] 3Dplus軸（時刻・α・可視）
 - [x] 視錐台カリング
-- [x] 21/21 ネイティブテスト PASS
 - [x] WebGL突合PoC
-- [ ] スキニング（ボーン変換）の検証層
-- [ ] AABB/球の衝突判定検証層
+
+**Phase 1 (完了)**:
+- [x] クォータニオン（identity / fromAxisAngle / fromEuler / mul / normalize / slerp / toMatrix）
+- [x] `transform.quaternion` で Euler を上書き
+- [x] `camera.lookAt` + `camera.up` 追従カメラ
+- [x] `camera.ortho` 正射影
+- [x] `assert_projectScene` 段階別突合API（Bible §7.1）
+- [x] **39/39 ネイティブテスト PASS**
+
+**Phase 2 (次)**:
+- [ ] 三角形ステージ + 背面カリング
+- [ ] スキニング（ボーン変換）の Twin
+
+**Phase 3 (別ファイル化)**:
+- [ ] `collision.js` — AABB / 球 / Ray-Tri の Twin
 - [ ] アニメーション補間の鉱脈採掘（GPUサンプル → CPU純粋関数を法則解読）
 
 ---

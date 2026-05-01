@@ -6,7 +6,7 @@
 //      数値が正しいことが言えるということは、GPUと突合する資格があるということ。
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { projectScene, _math } = require('../cpu3d.js');
+const { projectScene, assert_projectScene, _math } = require('../cpu3d.js');
 
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
@@ -238,5 +238,276 @@ test('rotationY(π) * (1,0,0,1) = (-1,0,0,1)', () => {
   assert.ok(close(out[0], -1, 1e-9));
   assert.ok(close(out[1], 0, 1e-9));
   assert.ok(close(out[2], 0, 1e-9));
+});
+
+// === 8. クォータニオン (Phase 1) ===
+test('quatIdentity: (1,0,0) は不変', () => {
+  const q = _math.quatIdentity();
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'p', vertices: [[1,0,0]],
+      transform: { position:[0,0,0], rotation:[0,0,0], quaternion: q, scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.world[0], 1));
+  assert.ok(close(v.world[1], 0));
+  assert.ok(close(v.world[2], 0));
+});
+
+test('quatFromAxisAngle: Y軸π/2 で (1,0,0) → (0,0,-1)', () => {
+  const q = _math.quatFromAxisAngle([0,1,0], Math.PI/2);
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'p', vertices: [[1,0,0]],
+      transform: { position:[0,0,0], rotation:[0,0,0], quaternion: q, scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.world[0], 0));
+  assert.ok(close(v.world[1], 0));
+  assert.ok(close(v.world[2], -1));
+});
+
+test('quatFromEuler は Euler 行列と数値一致する', () => {
+  const rx = 0.3, ry = 0.7, rz = 0.5;
+  // Euler 経路
+  const r1 = projectScene(baseScene({
+    objects: [{
+      id:'p', vertices: [[1,2,3]],
+      transform: { position:[0,0,0], rotation:[rx,ry,rz], scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  // Quaternion 経路
+  const q = _math.quatFromEuler(rx, ry, rz);
+  const r2 = projectScene(baseScene({
+    objects: [{
+      id:'p', vertices: [[1,2,3]],
+      transform: { position:[0,0,0], rotation:[0,0,0], quaternion: q, scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  for (let k = 0; k < 3; k++) {
+    assert.ok(close(r1.objects[0].vertices[0].world[k], r2.objects[0].vertices[0].world[k], 1e-9));
+  }
+});
+
+test('quaternion は rotation を上書きする', () => {
+  // rotation はゴミ値、quaternion で正しく Y軸90度に
+  const q = _math.quatFromAxisAngle([0,1,0], Math.PI/2);
+  const r = projectScene(baseScene({
+    objects: [{
+      id:'p', vertices: [[1,0,0]],
+      transform: { position:[0,0,0], rotation:[3.14, 0.99, -1.23], quaternion: q, scale:[1,1,1] },
+      parent: null
+    }]
+  }));
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.world[0], 0));
+  assert.ok(close(v.world[2], -1));
+});
+
+test('quatSlerp(a, a, t) = a', () => {
+  const a = _math.quatFromAxisAngle([0,1,0], 0.7);
+  const out = _math.quatSlerp(a, a, 0.5);
+  for (let k = 0; k < 4; k++) assert.ok(close(out[k], a[k], 1e-9));
+});
+
+test('quatSlerp(id, q, 0) = id, slerp(id, q, 1) = q', () => {
+  const id = _math.quatIdentity();
+  const q = _math.quatFromAxisAngle([0,1,0], Math.PI/3);
+  const at0 = _math.quatSlerp(id, q, 0);
+  const at1 = _math.quatSlerp(id, q, 1);
+  for (let k = 0; k < 4; k++) {
+    assert.ok(close(at0[k], id[k], 1e-9));
+    assert.ok(close(at1[k], q[k], 1e-9));
+  }
+});
+
+test('quatMul(a, identity) = a', () => {
+  const a = _math.quatFromAxisAngle([1,2,3], 0.4);
+  const id = _math.quatIdentity();
+  const out = _math.quatMul(a, id);
+  for (let k = 0; k < 4; k++) assert.ok(close(out[k], a[k], 1e-12));
+});
+
+// === 9. lookAt カメラ (Phase 1) ===
+test('lookAt: (0,5,5) から原点を見て、原点の頂点は screen 中央', () => {
+  const r = projectScene(baseScene({
+    camera: {
+      position: [0, 5, 5],
+      lookAt:   [0, 0, 0],
+      fov: Math.PI/2, aspect: 800/600, near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[0,0,0]], transform: T0, parent: null }]
+  }));
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.screen[0], 400, 1e-6));
+  assert.ok(close(v.screen[1], 300, 1e-6));
+});
+
+test('lookAt: rotation より優先される', () => {
+  // rotation はゴミ、lookAt で正しい view が取られるか
+  const r = projectScene({
+    camera: {
+      position: [0, 0, 0],
+      rotation: [1.2, 0.4, -0.7],   // ゴミ
+      lookAt:   [0, 0, -5],         // -Z を見る = 既定向きと等価
+      fov: Math.PI/2, aspect: 1, near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[0,0,-5]], transform: T0, parent: null }]
+  });
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.screen[0], 400, 1e-6));
+  assert.ok(close(v.screen[1], 300, 1e-6));
+});
+
+test('lookAt: 原点を見るカメラから +X の頂点は画面右側に出る', () => {
+  const r = projectScene({
+    camera: {
+      position: [0, 0, 5],
+      lookAt:   [0, 0, 0],
+      fov: Math.PI/2, aspect: 1, near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[1,0,0]], transform: T0, parent: null }]
+  });
+  const v = r.objects[0].vertices[0];
+  assert.ok(v.screen[0] > 400, `expected right-side, got screen.x=${v.screen[0]}`);
+});
+
+test('lookAt: up を反転すると上下も反転する', () => {
+  const base = {
+    camera: {
+      position: [0, 0, 5],
+      lookAt:   [0, 0, 0],
+      fov: Math.PI/2, aspect: 1, near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[0,1,0]], transform: T0, parent: null }]  // 上方向の点
+  };
+  const r1 = projectScene(base);
+  const r2 = projectScene({ ...base, camera: { ...base.camera, up: [0, -1, 0] } });
+  // up反転: 同じ上方向の点が画面上下逆に出る
+  // r1 では screen.y < 300（上半分）、r2 では screen.y > 300（下半分）
+  assert.ok(r1.objects[0].vertices[0].screen[1] < 300);
+  assert.ok(r2.objects[0].vertices[0].screen[1] > 300);
+});
+
+// === 10. 正射影 ortho (Phase 1) ===
+test('ortho: 視錐台中心の頂点は screen 中央', () => {
+  const r = projectScene({
+    camera: {
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      ortho: { left: -5, right: 5, bottom: -5, top: 5 },
+      near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[0,0,-10]], transform: T0, parent: null }]
+  });
+  const v = r.objects[0].vertices[0];
+  assert.ok(close(v.screen[0], 400, 1e-6));
+  assert.ok(close(v.screen[1], 300, 1e-6));
+});
+
+test('ortho: 透視と違って距離による拡縮が無い', () => {
+  const cam = {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    ortho: { left: -5, right: 5, bottom: -5, top: 5 },
+    near: 0.1, far: 100
+  };
+  // 同じローカル(1,0,…)が、奥行きz違いでスクリーンX一致するか
+  const r1 = projectScene({
+    camera: cam, viewport: { width: 800, height: 600 },
+    objects: [{ id:'a', vertices: [[1,0,-2]], transform: T0, parent: null }]
+  });
+  const r2 = projectScene({
+    camera: cam, viewport: { width: 800, height: 600 },
+    objects: [{ id:'a', vertices: [[1,0,-50]], transform: T0, parent: null }]
+  });
+  assert.ok(close(r1.objects[0].vertices[0].screen[0], r2.objects[0].vertices[0].screen[0], 1e-9));
+});
+
+test('ortho: 視錐台外は inFrustum=false', () => {
+  const r = projectScene({
+    camera: {
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      ortho: { left: -5, right: 5, bottom: -5, top: 5 },
+      near: 0.1, far: 100
+    },
+    viewport: { width: 800, height: 600 },
+    objects: [{ id:'p', vertices: [[10,0,-10]], transform: T0, parent: null }]
+  });
+  assert.equal(r.objects[0].vertices[0].inFrustum, false);
+});
+
+// === 11. assert_projectScene 突合API (Bible §7.1) ===
+test('assert: Twin の出力を Twin で突合 → ok=true, maxError=0', () => {
+  const scene = baseScene({
+    objects: [{ id:'p', vertices: [[0,0,-5]], transform: T0, parent: null }]
+  });
+  const twin = projectScene(scene);
+  // Twin が出した screen を expected として与える → 完全一致
+  const expected = {
+    objects: [{ id:'p', vertices: [twin.objects[0].vertices[0].screen.slice()] }]
+  };
+  const result = assert_projectScene(twin, expected, { stage:'screen', eps:1e-9 });
+  assert.equal(result.ok, true);
+  assert.equal(result.maxError, 0);
+  assert.equal(result.mismatches.length, 0);
+});
+
+test('assert: 期待値が eps を超えてズレると ok=false かつ firstFailure 記録', () => {
+  const scene = baseScene({
+    objects: [{ id:'p', vertices: [[0,0,-5]], transform: T0, parent: null }]
+  });
+  const twin = projectScene(scene);
+  const expected = {
+    objects: [{ id:'p', vertices: [[399, 300]] }]   // 1px ズレ
+  };
+  const result = assert_projectScene(twin, expected, { stage:'screen', eps:0.5 });
+  assert.equal(result.ok, false);
+  assert.ok(result.firstFailure);
+  assert.equal(result.firstFailure.objectId, 'p');
+  assert.equal(result.firstFailure.vertexIndex, 0);
+  assert.ok(result.maxError >= 1);
+});
+
+test('assert: stage="world" で world 座標を比較できる', () => {
+  const scene = baseScene({
+    objects: [{
+      id:'p', vertices: [[0,0,0]],
+      transform: { position:[2,3,-5], rotation:[0,0,0], scale:[1,1,1] },
+      parent: null
+    }]
+  });
+  const twin = projectScene(scene);
+  const expected = {
+    objects: [{ id:'p', vertices: [[2, 3, -5]] }]
+  };
+  const result = assert_projectScene(twin, expected, { stage:'world', eps:1e-9 });
+  assert.equal(result.ok, true);
+});
+
+test('assert: 未知の object id は mismatch として記録', () => {
+  const scene = baseScene({
+    objects: [{ id:'p', vertices: [[0,0,-5]], transform: T0, parent: null }]
+  });
+  const twin = projectScene(scene);
+  const expected = {
+    objects: [{ id:'unknown', vertices: [[0, 0]] }]
+  };
+  const result = assert_projectScene(twin, expected, { stage:'screen', eps:0.5 });
+  assert.equal(result.ok, false);
+  assert.equal(result.mismatches[0].objectId, 'unknown');
+  assert.match(result.mismatches[0].error, /not found/);
 });
 // [/ai_s_emblem: Cpu3D-Tests]

@@ -232,6 +232,30 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
   .demo-frame.tall { height: 520px; }
 }
 
+/* scaling table */
+.scale-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 18px;
+  border: 3px solid var(--fg);
+  font-size: 15px;
+}
+.scale-table th, .scale-table td {
+  padding: 10px 14px;
+  border: 1px solid var(--fg);
+  text-align: left;
+  vertical-align: top;
+}
+.scale-table thead th {
+  background: var(--fg);
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.scale-table td:nth-child(2) { color: var(--fg-dim); font-family: "SF Mono", Menlo, Consolas, monospace; }
+.scale-table td:nth-child(3) { font-family: "SF Mono", Menlo, Consolas, monospace; }
+.scale-table td:nth-child(3) strong { color: var(--accent-4); }
+
 /* docs links */
 .docs-links {
   display: grid;
@@ -371,6 +395,34 @@ app.js の [機能名] を [変更内容] してください。</div>
   </p>
   <p>
     AIに「これを作って」と頼めば、同じ構成でゲーム・可視化・小ツールを次々と量産できます。<strong>ここで触ったデモがそのまま「あなたが頼める雛形」です。</strong>
+  </p>
+</section>
+
+<section class="block tech-note">
+  <h2>設計上の主張 — オーバーヘッドのスケーリング</h2>
+  <p class="lead">
+    AI 時代の本質は「秒あたり何行書けるか」ではなく、コード量 C が増えるにつれて
+    開発のオーバーヘッド (調査・修正影響範囲・検証) がどう増えるか。
+    O(C) で増える設計と O(log C) に押さえ込む設計では、長期で雲泥の差になる。
+  </p>
+  <p>
+    以下は ai-desk の設計が満たす理論上限の主張 (実測値ではない)。
+    「制約セットとして全軸を低く保つよう作られている」という見方。
+  </p>
+  <table class="scale-table">
+    <thead>
+      <tr><th>オーバーヘッド軸</th><th>素朴な書き方</th><th>ai-desk</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ビルド / コンパイル</td><td>O(C)</td><td><strong>O(0)</strong> (ゼロ依存・ノービルド)</td></tr>
+      <tr><td>影響箇所の特定</td><td>O(C)</td><td><strong>O(log C)</strong> (skeleton / focus)</td></tr>
+      <tr><td>編集の blast radius</td><td>O(callers)</td><td><strong>O(1)</strong> (共有ヘルパー禁止)</td></tr>
+      <tr><td>検証範囲</td><td>O(C) (フル回帰)</td><td><strong>O(変更単位)</strong> (Twin / 網羅 per goal)</td></tr>
+      <tr><td>文脈切替コスト</td><td>O(file数)</td><td><strong>O(Bridge数)</strong> (明示タグで可視化)</td></tr>
+    </tbody>
+  </table>
+  <p>
+    実測検証は <code>eval/eval.js</code> で進行中。ベンチ完了次第、上の主張がどこで成立し、どこで崩れるかを更新する。
   </p>
 </section>
 

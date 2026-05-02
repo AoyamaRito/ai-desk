@@ -232,6 +232,30 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
   .demo-frame.tall { height: 520px; }
 }
 
+/* scaling table */
+.scale-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 18px;
+  border: 3px solid var(--fg);
+  font-size: 15px;
+}
+.scale-table th, .scale-table td {
+  padding: 10px 14px;
+  border: 1px solid var(--fg);
+  text-align: left;
+  vertical-align: top;
+}
+.scale-table thead th {
+  background: var(--fg);
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.scale-table td:nth-child(2) { color: var(--fg-dim); font-family: "SF Mono", Menlo, Consolas, monospace; }
+.scale-table td:nth-child(3) { font-family: "SF Mono", Menlo, Consolas, monospace; }
+.scale-table td:nth-child(3) strong { color: var(--accent-4); }
+
 /* docs links */
 .docs-links {
   display: grid;
@@ -373,6 +397,35 @@ ai-eyes and fix [the symptom you're seeing].</div>
   <p>
     Ask the AI "build this" and it can produce new games, visualizers, and small tools using the same structure, one after another.
     <strong>The demos you just touched are the exact templates you can ask for.</strong>
+  </p>
+</section>
+
+<section class="block tech-note">
+  <h2>Design claim — overhead scaling</h2>
+  <p class="lead">
+    The real differentiator in the AI era isn't "lines per second." It's how the development overhead
+    (investigation, blast radius, verification) scales as the codebase size C grows.
+    O(C) overhead and O(log C) overhead diverge enormously over the long run.
+  </p>
+  <p>
+    The table below states the theoretical upper-bounds ai-desk's design is built to satisfy
+    (these are <strong>theoretical claims, not measured benchmarks</strong>) — read it as
+    "the constraint set is shaped to keep every axis low."
+  </p>
+  <table class="scale-table">
+    <thead>
+      <tr><th>Overhead axis</th><th>Naive style</th><th>ai-desk</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Build / compile</td><td>O(C)</td><td><strong>O(0)</strong> (zero-dep, no build)</td></tr>
+      <tr><td>Locating the change site</td><td>O(C)</td><td><strong>O(log C)</strong> (skeleton / focus)</td></tr>
+      <tr><td>Edit blast radius</td><td>O(callers)</td><td><strong>O(1)</strong> (no shared helpers)</td></tr>
+      <tr><td>Verification scope</td><td>O(C) (full regression)</td><td><strong>O(change unit)</strong> (Twin / per-goal exhaustive)</td></tr>
+      <tr><td>Context-switch cost</td><td>O(file count)</td><td><strong>O(Bridge count)</strong> (explicit, tagged)</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Empirical validation is in progress under <code>eval/eval.js</code>. As benchmarks land, this table will be updated to show where the claim holds and where it breaks.
   </p>
 </section>
 

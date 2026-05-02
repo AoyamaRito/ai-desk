@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Swarm — ai-desk demo</title>
+<style>
+:root {
+  --fg: #1a0f24;
+  --accent: #6b3aff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html.embed body > header { display: none; }
+html, body { height: 100%; }
+body {
+  background: linear-gradient(135deg, #e9defc 0%, #f0fbf9 100%);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  padding: 14px 20px;
+  border-bottom: 3px solid var(--fg);
+  background: #ffffff;
+}
+header h1 { font-size: 18px; font-weight: 800; }
+header p { font-size: 13px; color: #555; margin-top: 2px; }
+main {
+  flex: 1 1 auto;
+  position: relative;
+  cursor: none;
+  touch-action: manipulation;
+}
+canvas { display: block; width: 100%; height: 100%; }
+.hud {
+  position: absolute;
+  top: 14px; left: 14px;
+  background: rgba(255,255,255,0.92);
+  border: 3px solid var(--fg);
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  pointer-events: none;
+}
+.controls {
+  position: absolute;
+  bottom: 14px; right: 14px;
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  background: #ffffff;
+  border: 3px solid var(--fg);
+  color: var(--fg);
+  padding: 8px 16px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  font-family: inherit;
+}
+.btn:hover { background: var(--fg); color: #ffffff; }
+.btn.on { background: var(--accent); color: #ffffff; border-color: var(--accent); }
+</style>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <h1>Color Swarm</h1>
+  <p>カーソルを動かすとカラフルな粒子が引き寄せられる。クリックで弾けて散る。</p>
+</header>
+
+<main>
+  <canvas id="c"></canvas>
+  <div class="hud">粒子: <span id="num">—</span></div>
+  <div class="controls">
+    <button class="btn on" id="mode">引き寄せ</button>
+    <button class="btn" id="reset">Reset</button>
+  </div>
+</main>
+
+<script>
+const COLORS = ['#ff1d6d', '#ffcc00', '#00c4cc', '#6b3aff', '#00d97e'];
+const NUM = 220;
+const RADIUS = 220;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const numEl = document.getElementById('num');
+const modeBtn = document.getElementById('mode');
+let W = 0, H = 0;
+let dots = [];
+let pointer = { x: -9999, y: -9999, active: false };
+let attract = true;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+
+function reset() {
+  dots = [];
+  for (let i = 0; i < NUM; i++) {
+    dots.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: 3 + Math.random() * 5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    });
+  }
+  numEl.textContent = NUM;
+}
+
+function step() {
+  ctx.fillStyle = 'rgba(233, 222, 252, 0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const d of dots) {
+    if (pointer.active) {
+      const dx = pointer.x - d.x;
+      const dy = pointer.y - d.y;
+      const dist = Math.hypot(dx, dy) + 0.001;
+      if (dist < RADIUS) {
+        const force = (1 - dist / RADIUS) * 0.45;
+        const dir = attract ? 1 : -1;
+        d.vx += (dx / dist) * force * dir;
+        d.vy += (dy / dist) * force * dir;
+      }
+    }
+    d.vx *= 0.94;
+    d.vy *= 0.94;
+    d.x += d.vx;
+    d.y += d.vy;
+
+    if (d.x < 0) d.x += W;
+    if (d.x > W) d.x -= W;
+    if (d.y < 0) d.y += H;
+    if (d.y > H) d.y -= H;
+
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+    ctx.fillStyle = d.color;
+    ctx.fill();
+  }
+
+  if (pointer.active) {
+    ctx.beginPath();
+    ctx.arc(pointer.x, pointer.y, attract ? 14 : 18, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = attract ? '#6b3aff' : '#ff1d6d';
+    ctx.stroke();
+  }
+
+  requestAnimationFrame(step);
+}
+
+function pointerXY(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+
+canvas.addEventListener('pointermove', e => {
+  const p = pointerXY(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.active = true;
+});
+canvas.addEventListener('pointerleave', () => { pointer.active = false; });
+canvas.addEventListener('pointerdown', e => {
+  const p = pointerXY(e);
+  for (const d of dots) {
+    const dx = d.x - p.x, dy = d.y - p.y;
+    const dist = Math.hypot(dx, dy) + 0.001;
+    if (dist < RADIUS) {
+      const force = (1 - dist / RADIUS) * 16;
+      d.vx += (dx / dist) * force;
+      d.vy += (dy / dist) * force;
+    }
+  }
+});
+
+modeBtn.addEventListener('click', () => {
+  attract = !attract;
+  modeBtn.textContent = attract ? '引き寄せ' : '反発';
+  modeBtn.classList.toggle('on', attract);
+});
+
+document.getElementById('reset').addEventListener('click', reset);
+
+resize();
+reset();
+step();
+</script>
+</body>
+</html>

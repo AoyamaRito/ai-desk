@@ -1,0 +1,47 @@
+{
+  "_doc": "Evaluation question set for doc-exec. Each question probes a Bible concept. Scoring is keyword-based + manual. Edit freely.",
+  "questions": [
+    {
+      "id": "q1-heavy-function",
+      "q": "Heavy Function 原則とは何か。なぜ shared helper を避けるのか、3 行以内で答えよ。",
+      "must_include": ["Heavy", "shared", "依存"],
+      "must_not": []
+    },
+    {
+      "id": "q2-twin",
+      "q": "Twin (検証双子) はどの層に置かれ、何のために存在するか。",
+      "must_include": ["L4", "verify", "検証"],
+      "must_not": []
+    },
+    {
+      "id": "q3-real-shadow",
+      "q": "REAL と SHADOW の関係を述べよ。どちらが正本か。",
+      "must_include": ["REAL", "SHADOW", "正本"],
+      "must_not": []
+    },
+    {
+      "id": "q4-emblem-bridge",
+      "q": "Emblem と Bridge の違いは何か。Bridge は何を表すタグか。",
+      "must_include": ["Emblem", "Bridge", "層", "横断"],
+      "must_not": []
+    },
+    {
+      "id": "q5-constraint-folding",
+      "q": "Constraint Folding とは何か。Heavy Function とどう関係するか。",
+      "must_include": ["Constraint", "Folding", "Heavy"],
+      "must_not": []
+    },
+    {
+      "id": "q6-spotlight",
+      "q": "Spotlight 原則は LLM のどんな性質に対する設計か。具体的な距離数値も含めて答えよ。",
+      "must_include": ["300", "局所", "参照"],
+      "must_not": []
+    },
+    {
+      "id": "q7-tag-immutability",
+      "q": "Tag Immutability の意味と、ai-desk の apply モードでこれがどう守られているか。",
+      "must_include": ["Immutability", "ヘッダ", "apply"],
+      "must_not": []
+    }
+  ]
+}

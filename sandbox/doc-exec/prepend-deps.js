@@ -78,11 +78,27 @@ const sections = parse(src);
 const stats = { secs: 0, withDeps: 0, totalDeps: 0, perTerm: {} };
 const outParts = [];
 
+const RELATED_LINE_RE = /^>\s+(?:原則|状態|層|タグ|検証|永続化|ツール|その他|関連):/;
+
 for (const sec of sections) {
   stats.secs++;
   const m = sec.body.match(/^(#\s+[^\n]+)\n?([\s\S]*)$/);
   const head = m ? m[1] : `# ${sec.name}`;
-  const rest = m ? m[2] : sec.body;
+  let rest = m ? m[2] : sec.body;
+
+  // 冪等性: 前回 prepend した関連ブロックを section 先頭から剥がす。
+  // これをやらないと再実行で関連行が二重化する。
+  // 構造: [先頭の空行] → [関連行群] → [区切り空行] → 本文
+  {
+    const lines = rest.split('\n');
+    let i = 0;
+    while (i < lines.length && lines[i].trim() === '') i++;
+    if (i < lines.length && RELATED_LINE_RE.test(lines[i])) {
+      while (i < lines.length && RELATED_LINE_RE.test(lines[i])) i++;
+      while (i < lines.length && lines[i].trim() === '') i++;
+      rest = lines.slice(i).join('\n');
+    }
+  }
 
   // canonical 検出: 自分自身の glossary セクションは関連に含めない
   const selfCanonical = sec.name.match(/^<<(.+)>>$/);

@@ -200,13 +200,42 @@ section 間依存を `<!-- @deps: name1, name2 -->` で書くモデル。
 
 ---
 
+## 効果測定ハーネス (`eval/`)
+
+`eval/eval.js` で 3 context (deps / bundle / direct) の prompt を吐き、別 LLM の回答を採点する手動 MVP。
+
+```bash
+# 1. prompt 生成
+node eval/eval.js prompt deps      # → eval/prompts/deps.md
+node eval/eval.js prompt bundle    # → eval/prompts/bundle.md
+node eval/eval.js prompt direct    # → eval/prompts/direct.md
+
+# 2. 各 prompt を別 LLM (Claude Web / GPT / Gemini 等) にコピペ
+#    回答を eval/answers/<ctx>.md に保存 (## <q-id> 見出し形式)
+
+# 3. 採点
+node eval/eval.js score all
+```
+
+質問セット: `eval/questions.json` (7 問、Bible 核概念)。must_include キーワードで部分点。
+意味判定は人間が最終確認 (キーワード一致は必要条件・十分条件ではない)。
+
+## パイプライン回帰テスト (`test/`)
+
+```bash
+node --test test/pipeline.test.js   # 6 tests: golden + idempotency + masking + alias + self-ref
+UPDATE_GOLDEN=1 node --test test/pipeline.test.js   # 仕様変更時に golden を更新
+```
+
+固定フィクスチャ (`test/fixtures/`) でビルドし、`test/golden/` と byte 一致を確認。
+本リポの md 変更で壊れない独立テスト。
+
 ## 次の実験候補 (引き継ぐ LLM へ)
 
 優先順:
 
-1. **効果測定** ── これが最優先
-   - `all-docs-deps.md` を渡した AI と素の md を渡した AI で同じ質問セットに答えさせる
-   - 5〜10 問で十分。Bible の核概念を問う形 (例: "Heavy Function 原則と Constraint Folding の関係を述べよ")
+1. **効果測定の実走** ── ハーネスは入った。あとは LLM に prompt を流すだけ
+   - 上の eval ワークフロー参照
    - 正答率の差が出れば穴の優先度が一気に絞れる
    - 正答率が変わらなければ用語マーカーモデル自体を疑うべき
 

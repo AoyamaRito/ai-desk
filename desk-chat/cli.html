@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>desk-chat (CLI) — gemini-cli emulator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0a0e14; color: #b3b1ad; font-family: "SF Mono", Menlo, "Courier New", monospace; font-size: 14px; line-height: 1.55; overflow: hidden; }
+button, input { font: inherit; color: inherit; background: transparent; border: 0; outline: none; }
+header {
+  height: 32px; padding: 0 14px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #1c2128; background: #0d1117; font-size: 12px; flex-shrink: 0;
+}
+header .title { color: #ffb454; font-weight: 700; letter-spacing: 0.04em; }
+header .pill { font-size: 10px; padding: 1px 6px; background: #1c2128; border-radius: 99px; color: #626a73; letter-spacing: 0.04em; }
+header .grow { flex: 1 1 auto; }
+header .icon-btn { padding: 4px 10px; border: 1px solid #1c2128; cursor: pointer; font-size: 11px; color: #626a73; }
+header .icon-btn:hover { background: #1c2128; color: #b3b1ad; }
+header a { color: #59c2ff; text-decoration: none; }
+header a:hover { text-decoration: underline; }
+main { height: calc(100% - 32px); display: flex; flex-direction: column; }
+#term {
+  flex: 1 1 auto; overflow-y: auto; padding: 16px 22px;
+  white-space: pre-wrap; word-wrap: break-word;
+}
+#term .line { display: block; }
+.c-prompt   { color: #ffb454; }
+.c-user     { color: #b3b1ad; }
+.c-model    { color: #d2a6ff; }
+.c-system   { color: #59c2ff; }
+.c-error    { color: #ff6b6b; }
+.c-tool     { color: #95e6cb; }
+.c-toolargs { color: #626a73; }
+.c-banner   { color: #59c2ff; }
+.c-meta     { color: #626a73; }
+.c-bold     { color: #ffb454; font-weight: 700; }
+.c-code     { background: #1c2128; padding: 1px 5px; border-radius: 3px; color: #95e6cb; }
+pre.c-codeblock {
+  background: #0d1117; border-left: 2px solid #59c2ff; padding: 10px 14px; margin: 6px 0;
+  color: #d2a6ff; overflow-x: auto;
+}
+#composer {
+  border-top: 1px solid #1c2128; padding: 8px 22px; display: flex; align-items: center; gap: 10px; background: #0d1117; flex-shrink: 0;
+}
+#composer .prompt { color: #ffb454; font-weight: 700; }
+#composer input { flex: 1 1 auto; color: #b3b1ad; font-family: inherit; }
+
+dialog { background: #0d1117; color: #b3b1ad; border: 1px solid #1c2128; border-radius: 6px; padding: 22px 26px; min-width: 440px; font-family: inherit; }
+dialog::backdrop { background: rgba(0,0,0,0.6); }
+dialog h2 { font-size: 14px; margin-bottom: 14px; color: #ffb454; }
+dialog label { display: block; font-size: 11px; color: #626a73; margin: 12px 0 4px; }
+dialog input, dialog select { width: 100%; padding: 8px 10px; background: #0a0e14; border: 1px solid #1c2128; border-radius: 4px; font-size: 13px; }
+dialog .actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
+dialog button { padding: 6px 14px; background: #1c2128; border: 1px solid #1c2128; border-radius: 4px; cursor: pointer; font-size: 12px; }
+dialog button.primary { background: #ffb454; color: #0a0e14; border-color: #ffb454; font-weight: 700; }
+dialog button:hover { background: #2c3038; }
+dialog button.primary:hover { background: #ffc97c; }
+.hint { font-size: 11px; color: #626a73; margin-top: 6px; }
+.hint a { color: #59c2ff; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">gemini</span>
+  <span class="pill">browser emulator · stage B</span>
+  <span class="grow"></span>
+  <a href="standalone.html">→ GUI</a>
+  <button class="icon-btn" id="btn-settings">/settings</button>
+</header>
+
+<main>
+  <div id="term"></div>
+  <div id="composer">
+    <span class="prompt">&gt;</span>
+    <input id="input" autocomplete="off" autofocus placeholder="type a message or /help">
+  </div>
+</main>
+
+<dialog id="settings-dialog">
+  <h2>Settings</h2>
+  <label>API key (Gemini)</label>
+  <input id="opt-key" type="password" placeholder="paste here">
+  <p class="hint">stored in browser localStorage only · <a href="https://aistudio.google.com/apikey" target="_blank">get a key</a></p>
+  <label>Model</label>
+  <select id="opt-model">
+    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+  </select>
+  <div class="actions">
+    <button type="button" id="opt-cancel">cancel</button>
+    <button type="button" class="primary" id="opt-save">save</button>
+  </div>
+</dialog>
+
+<script>
+// ============================================================
+// desk-chat / cli.html — gemini-cli look-and-feel emulator
+//
+// Same backend as standalone.html (Gemini API direct + OPFS
+// virtual workspace + 4-tool surface). UI swapped for a
+// terminal-style stream + slash commands.
+//
+// Shared state with standalone.html via localStorage (settings,
+// chat history) and OPFS (workspace files). Open one or the
+// other — they see the same data.
+// ============================================================
+
+const STORAGE_KEY = 'desk-chat:state';
+const SETTINGS_KEY = 'desk-chat:settings';
+const WORKSPACE_DIR = 'workspace';
+
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+if (!settings.provider) settings.provider = 'gemini';
+if (!settings.model)    settings.model    = 'gemini-2.0-flash';
+
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { messages: [] };
+function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// ---------- Virtual FS via OPFS (identical to standalone.html)
+const vfs = {
+  async _root() { return await (await navigator.storage.getDirectory()).getDirectoryHandle(WORKSPACE_DIR, { create: true }); },
+  async _resolve(path, { create = false } = {}) {
+    const parts = path.replace(/^\/+/, '').split('/').filter(Boolean);
+    if (parts.length === 0) throw new Error('empty path');
+    const filename = parts.pop();
+    let dir = await this._root();
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create });
+    return { dir, filename };
+  },
+  async list(prefix = '') {
+    const out = [];
+    async function walk(dir, base) {
+      for await (const [name, handle] of dir.entries()) {
+        const full = base ? `${base}/${name}` : name;
+        if (handle.kind === 'file') out.push(full);
+        else if (handle.kind === 'directory') await walk(handle, full);
+      }
+    }
+    await walk(await this._root(), '');
+    return out.filter(p => p.startsWith(prefix.replace(/^\/+/, ''))).sort();
+  },
+  async read(path)        { const { dir, filename } = await this._resolve(path); return await (await (await dir.getFileHandle(filename)).getFile()).text(); },
+  async write(path, data) { const { dir, filename } = await this._resolve(path, { create: true }); const fh = await dir.getFileHandle(filename, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); },
+  async delete(path)      { const { dir, filename } = await this._resolve(path); await dir.removeEntry(filename); },
+};
+
+const TOOL_DEFS = [
+  { name: 'read_file',   description: 'Read a file from the virtual workspace.',   parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
+  { name: 'write_file',  description: 'Create or overwrite a workspace file.',     parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
+  { name: 'list_files',  description: 'List files under an optional path prefix.', parameters: { type: 'object', properties: { prefix: { type: 'string' } } } },
+  { name: 'delete_file', description: 'Delete a file from the workspace.',         parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
+];
+
+async function runTool(name, args) {
+  try {
+    if (name === 'read_file')   return { content: await vfs.read(args.path) };
+    if (name === 'write_file')  { await vfs.write(args.path, args.content); return { ok: true, path: args.path, bytes: args.content.length }; }
+    if (name === 'list_files')  return { files: await vfs.list(args.prefix || '') };
+    if (name === 'delete_file') { await vfs.delete(args.path); return { ok: true }; }
+    return { error: `unknown tool: ${name}` };
+  } catch (e) { return { error: e.message }; }
+}
+
+// ---------- Terminal renderer
+const termEl = document.getElementById('term');
+function append(html) {
+  const div = document.createElement('div');
+  div.className = 'line';
+  div.innerHTML = html;
+  termEl.appendChild(div);
+  termEl.scrollTop = termEl.scrollHeight;
+}
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function renderText(text) {
+  // very small markdown subset: ```code blocks```, `inline`, **bold**
+  let out = '';
+  const lines = text.split('\n');
+  let inCode = false; let codeBuf = '';
+  for (const line of lines) {
+    const m = line.match(/^```(\w*)$/);
+    if (m) {
+      if (inCode) { out += `<pre class="c-codeblock">${escapeHtml(codeBuf)}</pre>`; inCode = false; codeBuf = ''; }
+      else { inCode = true; codeBuf = ''; }
+      continue;
+    }
+    if (inCode) { codeBuf += line + '\n'; continue; }
+    let l = escapeHtml(line);
+    l = l.replace(/`([^`]+)`/g, '<span class="c-code">$1</span>');
+    l = l.replace(/\*\*([^*]+)\*\*/g, '<span class="c-bold">$1</span>');
+    out += l + '\n';
+  }
+  if (inCode) out += `<pre class="c-codeblock">${escapeHtml(codeBuf)}</pre>`;
+  return out;
+}
+
+function welcomeBanner() {
+  append(`<span class="c-banner">desk-chat · gemini browser emulator (Stage B)</span>`);
+  append(`<span class="c-meta">model: ${settings.model} · workspace: OPFS:/${WORKSPACE_DIR}/ · type /help for commands</span>`);
+  append('');
+  if (!settings.apiKey) append(`<span class="c-error">API key not set. Type /settings to add one.</span>`);
+}
+
+function replayHistory() {
+  for (const m of state.messages) {
+    if (m.role === 'user')               append(`<span class="c-prompt">&gt;</span> <span class="c-user">${escapeHtml(m.text)}</span>`);
+    else if (m.role === 'model' && m.text) append(`<span class="c-model">${renderText(m.text)}</span>`);
+    else if (m.role === 'model' && m.toolCall) append(`<span class="c-tool">· ${m.toolCall.name}</span><span class="c-toolargs">(${escapeHtml(JSON.stringify(m.toolCall.args)).slice(0, 200)})</span>`);
+    else if (m.role === 'tool')          append(`<span class="c-meta">  → ${escapeHtml(JSON.stringify(m.toolResult)).slice(0, 200)}</span>`);
+    else if (m.role === 'system')        append(`<span class="c-system">${escapeHtml(m.text)}</span>`);
+  }
+}
+
+// ---------- Slash commands
+async function handleSlash(cmd) {
+  const [name, ...rest] = cmd.split(/\s+/);
+  const arg = rest.join(' ');
+  switch (name) {
+    case '/help':
+      append(`<span class="c-meta">commands:
+  /help                  this list
+  /clear                 clear the screen (history kept)
+  /reset                 wipe chat history
+  /files                 list workspace files
+  /cat <path>            print a workspace file
+  /rm <path>             delete a workspace file
+  /model <name>          switch model (gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro)
+  /settings              open settings dialog
+  /export                download workspace as zip (TODO)</span>`);
+      return;
+    case '/clear':
+      termEl.innerHTML = '';
+      welcomeBanner();
+      return;
+    case '/reset':
+      state = { messages: [] }; persist();
+      termEl.innerHTML = '';
+      welcomeBanner();
+      append(`<span class="c-system">chat history cleared.</span>`);
+      return;
+    case '/files': {
+      const files = await vfs.list();
+      if (files.length === 0) append(`<span class="c-meta">(empty workspace)</span>`);
+      else for (const f of files) append(`  <span class="c-tool">${escapeHtml(f)}</span>`);
+      return;
+    }
+    case '/cat': {
+      if (!arg) { append(`<span class="c-error">usage: /cat <path></span>`); return; }
+      try { const text = await vfs.read(arg); append(`<pre class="c-codeblock">${escapeHtml(text)}</pre>`); }
+      catch (e) { append(`<span class="c-error">${escapeHtml(e.message)}</span>`); }
+      return;
+    }
+    case '/rm': {
+      if (!arg) { append(`<span class="c-error">usage: /rm <path></span>`); return; }
+      try { await vfs.delete(arg); append(`<span class="c-system">deleted ${escapeHtml(arg)}</span>`); }
+      catch (e) { append(`<span class="c-error">${escapeHtml(e.message)}</span>`); }
+      return;
+    }
+    case '/model':
+      if (!arg) { append(`<span class="c-meta">current model: ${settings.model}</span>`); return; }
+      settings.model = arg;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      append(`<span class="c-system">model set to ${arg}</span>`);
+      return;
+    case '/settings':
+      openSettings();
+      return;
+    case '/export':
+      append(`<span class="c-meta">/export not yet implemented in this MVP. workspace lives in OPFS — visible from the GUI panel at standalone.html</span>`);
+      return;
+    default:
+      append(`<span class="c-error">unknown command: ${escapeHtml(name)}. /help for list.</span>`);
+  }
+}
+
+// ---------- Settings dialog
+const settingsDialog = document.getElementById('settings-dialog');
+const optKey   = document.getElementById('opt-key');
+const optModel = document.getElementById('opt-model');
+function openSettings() {
+  optKey.value   = settings.apiKey || '';
+  optModel.value = settings.model;
+  settingsDialog.showModal();
+}
+document.getElementById('btn-settings').onclick = openSettings;
+document.getElementById('opt-cancel').onclick   = () => settingsDialog.close();
+document.getElementById('opt-save').onclick = () => {
+  settings.apiKey = optKey.value.trim();
+  settings.model  = optModel.value;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  settingsDialog.close();
+  append(`<span class="c-system">settings saved.</span>`);
+};
+
+// ---------- Input
+const inputEl = document.getElementById('input');
+let busy = false;
+inputEl.addEventListener('keydown', async e => {
+  if (e.key !== 'Enter' || e.isComposing || busy) return;
+  e.preventDefault();
+  const text = inputEl.value.trim();
+  if (!text) return;
+  inputEl.value = '';
+  if (text.startsWith('/')) { await handleSlash(text); return; }
+  if (!settings.apiKey) { append(`<span class="c-error">API key not set. /settings to add one.</span>`); return; }
+  append(`<span class="c-prompt">&gt;</span> <span class="c-user">${escapeHtml(text)}</span>`);
+  state.messages.push({ role: 'user', text }); persist();
+  await runTurn();
+});
+
+// ---------- Talk to Gemini (function-calling loop)
+const SYSTEM_PROMPT = `You are an AI coding assistant operating inside the desk-chat browser-emulated CLI (no real OS).
+
+You have a virtual workspace (OPFS-backed, browser-local). Tools: read_file / write_file / list_files / delete_file.
+
+Style:
+- Be concise. Match the user's language (Japanese or English).
+- When the user asks to build something, just build it: write_file, then briefly say what you did.
+- When asked to fix or change a file, read_file first, then write_file with the updated content.
+- Prefer single-file vanilla HTML+JS solutions. Zero dependencies.
+- Don't apologise; don't pad answers; don't restate the question.`;
+
+async function runTurn() {
+  busy = true;
+  inputEl.disabled = true;
+  const stopper = startSpinner();
+  const MAX_HOPS = 8;
+  try {
+    for (let hop = 0; hop < MAX_HOPS; hop++) {
+      let resp;
+      try { resp = await callGemini(); }
+      catch (e) {
+        append(`<span class="c-error">API error: ${escapeHtml(e.message)}</span>`);
+        state.messages.push({ role: 'system', text: 'API error: ' + e.message }); persist();
+        break;
+      }
+      if (resp.text) {
+        state.messages.push({ role: 'model', text: resp.text }); persist();
+        append(`<span class="c-model">${renderText(resp.text)}</span>`);
+      }
+      if (!resp.toolCalls || resp.toolCalls.length === 0) break;
+      for (const tc of resp.toolCalls) {
+        state.messages.push({ role: 'model', toolCall: { name: tc.name, args: tc.args } }); persist();
+        append(`<span class="c-tool">· ${tc.name}</span><span class="c-toolargs">(${escapeHtml(JSON.stringify(tc.args)).slice(0, 200)})</span>`);
+        const result = await runTool(tc.name, tc.args);
+        state.messages.push({ role: 'tool', toolName: tc.name, toolResult: result }); persist();
+        append(`<span class="c-meta">  → ${escapeHtml(JSON.stringify(result)).slice(0, 200)}</span>`);
+      }
+    }
+  } finally {
+    stopper();
+    busy = false;
+    inputEl.disabled = false;
+    inputEl.focus();
+  }
+}
+
+function startSpinner() {
+  const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let i = 0;
+  const span = document.createElement('div');
+  span.className = 'line';
+  span.innerHTML = `<span class="c-meta">⠋ thinking…</span>`;
+  termEl.appendChild(span);
+  termEl.scrollTop = termEl.scrollHeight;
+  const id = setInterval(() => {
+    span.innerHTML = `<span class="c-meta">${frames[i++ % frames.length]} thinking…</span>`;
+  }, 100);
+  return () => { clearInterval(id); span.remove(); };
+}
+
+async function callGemini() {
+  if (!settings.apiKey) throw new Error('API key not set');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`;
+  const contents = [];
+  for (const m of state.messages) {
+    if (m.role === 'user') contents.push({ role: 'user', parts: [{ text: m.text }] });
+    else if (m.role === 'model' && m.text) contents.push({ role: 'model', parts: [{ text: m.text }] });
+    else if (m.role === 'model' && m.toolCall) contents.push({ role: 'model', parts: [{ functionCall: { name: m.toolCall.name, args: m.toolCall.args } }] });
+    else if (m.role === 'tool') contents.push({ role: 'user', parts: [{ functionResponse: { name: m.toolName, response: m.toolResult } }] });
+  }
+  const body = {
+    contents,
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    tools: [{ functionDeclarations: TOOL_DEFS }],
+  };
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { const t = await r.text(); throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`); }
+  const data = await r.json();
+  const cand = data.candidates && data.candidates[0];
+  const parts = (cand && cand.content && cand.content.parts) || [];
+  let text = ''; const toolCalls = [];
+  for (const p of parts) {
+    if (p.text) text += p.text;
+    if (p.functionCall) toolCalls.push({ name: p.functionCall.name, args: p.functionCall.args || {} });
+  }
+  return { text: text.trim(), toolCalls };
+}
+
+// ---------- init
+welcomeBanner();
+replayHistory();
+inputEl.focus();
+</script>
+</body>
+</html>

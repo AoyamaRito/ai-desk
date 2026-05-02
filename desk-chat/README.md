@@ -111,6 +111,27 @@ https://<your-pages>/desk-chat/standalone.html
 
 Get a Gemini API key from <https://aistudio.google.com/apikey>, paste it in Settings, start chatting.
 
+### CLI emulator (`cli.html`)
+
+`desk-chat/cli.html` is a sibling file — same backend (Gemini API + OPFS workspace + 4 tools), different look. It mimics gemini-cli's terminal UI: orange banner, `>` prompt, slash commands.
+
+```bash
+open desk-chat/cli.html
+```
+
+Slash commands handled locally (no model call):
+- `/help` — list commands
+- `/files` — list workspace
+- `/cat <path>` — print a file
+- `/rm <path>` — delete a file
+- `/clear` — clear screen (history kept)
+- `/reset` — wipe chat history
+- `/model <name>` — switch model
+- `/settings` — open settings
+- `/export` — workspace zip (TODO)
+
+Both `standalone.html` (GUI) and `cli.html` (terminal) share the same OPFS workspace and the same chat history (via localStorage). Open whichever feels right; switch any time.
+
 ### Limits / next steps
 
 - Only Gemini provider for now. Adding Anthropic / OpenAI is mostly a `callGemini()` adapter swap.

@@ -229,11 +229,11 @@ node --test actions/tests/fighter-cancel.test.js
 - **[`ai-desk.js`](ai-desk.js) (手)** — Emblem タグで仮想分割し、`skeleton` / `focus` / `apply` の三段で AI が安全に局所更新するための CLI
 
 ```bash
-node ai-desk.js path/to/file.js skeleton          # 構造把握
-node ai-desk.js path/to/file.js focus EmblemName  # 局所読込
-node ai-desk.js path/to/file.js apply patch.js    # 部分適用
-node ai-desk.js path/to/file.js check             # タグ・語彙の整合性チェック
-node ai-desk.js path/to/file.js coverage          # Bridge 網羅レポート
+node ai-desk.js path/to/file.js skeleton                     # 構造把握 (行番号付き)
+node ai-desk.js path/to/file.js focus EmblemName             # 局所読込
+node ai-desk.js path/to/file.js apply patch.js [--dry-run]   # 原子的適用 (pre-flight 検証 → 全成功で書込 / 1件失敗で何もしない)
+node ai-desk.js path/to/file.js check                        # タグ・語彙の整合性チェック
+node ai-desk.js path/to/file.js coverage                     # Bridge 網羅レポート
 ```
 
 - **[`ai-eyes.js`](ai-eyes.js) (目)** — ブラウザエラーの自動収集、スナップショット保存、リモート操作を受け付けるゼロ依存ローカルサーバー

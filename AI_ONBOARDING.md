@@ -74,15 +74,19 @@ node ../ai-eyes.js          # ai-eyes を起動してブラウザで確認 (loca
 ### ai-desk（コード編集の手順）
 
 ```bash
-node ai-desk.js <file> skeleton          # 1. 構造を層ソートで把握
-node ai-desk.js <file> focus <Name>      # 2. 対象 Emblem を局所読み込み
-node ai-desk.js <file> check             # 3. タグ整合性・語彙チェック
-node ai-desk.js <file> coverage          # 4. Bridge 網羅レポート
-node ai-desk.js <file> apply patch.js    # 5. パッチ適用（破壊フェンス付き）
+node ai-desk.js <file> skeleton                     # 1. 構造を層ソートで把握 (行番号付き)
+node ai-desk.js <file> focus <Name>                 # 2. 対象 Emblem を局所読み込み
+node ai-desk.js <file> check                        # 3. タグ整合性・語彙チェック
+node ai-desk.js <file> coverage                     # 4. Bridge 網羅レポート
+node ai-desk.js <file> apply patch.js --dry-run     # 5a. 何が置き換わるか確認 (書かない)
+node ai-desk.js <file> apply patch.js               # 5b. 原子的適用
 ```
 
 変更を加えるときは、直接書き換えるより patch.js に書いて apply する方が安全。
-apply は **Tag Immutability（タグ不変性）** を検査し、Emblem 数の増減やタグ構造の破壊があれば自動でキャンセルする。
+apply は **pre-flight 検証 → 原子的書込** のセマンティクス: patch 内の全 emblem/bridge 名が
+ターゲットに「ちょうど 1 件」存在することを先に確認し、1 件でも欠けたり重複していたら
+何も書かずに exit 1 する。`--dry-run` は plan を表示するだけで書き込まない。
+さらに **Tag Immutability** によりタグ件数の変動を検知すると書込をキャンセルする。
 
 ### ai-eyes + eyes-e2e（観測・デバッグ）
 

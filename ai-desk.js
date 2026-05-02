@@ -36,14 +36,16 @@ Usage:
   ai-desk <filename> <mode> [args...]
 
 Modes:
-  skeleton           Layer-sorted map of emblems and bridges.
-                     Order: L1 → L1toL2 → L2 → L2toL3 → L3 → L3toL4
-                            → L3toPersistent → L3toNetwork → L4 → OutOfLayers.
-  focus <Name>       Extract the exact source of the specified emblem or bridge.
-  apply <patch>      Replace emblems/bridges in target matching the patch's names.
-  check              Verify emblem/bridge integrity (nesting, uniqueness, completeness).
-  coverage           Bridge coverage report. Which layer transitions have bridges declared.
-  miner <data.json>  [AI-Only] Extract logic (laws) from data and synthesize code.
+  skeleton                    Layer-sorted map of emblems and bridges with line numbers.
+                              Order: L1 → L1toL2 → L2 → L2toL3 → L3 → L3toL4
+                                     → L3toPersistent → L3toNetwork → L4 → OutOfLayers.
+  focus <Name>                Extract the exact source of the specified emblem or bridge.
+  apply <patch> [--dry-run]   Pre-flight verify all patch names exist in target,
+                              then atomically replace. Fails (no mutation) if any
+                              patch is unresolved or duplicated. --dry-run prints
+                              the plan without writing.
+  check                       Verify emblem/bridge integrity (nesting, uniqueness, completeness).
+  coverage                    Bridge coverage report. Which layer transitions have bridges declared.
 
 Format (emblem):
   // [${EMB_MARK}:#importance#layer#tag <name>]
@@ -92,7 +94,7 @@ const filePath = args[0];
 const mode = args[1];
 const extraArgs = args.slice(2);
 
-if (mode !== 'miner' && !fs.existsSync(filePath)) {
+if (!fs.existsSync(filePath)) {
   console.error(`File not found: ${filePath}`);
   process.exit(1);
 }
@@ -100,10 +102,9 @@ if (mode !== 'miner' && !fs.existsSync(filePath)) {
 switch (mode) {
   case 'skeleton': runSkeleton(filePath); break;
   case 'focus':    runFocus(filePath, extraArgs[0]); break;
-  case 'apply':    runApply(filePath, extraArgs[0]); break;
+  case 'apply':    runApply(filePath, extraArgs[0], extraArgs.slice(1)); break;
   case 'check':    runCheck(filePath); break;
   case 'coverage': runCoverage(filePath); break;
-  case 'miner':    runMiner(extraArgs[0]); break;
   default:
     console.error(`Unknown mode: ${mode}`);
     process.exit(1);
@@ -116,6 +117,19 @@ function runSkeleton(filePath) {
   // Inline parsers (Bible §0.1.2 — 共有禁止: regexは各モードに複製).
   const EMBLEM_RE = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
   const BRIDGE_RE = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
+
+  // Char index → 1-indexed line number. インライン展開（§0.1.2 共有禁止）。
+  // 行頭オフセットを線形走査で構築 → 各タグの開始/終了位置から行番号を引く。
+  const lineStarts = [0];
+  for (let i = 0; i < code.length; i++) if (code[i] === '\n') lineStarts.push(i + 1);
+  const lineOf = (idx) => {
+    let lo = 0, hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lineStarts[mid] <= idx) lo = mid; else hi = mid - 1;
+    }
+    return lo + 1;
+  };
 
   const items = [];
   let m;
@@ -130,6 +144,8 @@ function runSkeleton(filePath) {
     }
     const trimmed = content.trim();
     const lines = trimmed === '' ? 0 : trimmed.split('\n').length;
+    const startLine = lineOf(m.index);
+    const endLine = lineOf(m.index + m[0].length - 1);
     let sortKey, label;
     if      (/#L1\b/.test(meta) || /#physical\b/.test(meta)) { sortKey = 1.0;   label = 'L1'; }
     else if (/#L2\b/.test(meta) || /#intent\b/.test(meta))   { sortKey = 2.0;   label = 'L2'; }
@@ -138,7 +154,7 @@ function runSkeleton(filePath) {
     else if (/#verify\b/.test(meta))                         { sortKey = 5.0;   label = 'Verify'; }
     else if (/#OutOfLayers\b/.test(meta) || /#config\b/.test(meta)) { sortKey = 100.0; label = 'OutOfLayers'; }
     else                                                     { sortKey = 200.0; label = '(untagged)'; }
-    items.push({ kind: 'emblem', sortKey, label, meta, name, lines });
+    items.push({ kind: 'emblem', sortKey, label, meta, name, lines, startLine, endLine });
   }
 
   // Bridge 収集 + 方向解析。LxtoLy / LxtoPersistent / LxtoNetwork。
@@ -150,6 +166,8 @@ function runSkeleton(filePath) {
     }
     const trimmed = content.trim();
     const lines = trimmed === '' ? 0 : trimmed.split('\n').length;
+    const startLine = lineOf(m.index);
+    const endLine = lineOf(m.index + m[0].length - 1);
     let sortKey;
     const fromMatch = direction.match(/^L(\d)to(.+)$/);
     if (fromMatch) {
@@ -162,7 +180,7 @@ function runSkeleton(filePath) {
     } else {
       sortKey = 150.0;
     }
-    items.push({ kind: 'bridge', sortKey, label: direction, meta: direction, name, lines });
+    items.push({ kind: 'bridge', sortKey, label: direction, meta: direction, name, lines, startLine, endLine });
   }
 
   // 安定ソート: layer順、同層内は出現順を保つ（Array#sort は V8 で stable）。
@@ -180,12 +198,13 @@ function runSkeleton(filePath) {
       console.log(`-- ${item.label} --`);
       prevLabel = item.label;
     }
+    const range = `(L${item.startLine}-${item.endLine})`;
     if (item.kind === 'emblem') {
-      console.log(`// [${EMB_MARK}:${item.meta} ${item.name}]`);
+      console.log(`// [${EMB_MARK}:${item.meta} ${item.name}] ${range}`);
       console.log(`  /* [Emblem: ${item.name} (${item.lines} lines hidden)] */`);
       console.log(`// [/${EMB_MARK}: ${item.name}]`);
     } else {
-      console.log(`// [${BRD_MARK}:${item.meta} ${item.name}]`);
+      console.log(`// [${BRD_MARK}:${item.meta} ${item.name}] ${range}`);
       console.log(`  /* [Bridge: ${item.name} ${item.meta} (${item.lines} lines hidden)] */`);
       console.log(`// [/${BRD_MARK}: ${item.name}]`);
     }
@@ -392,13 +411,17 @@ function runCoverage(filePath) {
 // [/ai_s_emblem: Run-Coverage]
 
 // [ai_s_emblem:#high#logic Run-Apply]
-function runApply(filePath, patchPath) {
+// セマンティクス: pre-flight 検証 → 全成功なら原子的書込 / 1件でも失敗で何もしない (Atomic apply)。
+//   --dry-run を渡すと plan を表示するだけで書き込まない。
+//   旧仕様の「skip して継続」は廃止。中途半端な状態は AI を混乱させるため (§0.0)。
+function runApply(filePath, patchPath, flags = []) {
+  const isDryRun = flags.includes('--dry-run');
   if (!patchPath || !fs.existsSync(patchPath)) {
     console.error('Error: Valid patch file required.');
     process.exit(1);
   }
 
-  let newCode = fs.readFileSync(filePath, 'utf8');
+  const targetCode = fs.readFileSync(filePath, 'utf8');
   const patchCode = fs.readFileSync(patchPath, 'utf8');
 
   // パッチ側の Emblem を一括収集（独立 regex、§0.1.2 共有禁止）。
@@ -424,109 +447,97 @@ function runApply(filePath, patchPath) {
     process.exit(1);
   }
 
-  // 適用前のタグ数を記録（破壊検知のため）。Emblem / Bridge 別カウント。
-  const baseEmblemStarts = (newCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
-  const baseBridgeStarts = (newCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
-  let appliedCount = 0;
+  // ---- Pre-flight: 全 patch 名がターゲットに「ちょうど1件」存在するか検証。
+  // 失敗（unresolved / duplicate）が1件でもあれば exit 1（書き込みなし）。
+  const plan = []; // { kind, name, meta, start, end, replacement }
+  const failures = [];
 
-  // Emblem パッチ適用
   for (const pEmb of patchEmblems) {
     const re = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
     const matches = [];
     let m;
-    while ((m = re.exec(newCode)) !== null) {
+    while ((m = re.exec(targetCode)) !== null) {
       if (m[2] === pEmb.name) {
-        matches.push({ meta: m[1], name: m[2], start: m.index, end: m.index + m[0].length });
+        matches.push({ meta: m[1], start: m.index, end: m.index + m[0].length });
       }
     }
     if (matches.length === 1) {
       const t = matches[0];
       // Tag Immutability: ヘッダ・フッタはターゲット側を保持し、中身だけ差し替える。
-      const safeReplacement = `// [${EMB_MARK}:${t.meta} ${t.name}]\n${pEmb.content.trim()}\n// [/${EMB_MARK}: ${t.name}]`;
-      newCode = newCode.slice(0, t.start) + safeReplacement + newCode.slice(t.end);
-      appliedCount++;
-      console.log(`Applied patch for emblem: ${pEmb.name}`);
+      const replacement = `// [${EMB_MARK}:${t.meta} ${pEmb.name}]\n${pEmb.content.trim()}\n// [/${EMB_MARK}: ${pEmb.name}]`;
+      plan.push({ kind: 'emblem', name: pEmb.name, meta: t.meta, start: t.start, end: t.end, replacement });
     } else if (matches.length > 1) {
-      console.log(`Warning: Duplicate emblem name '${pEmb.name}' in target. (Skipping for safety)`);
+      failures.push(`emblem '${pEmb.name}' is duplicated in target (${matches.length} matches)`);
     } else {
-      console.log(`Warning: Emblem '${pEmb.name}' not found in target. (Skipping)`);
+      failures.push(`emblem '${pEmb.name}' not found in target`);
     }
   }
 
-  // Bridge パッチ適用（独立ロジック §0.1.2 共有禁止）
   for (const pBr of patchBridges) {
     const re = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
     const matches = [];
     let m;
-    while ((m = re.exec(newCode)) !== null) {
+    while ((m = re.exec(targetCode)) !== null) {
       if (m[2] === pBr.name) {
-        matches.push({ direction: m[1], name: m[2], start: m.index, end: m.index + m[0].length });
+        matches.push({ direction: m[1], start: m.index, end: m.index + m[0].length });
       }
     }
     if (matches.length === 1) {
       const t = matches[0];
-      const safeReplacement = `// [${BRD_MARK}:${t.direction} ${t.name}]\n${pBr.content.trim()}\n// [/${BRD_MARK}: ${t.name}]`;
-      newCode = newCode.slice(0, t.start) + safeReplacement + newCode.slice(t.end);
-      appliedCount++;
-      console.log(`Applied patch for bridge: ${pBr.name}`);
+      const replacement = `// [${BRD_MARK}:${t.direction} ${pBr.name}]\n${pBr.content.trim()}\n// [/${BRD_MARK}: ${pBr.name}]`;
+      plan.push({ kind: 'bridge', name: pBr.name, meta: t.direction, start: t.start, end: t.end, replacement });
     } else if (matches.length > 1) {
-      console.log(`Warning: Duplicate bridge name '${pBr.name}' in target. (Skipping for safety)`);
+      failures.push(`bridge '${pBr.name}' is duplicated in target (${matches.length} matches)`);
     } else {
-      console.log(`Warning: Bridge '${pBr.name}' not found in target. (Skipping)`);
+      failures.push(`bridge '${pBr.name}' not found in target`);
     }
   }
 
-  if (appliedCount === 0) {
-    console.log('No patches applied. (All emblems/bridges were not found or skipped)');
+  if (failures.length > 0) {
+    console.error(`\n[FATAL] Pre-flight failed (${failures.length} issue${failures.length > 1 ? 's' : ''}). No changes written.`);
+    for (const f of failures) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+
+  // ---- Dry-run: plan を表示して終了。
+  if (isDryRun) {
+    console.log(`[Dry-Run] ${filePath} ← ${patchPath}`);
+    console.log(`Plan: ${plan.length} replacement${plan.length > 1 ? 's' : ''} would be applied.\n`);
+    for (const p of plan) {
+      console.log(`  ${p.kind} '${p.name}' [${p.meta}]  bytes ${p.start}..${p.end}`);
+    }
+    console.log(`\n(no file written — re-run without --dry-run to apply)`);
     return;
   }
 
-  // Destruction Fence: Emblem / Bridge どちらも対称性と件数不変を検査。
-  {
-    const postEmblemStarts = (newCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
-    const postEmblemEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${EMB_MARK}:`, 'g')) || []).length;
-    const postBridgeStarts = (newCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
-    const postBridgeEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${BRD_MARK}:`, 'g')) || []).length;
-    if (postEmblemStarts !== postEmblemEnds) {
-      console.error(`\n[FATAL] Apply cancelled! Emblem tag corrupted (starts: ${postEmblemStarts}, ends: ${postEmblemEnds}).`);
-      process.exit(1);
-    }
-    if (postBridgeStarts !== postBridgeEnds) {
-      console.error(`\n[FATAL] Apply cancelled! Bridge tag corrupted (starts: ${postBridgeStarts}, ends: ${postBridgeEnds}).`);
-      process.exit(1);
-    }
-    if (postEmblemStarts !== baseEmblemStarts) {
-      console.error(`\n[FATAL] Apply cancelled! Emblem count changed (${baseEmblemStarts} -> ${postEmblemStarts}).`);
-      console.error(`Structural changes (adding/removing tags) are restricted in 'apply' to prevent destruction.`);
-      process.exit(1);
-    }
-    if (postBridgeStarts !== baseBridgeStarts) {
-      console.error(`\n[FATAL] Apply cancelled! Bridge count changed (${baseBridgeStarts} -> ${postBridgeStarts}).`);
-      console.error(`Structural changes (adding/removing tags) are restricted in 'apply' to prevent destruction.`);
-      process.exit(1);
-    }
-    // 原子書き込み: tmp に書いてから rename することでクラッシュによるファイル破壊を防ぐ。
-    const tmpPath = filePath + '.tmp';
-    fs.writeFileSync(tmpPath, newCode, 'utf8');
-    fs.renameSync(tmpPath, filePath);
-    console.log(`Successfully updated ${filePath}. (Immutability check passed)`);
+  // ---- Atomic apply: 全 plan を後ろから splice して原コードに 1 回で適用。
+  // 後ろから処理することで先頭の置換による offset ズレを回避（巻き戻り耐性）。
+  const sortedPlan = [...plan].sort((a, b) => b.start - a.start);
+  let newCode = targetCode;
+  for (const p of sortedPlan) {
+    newCode = newCode.slice(0, p.start) + p.replacement + newCode.slice(p.end);
   }
-}
-// [/ai_s_emblem: Run-Apply]
 
-// [ai_s_emblem:#mid#logic Run-Miner]
-function runMiner(dataPath) {
-  if (!dataPath || !fs.existsSync(dataPath)) {
-    console.error('Error: Valid data file (.json or .csv) required for mining.');
+  // ---- Destruction Fence: タグ件数の不変性を検査（壊れていたら書かない）。
+  const baseEmblemStarts = (targetCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
+  const baseBridgeStarts = (targetCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
+  const postEmblemStarts = (newCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
+  const postEmblemEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${EMB_MARK}:`, 'g')) || []).length;
+  const postBridgeStarts = (newCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
+  const postBridgeEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${BRD_MARK}:`, 'g')) || []).length;
+  if (postEmblemStarts !== postEmblemEnds || postBridgeStarts !== postBridgeEnds ||
+      postEmblemStarts !== baseEmblemStarts || postBridgeStarts !== baseBridgeStarts) {
+    console.error(`\n[FATAL] Apply cancelled! Tag structure broken after replacement. No file written.`);
+    console.error(`  emblem starts: ${baseEmblemStarts} → ${postEmblemStarts} / ends: ${postEmblemEnds}`);
+    console.error(`  bridge starts: ${baseBridgeStarts} → ${postBridgeStarts} / ends: ${postBridgeEnds}`);
     process.exit(1);
   }
-  const dataContent = fs.readFileSync(dataPath, 'utf8');
-  console.log(`\n[Miner] Data loaded from ${dataPath}.`);
-  console.log(`\n--- DATASET START ---`);
-  console.log(dataContent);
-  console.log(`--- DATASET END ---`);
-  console.log(`\n[AI Action Required]: Analyze the dataset above, extract the underlying laws, and synthesize a self-contained Heavy Function in JavaScript.`);
-  // miner はデータを標準出力に流すだけで終わる。コード合成はこの出力を読んだ AI の推論ループ内で行われる。
-  // 単体実行では何も生成しない。
+
+  // ---- 原子書き込み: tmp に書いてから rename することでクラッシュによるファイル破壊を防ぐ。
+  const tmpPath = filePath + '.tmp';
+  fs.writeFileSync(tmpPath, newCode, 'utf8');
+  fs.renameSync(tmpPath, filePath);
+  console.log(`Applied ${plan.length} patch${plan.length > 1 ? 'es' : ''} to ${filePath}. (atomic, immutability check passed)`);
+  for (const p of plan) console.log(`  - ${p.kind} '${p.name}'`);
 }
-// [/ai_s_emblem: Run-Miner]
+// [/ai_s_emblem: Run-Apply]

@@ -139,6 +139,16 @@ test('skeleton: lists all emblem and bridge names', () => {
   fs.unlinkSync(f);
 });
 
+test('skeleton: emits line ranges for each emblem and bridge', () => {
+  const f = tmp(VALID);
+  const r = run([f, 'skeleton']);
+  // Each entry should have a (Lstart-Lend) range marker.
+  assert.match(r.out, /Alpha\] \(L\d+-\d+\)/);
+  assert.match(r.out, /Beta\] \(L\d+-\d+\)/);
+  assert.match(r.out, /MyBridge\] \(L\d+-\d+\)/);
+  fs.unlinkSync(f);
+});
+
 // ================================================================
 // FOCUS — extracts exact emblem
 // ================================================================
@@ -217,7 +227,7 @@ const y = 3;
   fs.unlinkSync(patch);
 });
 
-test('apply: warns and skips when emblem name not found in target', () => {
+test('apply: pre-flight fails (exit 1, no write) when emblem name not found in target', () => {
   const target = tmp(`
 // [ai_s_emblem:#L3#logic Alpha]
 const x = 1;
@@ -228,9 +238,65 @@ const x = 1;
 const x = 99;
 // [/ai_s_emblem: Ghost]
 `);
+  const before = fs.readFileSync(target, 'utf8');
   const r = run([target, 'apply', patch]);
+  assert.equal(r.code, 1);
+  assert.ok(r.err.includes('Ghost') && r.err.includes('not found'));
+  // Atomic apply: pre-flight failure must leave file untouched.
+  const after = fs.readFileSync(target, 'utf8');
+  assert.equal(after, before, 'target file must be byte-identical after pre-flight failure');
+  fs.unlinkSync(target);
+  fs.unlinkSync(patch);
+});
+
+test('apply: --dry-run prints plan and does not modify target', () => {
+  const target = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const x = 1;
+// [/ai_s_emblem: Alpha]
+`);
+  const patch = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const x = 999;
+// [/ai_s_emblem: Alpha]
+`);
+  const before = fs.readFileSync(target, 'utf8');
+  const r = run([target, 'apply', patch, '--dry-run']);
   assert.equal(r.code, 0);
-  assert.ok(r.out.includes('Ghost') && (r.out.includes('not found') || r.out.includes('Skipping')));
+  assert.ok(r.out.includes('Dry-Run'));
+  assert.ok(r.out.includes('Alpha'));
+  assert.ok(r.out.includes('no file written'));
+  const after = fs.readFileSync(target, 'utf8');
+  assert.equal(after, before, 'target file must be unchanged after dry-run');
+  fs.unlinkSync(target);
+  fs.unlinkSync(patch);
+});
+
+test('apply: atomic — when one of two patches fails pre-flight, none are applied', () => {
+  const target = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const a = 1;
+// [/ai_s_emblem: Alpha]
+
+// [ai_s_emblem:#L3#logic Beta]
+const b = 2;
+// [/ai_s_emblem: Beta]
+`);
+  // Patch has Alpha (exists) and Ghost (missing). Atomic → neither should be applied.
+  const patch = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const a = 999;
+// [/ai_s_emblem: Alpha]
+
+// [ai_s_emblem:#L3#logic Ghost]
+const g = 0;
+// [/ai_s_emblem: Ghost]
+`);
+  const before = fs.readFileSync(target, 'utf8');
+  const r = run([target, 'apply', patch]);
+  assert.equal(r.code, 1);
+  const after = fs.readFileSync(target, 'utf8');
+  assert.equal(after, before, 'atomic: file must be untouched when any patch fails pre-flight');
   fs.unlinkSync(target);
   fs.unlinkSync(patch);
 });

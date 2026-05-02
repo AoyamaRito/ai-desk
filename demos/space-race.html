@@ -635,21 +635,30 @@ function step(now) {
   });
   for (const { r, i } of sortedRings) drawRing(r, i === 0);
 
-  // meteors — bright glowing head (drawn before particles so trail bursts on top)
+  // meteors — flat-design 5-point stars in additive blend so overlaps glow
+  ctx.globalCompositeOperation = 'lighter';
   for (const m of meteors) {
     const p = project(m.x, m.y, m.z);
     if (!p) continue;
-    const sz = Math.max(2, (3 - p.z / 2000) * 2.2);
+    const sz = Math.max(3, (3 - p.z / 2000) * 4);
     ctx.globalAlpha = Math.min(1, m.life * 1.4);
     ctx.fillStyle = m.color;
     ctx.shadowColor = m.color;
-    ctx.shadowBlur = 30;
+    ctx.shadowBlur = 32;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    for (let i = 0; i < 10; i++) {
+      const r = (i % 2 === 0) ? sz : sz * 0.42;
+      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const x = p.x + Math.cos(a) * r;
+      const y = p.y + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
+  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
 
   // 3D particles (drawn after rings, before ship)
   // sort approximately back-to-front by local z so glow blends sanely

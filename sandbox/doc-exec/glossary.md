@@ -115,7 +115,8 @@ Intent 層 (Bible §2)。生のイベントを Command JSON に変換する <<L3
 <!-- @category: layer -->
 
 Logic 層 (Bible §2)。`(REAL_state, Command) => newState` の純粋 Reducer。
-副作用は持たず、状態更新後に <<Bridge>> 関数を明示的に呼び出して外界へ伝播させる。
+副作用を一切持たない。外界への伝播は <<L4>> および <<L1>> / <<L2>> 側の Bridge 関数が
+新 state を読んで行う (L3 自身は何も呼び出さない)。
 
 ---
 
@@ -134,8 +135,11 @@ Draw 層 (Bible §2)。`REAL_state` を元に DOM を狙撃更新する。
 <!-- @aliases: エンブレム -->
 
 <<ai-desk>> が認識する関数・ブロック単位の認知境界タグ (Bible §1)。
-`[ai_s_emblem:#<importance>#<category> Name]` で開始し `[/ai_s_emblem: Name]` で閉じる。
-有効タグ: `#high #mid #low` × `#L1 #L2 #L3 #L4 #physical #intent #logic #draw #verify #OutOfLayers #config`。
+`[ai_s_emblem:#<importance>#<layer>[#<aspect>] Name]` で開始し `[/ai_s_emblem: Name]` で閉じる。
+- 重要度: `#high #mid #low`
+- 層: `#L1 #L2 #L3 #L4 #physical #intent #logic #draw #verify #OutOfLayers #config`
+- アスペクト (層と直交): `#auth #security` ほか `ai-desk.config.json` の customTags
+- 読者: `#for_human` (人間向け散文を明示。無印は AI 向け)
 
 ---
 
@@ -143,7 +147,9 @@ Draw 層 (Bible §2)。`REAL_state` を元に DOM を狙撃更新する。
 
 <!-- @category: tag -->
 
-層をまたぐ関数につけるタグ (AI_ONBOARDING)。`[ai_s_bridge:LxtoLy Name]` で記述する。
+層をまたぐ関数につけるタグ (AI_ONBOARDING)。`[ai_s_bridge:<direction> Name]` で記述する。
+canonical な direction: `L[1-4]to(L[1-4]|Persistent|Network|Verify)` の組合せ
+(例: `L1toL2`, `L3toL4`, `L3toPersistent`, `L3toNetwork`, `L4toVerify`)。
 データは <<L1>>→<<L2>>→<<L3>>→<<L4>> の一方向に流れ、層境界を越える呼び出しは Bridge として明示する。
 
 ---
@@ -203,8 +209,9 @@ HTTP/3 (WebTransport 等) でストリーム送受、ハッシュ整合性検証
 <!-- @category: tool -->
 <!-- @aliases: オーケストレーター, run.js -->
 
-サーバー起動・ブラウザ操作・検証スクリプト実行を一本化した `run.js` パターン (AI_ONBOARDING)。
-AI が一撃のコマンドで全工程を完遂できる。
+サーバー起動・ブラウザ操作・検証スクリプト実行を一本化する単一エントリスクリプトのパターン (AI_ONBOARDING)。
+AI が一撃のコマンドで全工程を完遂できることを目指す。
+**現状: 概念のみ。本リポにはまだ `run.js` 等の実装はなく、用途別 (`ai-eyes.js`, `eyes-e2e.js` 等) を組み合わせて運用中。**
 
 ---
 
@@ -229,5 +236,7 @@ AI が一撃のコマンドで全工程を完遂できる。
 <!-- @category: tool -->
 <!-- @aliases: 実行型ドキュメント, executable doc -->
 
-実行型ドキュメントの概念検証。`sandbox/doc-exec/` 配下で MVP を組成中。
+実行型ドキュメントの概念検証。`sandbox/doc-exec/` 配下で MVP 動作中
+(`bundle-docs.js` + `prepend-deps.js` で 1 ファイル化 + 用語依存リスト付与、回帰 test と
+効果測定ハーネス込み)。
 マクロ展開ではなく **依存宣言** (セクション冒頭の関連リスト) でドキュメントの認知局所性を取り戻す試み。

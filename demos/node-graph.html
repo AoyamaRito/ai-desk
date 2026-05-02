@@ -321,22 +321,26 @@ function drawNode(n, ev) {
   ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText(def.label, sx + 10, sy + TITLE_H / 2);
-  // body content
-  ctx.font = '14px "SF Mono", Menlo, monospace';
+  // body content — show the live computed value on every node so the data flow is visible at a glance
   ctx.fillStyle = '#1a0f24';
+  ctx.textAlign = 'right';
   if (n.type === 'const') {
-    ctx.textAlign = 'right';
+    ctx.font = 'bold 16px "SF Mono", Menlo, monospace';
     ctx.fillText(String(n.v ?? 0), sx + NODE_W - 14, sy + TITLE_H + 22);
-    ctx.textAlign = 'left';
   } else if (n.type === 'out') {
     const v = ev.valueOf(n.id, 0, new Set());
     const display = isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(3)) : 'NaN';
-    ctx.textAlign = 'right';
-    ctx.font = 'bold 16px "SF Mono", Menlo, monospace';
+    ctx.font = 'bold 18px "SF Mono", Menlo, monospace';
     ctx.fillStyle = '#ff1d6d';
     ctx.fillText(display, sx + NODE_W - 14, sy + TITLE_H + 22);
-    ctx.textAlign = 'left';
+  } else if (def.outputs > 0) {
+    const v = ev.valueOf(n.id, 0, new Set());
+    const display = isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : 'NaN';
+    ctx.font = 'bold 14px "SF Mono", Menlo, monospace';
+    ctx.fillStyle = isFinite(v) ? '#1a0f24' : '#999';
+    ctx.fillText(display, sx + NODE_W - 14, sy + TITLE_H + 22);
   }
+  ctx.textAlign = 'left';
   // ports (input on left, output on right)
   for (let i = 0; i < def.inputs; i++) {
     const p = portPos(n, 'in', i);

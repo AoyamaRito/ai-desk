@@ -301,6 +301,31 @@ const g = 0;
   fs.unlinkSync(patch);
 });
 
+test('apply: pre-flight fails (exit 1, no write) when patch contains duplicate emblem names', () => {
+  const target = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const a = 1;
+// [/ai_s_emblem: Alpha]
+`);
+  const patch = tmp(`
+// [ai_s_emblem:#L3#logic Alpha]
+const a = 2;
+// [/ai_s_emblem: Alpha]
+
+// [ai_s_emblem:#L3#logic Alpha]
+const a = 3;
+// [/ai_s_emblem: Alpha]
+`);
+  const before = fs.readFileSync(target, 'utf8');
+  const r = run([target, 'apply', patch]);
+  assert.equal(r.code, 1);
+  assert.ok(r.err.includes('duplicated in patch'));
+  const after = fs.readFileSync(target, 'utf8');
+  assert.equal(after, before, 'target must be untouched when patch has duplicate names');
+  fs.unlinkSync(target);
+  fs.unlinkSync(patch);
+});
+
 // ================================================================
 // COVERAGE — reports layer transitions
 // ================================================================

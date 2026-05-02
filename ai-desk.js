@@ -34,6 +34,7 @@ const HELP_TEXT = `ai-desk (Emblem Edition) - Robust Workspace Manager
 
 Usage:
   ai-desk <filename> <mode> [args...]
+  ai-desk view <file1> <file2> [...]     ← multi-file read-only exception
 
 Modes:
   skeleton                    Layer-sorted map of emblems and bridges with line numbers.
@@ -46,6 +47,11 @@ Modes:
                               the plan without writing.
   check                       Verify emblem/bridge integrity (nesting, uniqueness, completeness).
   coverage                    Bridge coverage report. Which layer transitions have bridges declared.
+
+Multi-file (read-only, breaks <file> <mode> convention):
+  view <file1> <file2> ...    Concatenate files to stdout with FILE separators.
+                              Use when logically-paired files (e.g. impl + test, or
+                              REAL + builder + config) should be read as one unit.
 
 Format (emblem):
   // [${EMB_MARK}:#importance#layer#tag <name>]
@@ -70,6 +76,10 @@ Aspect tags (optional — used alongside layer tags, e.g. #high#L2#auth):
   #security          セキュリティ（入力検証・暗号・サニタイズ）
   Project-specific aspects → ai-desk.config.json customTags
 
+Audience tag (optional — declares the intended reader):
+  #for_human         人間向けの散文・ブランディング・思想説明
+                     (default: AI 向け — 簡潔・ツール親和)
+
 Bridge directions:
   L1toL2, L2toL3, L3toL4, L3toPersistent, L3toNetwork, ...
 
@@ -86,7 +96,24 @@ Examples:
 // [ai_s_emblem:#mid#cli Dispatcher]
 // 純粋ルーティングのみ。各モードは自分でファイルを読み・パースする（自己完結）。
 const args = process.argv.slice(2);
-if (args.length < 2 || args.includes('-h') || args.includes('--help')) {
+if (args.length < 1 || args.includes('-h') || args.includes('--help')) {
+  console.log(HELP_TEXT);
+  process.exit(0);
+}
+
+// Multi-file 例外: view は <file> <mode> 規約から外れる。
+// 引数規則: args[0] === 'view' で残りはすべてファイルパス。
+if (args[0] === 'view') {
+  const files = args.slice(1);
+  if (files.length === 0) {
+    console.error('Error: view requires at least one file path.');
+    process.exit(1);
+  }
+  runView(files);
+  process.exit(0);
+}
+
+if (args.length < 2) {
   console.log(HELP_TEXT);
   process.exit(0);
 }
@@ -258,7 +285,9 @@ function runCheck(filePath) {
     '#physical', '#intent', '#logic', '#draw',
     '#verify', '#OutOfLayers', '#config',
     // Aspect tags — 層と直交する横断関心事。最小限のみ。プロジェクト固有は customTags へ。
-    '#auth', '#security'
+    '#auth', '#security',
+    // Audience tag — 読み手を明示。無印は AI 向け（簡潔・ツール親和）。
+    '#for_human'
   ]);
 
   // Emblem 検査（既存ロジックそのまま）。
@@ -447,6 +476,27 @@ function runApply(filePath, patchPath, flags = []) {
     process.exit(1);
   }
 
+  // ---- Patch 内重複名チェック: 同名が patch に複数あると、降順 splice で範囲が重なり target が壊れる。
+  // pre-flight より前に弾く（target を読むまでもなく失敗確定）。
+  {
+    const dupFailures = [];
+    const seenEmb = new Set();
+    for (const p of patchEmblems) {
+      if (seenEmb.has(p.name)) dupFailures.push(`emblem '${p.name}' is duplicated in patch`);
+      seenEmb.add(p.name);
+    }
+    const seenBr = new Set();
+    for (const p of patchBridges) {
+      if (seenBr.has(p.name)) dupFailures.push(`bridge '${p.name}' is duplicated in patch`);
+      seenBr.add(p.name);
+    }
+    if (dupFailures.length > 0) {
+      console.error(`\n[FATAL] Patch contains duplicate names (${dupFailures.length} issue${dupFailures.length > 1 ? 's' : ''}). No changes written.`);
+      for (const f of dupFailures) console.error(`  - ${f}`);
+      process.exit(1);
+    }
+  }
+
   // ---- Pre-flight: 全 patch 名がターゲットに「ちょうど1件」存在するか検証。
   // 失敗（unresolved / duplicate）が1件でもあれば exit 1（書き込みなし）。
   const plan = []; // { kind, name, meta, start, end, replacement }
@@ -541,3 +591,25 @@ function runApply(filePath, patchPath, flags = []) {
   for (const p of plan) console.log(`  - ${p.kind} '${p.name}'`);
 }
 // [/ai_s_emblem: Run-Apply]
+
+// [ai_s_emblem:#high#logic Run-View]
+// Multi-file 例外モード: 論理的に一体のファイル群（DOCS_REAL.js + build-docs.js + docs.config.json 等）を
+// 一つのストリームとして AI に渡す。read-only。書き込み系（apply）は single-file を維持する。
+function runView(files) {
+  const missing = files.filter(f => !fs.existsSync(f));
+  if (missing.length > 0) {
+    console.error(`Error: file(s) not found: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  for (const f of files) {
+    const code = fs.readFileSync(f, 'utf8');
+    const lineCount = code === '' ? 0 : code.split('\n').length;
+    console.log('// ============================================================');
+    console.log(`// FILE: ${f} (${lineCount} lines)`);
+    console.log('// ============================================================');
+    process.stdout.write(code);
+    if (!code.endsWith('\n')) console.log('');
+    console.log('');
+  }
+}
+// [/ai_s_emblem: Run-View]

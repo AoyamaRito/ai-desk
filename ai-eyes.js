@@ -271,7 +271,7 @@ function popInput() {
 }
 // [/ai_s_emblem: InputManager]
 
-// [ai_s_emblem:#high#core Router]
+// [ai_s_emblem:#high#L1 Router]
 function serveStatic(req, res) {
   const urlPath = req.url.split('?')[0];
   const baseDir = path.resolve(STATIC_DIR);
@@ -586,7 +586,7 @@ function handleRequest(req, res) {
 }
 // [/ai_s_emblem: Router]
 
-// [ai_s_emblem:#high#core Server]
+// [ai_s_emblem:#high#L1 Server]
 const server = http.createServer(handleRequest);
 let currentPort = BASE_PORT;
 
@@ -640,7 +640,7 @@ function tryListen(port, attempt = 1) {
 }
 // [/ai_s_emblem: Server]
 
-// [ai_s_emblem:#mid#docs ClientSnippet]
+// [ai_s_emblem:#mid#OutOfLayers ClientSnippet]
 /*
  * ブラウザ側に貼るコード (コピペ用)
  * ※動的配信版は GET /client.js で取得可能。こちらは手動埋め込み用。
@@ -696,7 +696,7 @@ function tryListen(port, attempt = 1) {
  */
 // [/ai_s_emblem: ClientSnippet]
 
-// [ai_s_emblem:#mid#test E2ETest]
+// [ai_s_emblem:#mid#OutOfLayers E2ETest]
 const TEST_PORT = 3099;
 const TEST_LOG = 'test_error.log';
 const TEST_SNAPSHOTS = './test_snapshots';
@@ -807,7 +807,7 @@ async function runE2ETests() {
 }
 // [/ai_s_emblem: E2ETest]
 
-// [ai_s_emblem:#high#entry Main]
+// [ai_s_emblem:#high#OutOfLayers Main]
 function showHelp() {
   console.log(`
 ai-eyes v0.5.0 - Zero-dependency dev server with Remote Control

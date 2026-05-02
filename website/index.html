@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ai-desk — AIにプログラムを書かせるための土台</title>
+<meta name="description" content="人間がやるのはやりたいことを自然言語でAIに伝えることだけ。コードの読み書き・修正・テストはAIが担当する開発体系。">
+<meta property="og:title" content="ai-desk — AIにプログラムを書かせるための土台">
+<meta property="og:description" content="人間がやるのはやりたいことを自然言語でAIに伝えることだけ。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aoyamarito.github.io/ai-desk/website/">
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-elev: #161b22;
+  --fg: #e6edf3;
+  --fg-dim: #8b949e;
+  --accent: #58a6ff;
+  --accent-2: #7ee787;
+  --border: #30363d;
+  --code-bg: #1c2128;
+  --max: 880px;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 4em 0; }
+section { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+/* hero */
+.hero {
+  padding: 96px 24px 72px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.hero h1 {
+  font-size: 56px; font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 24px;
+  background: linear-gradient(180deg, var(--fg) 0%, var(--fg-dim) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero .tagline {
+  font-size: 22px;
+  color: var(--fg);
+  margin: 0 0 16px;
+  font-weight: 500;
+}
+.hero .sub {
+  font-size: 17px;
+  color: var(--fg-dim);
+  max-width: 620px;
+  margin: 0 auto 40px;
+}
+.cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  transition: all 0.15s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); }
+.btn-primary { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+.btn-primary:hover { background: #79b8ff; }
+.btn-secondary { background: transparent; color: var(--fg); }
+.btn-secondary:hover { background: var(--bg-elev); border-color: var(--fg-dim); }
+
+/* sections */
+section.block { padding-top: 72px; padding-bottom: 0; }
+section.block h2 {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 24px;
+  letter-spacing: -0.01em;
+}
+section.block p { color: var(--fg); margin: 0 0 16px; }
+section.block .lead { font-size: 18px; color: var(--fg); margin-bottom: 32px; }
+
+/* prompt examples */
+.prompt {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 12px 0 24px;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.prompt-label {
+  font-size: 13px;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 32px 0 8px;
+  font-weight: 600;
+}
+.prompt-label:first-of-type { margin-top: 8px; }
+
+/* demos grid */
+.demos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.demo-card {
+  display: block;
+  padding: 20px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  transition: all 0.15s ease;
+}
+.demo-card:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.demo-card h3 { margin: 0 0 6px; font-size: 17px; color: var(--fg); }
+.demo-card p { margin: 0; font-size: 14px; color: var(--fg-dim); line-height: 1.5; }
+
+/* docs links */
+.docs-links {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 16px 0;
+}
+.docs-links a {
+  padding: 12px 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.docs-links a:hover { border-color: var(--accent); text-decoration: none; }
+.docs-links .name { font-weight: 600; }
+.docs-links .desc { color: var(--fg-dim); font-size: 14px; margin-left: 16px; text-align: right; }
+
+/* footer */
+footer {
+  margin-top: 96px;
+  padding: 40px 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: 14px;
+}
+footer a { color: var(--fg-dim); }
+footer a:hover { color: var(--fg); }
+
+/* mobile */
+@media (max-width: 600px) {
+  .hero { padding: 64px 20px 56px; }
+  .hero h1 { font-size: 40px; }
+  .hero .tagline { font-size: 18px; }
+  section.block h2 { font-size: 26px; }
+  .docs-links a { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .docs-links .desc { margin-left: 0; text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>ai-desk</h1>
+  <p class="tagline">AIにプログラムを書かせるための土台</p>
+  <p class="sub">
+    人間がやるのは「やりたいこと」を自然言語でAIに伝えることだけ。<br>
+    コードの読み書き・修正・テストはAIが担当する開発体系。
+  </p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://aoyamarito.github.io/ai-desk/actions/index.html">デモを触る</a>
+    <a class="btn btn-secondary" href="https://github.com/AoyamaRito/ai-desk">GitHubを見る</a>
+  </div>
+</header>
+
+<section class="block">
+  <h2>どんな人に向いているか</h2>
+  <p class="lead">
+    AIに任せて何かを作りたいけれど、毎回コードがバラバラになって続かない。
+    そんな状況を構造側から解決します。
+  </p>
+  <p>
+    複雑な状態の組み合わせバグを構造的に潰す仕組みが入っているので、
+    AIが書いたコードが「途中まで動いて崩壊する」状況になりにくくなっています。
+    ゲームのルール・業務ロジック・アプリのUI──「条件分岐が多い」ものに特に効きます。
+  </p>
+</section>
+
+<section class="block">
+  <h2>使い方</h2>
+  <p class="lead">人間が叩くコマンドはほぼありません。AIに喋るだけです。</p>
+
+  <div class="prompt-label">何かを作りたいとき</div>
+  <div class="prompt">AI_ONBOARDING.md を読んでから、
+じゃんけんゲームをブラウザで動くように作ってください。</div>
+
+  <div class="prompt-label">バグを直したいとき</div>
+  <div class="prompt">AI_ONBOARDING.md を読んでから、
+[バグの現象] を直してください。
+ai-eyes は起動済みです (localhost:3000)。</div>
+
+  <div class="prompt-label">既存ファイルに手を入れたいとき</div>
+  <div class="prompt">AI_ONBOARDING.md を読んでから、
+app.js の [機能名] を [変更内容] してください。</div>
+</section>
+
+<section class="block">
+  <h2>触れるデモ</h2>
+  <div class="demos">
+    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/actions/index.html">
+      <h3>Action Constraint Lab</h3>
+      <p>格闘ゲームのキャンセル・コンボを19種の網羅テストで検証する実装デモ。</p>
+    </a>
+    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/action-demos.html">
+      <h3>Action Demos</h3>
+      <p>9種のアクションゲームアルゴリズムをブラウザで触れる。</p>
+    </a>
+    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/3dplus/examples/point-projection.html">
+      <h3>3Dplus 検証層</h3>
+      <p>GPU描画と並走するCPU側の純粋関数による突合デモ。</p>
+    </a>
+  </div>
+</section>
+
+<section class="block">
+  <h2>もっと知りたい</h2>
+  <div class="docs-links">
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/README.md">
+      <span class="name">README</span>
+      <span class="desc">クイックスタート (一般ユーザ向け)</span>
+    </a>
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/README.ai.md">
+      <span class="name">README.ai</span>
+      <span class="desc">設計思想・アーキテクチャ・哲学 (AI / アーキテクト向け)</span>
+    </a>
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/AI_NATIVE_MASTER_BIBLE.md">
+      <span class="name">Bible</span>
+      <span class="desc">全体の正典。設計の根拠がすべてここに</span>
+    </a>
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/AI_ONBOARDING.md">
+      <span class="name">AI Onboarding</span>
+      <span class="desc">AI が作業を始めるときに読むファイル</span>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <p>
+    <a href="https://github.com/AoyamaRito/ai-desk">GitHub</a> ·
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/LICENSE">MIT License</a>
+  </p>
+  <p>
+    沖井広行 / <a href="https://github.com/AoyamaRito">AoyamaRito</a> (蒼山りと)
+  </p>
+</footer>
+
+</body>
+</html>

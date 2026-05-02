@@ -232,6 +232,19 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
   .demo-frame.tall { height: 520px; }
 }
 
+/* setup steps */
+.setup .step-label {
+  font-size: 13px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 24px 0 6px; font-weight: 800;
+}
+.setup .step-cmd {
+  background: #f5f5f7; border: 2px solid var(--fg); border-left: 6px solid var(--accent-2);
+  padding: 12px 16px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  white-space: pre-wrap; word-break: break-word; color: var(--fg);
+}
+.setup .step-note { margin: 6px 0 0; font-size: 14px; color: var(--fg-dim); line-height: 1.6; }
+.setup .step-note code { background: #f5f5f7; padding: 1px 6px; border: 1px solid var(--border); font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+
 /* scaling table */
 .scale-table {
   width: 100%;
@@ -381,6 +394,31 @@ app.js の [機能名] を [変更内容] してください。</div>
     <p class="demo-desc">宇宙空間を猛スピードで進みながらリングをくぐる。ドラッグ or 矢印キーで操舵、左下レーダーで次のリングを確認。</p>
     <div class="demo-frame tall"><iframe src="demos/space-race.html?embed=1" loading="lazy" title="Space Race"></iframe></div>
   </div>
+</section>
+
+<section class="block setup">
+  <h2>本物の gemini-cli を WezTerm で使う</h2>
+  <p class="lead">
+    上のデモはあくまで雛形。手元の Mac / Linux で本格的に AI に作業を頼むなら、
+    ターミナル <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">WezTerm</a> +
+    <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener">gemini-cli</a> が一番早い。
+  </p>
+
+  <div class="step-label">1. WezTerm をインストール</div>
+  <div class="step-cmd">brew install --cask wezterm</div>
+  <div class="step-note">公式サイト <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">wezfurlong.org/wezterm</a> からも DL 可。</div>
+
+  <div class="step-label">2. gemini-cli をインストール</div>
+  <div class="step-cmd">npm install -g @google/gemini-cli</div>
+  <div class="step-note">Node.js (v18+) が前提。未導入なら <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a> から。</div>
+
+  <div class="step-label">3. API キーを取得して環境変数に設定</div>
+  <div class="step-cmd">export GEMINI_API_KEY=&lt;your-key&gt;</div>
+  <div class="step-note">キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> から無料取得。<code>~/.zshrc</code> に書いておくと毎回設定不要。</div>
+
+  <div class="step-label">4. WezTerm を開いて起動</div>
+  <div class="step-cmd">gemini</div>
+  <div class="step-note">あとは AI に自然言語で頼むだけ。<code>AI_ONBOARDING.md を読んでから [作りたいもの] を作って</code></div>
 </section>
 
 <section class="block tech-note">

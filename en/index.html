@@ -232,6 +232,19 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
   .demo-frame.tall { height: 520px; }
 }
 
+/* setup steps */
+.setup .step-label {
+  font-size: 13px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 24px 0 6px; font-weight: 800;
+}
+.setup .step-cmd {
+  background: #f5f5f7; border: 2px solid var(--fg); border-left: 6px solid var(--accent-2);
+  padding: 12px 16px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px;
+  white-space: pre-wrap; word-break: break-word; color: var(--fg);
+}
+.setup .step-note { margin: 6px 0 0; font-size: 14px; color: var(--fg-dim); line-height: 1.6; }
+.setup .step-note code { background: #f5f5f7; padding: 1px 6px; border: 1px solid var(--border); font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+
 /* scaling table */
 .scale-table {
   width: 100%;
@@ -381,6 +394,31 @@ ai-eyes and fix [the symptom you're seeing].</div>
     <p class="demo-desc">Hurtle through space and fly through rings. Drag or use arrow keys to steer; the radar at the bottom-left shows the next ring.</p>
     <div class="demo-frame tall"><iframe src="../demos/space-race.html?embed=1&amp;lang=en" loading="lazy" title="Space Race"></iframe></div>
   </div>
+</section>
+
+<section class="block setup">
+  <h2>Use the real gemini-cli with WezTerm</h2>
+  <p class="lead">
+    The inline demos above are templates. To actually delegate work to AI on your own machine,
+    the fastest path is <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">WezTerm</a> +
+    <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener">gemini-cli</a>.
+  </p>
+
+  <div class="step-label">1. Install WezTerm</div>
+  <div class="step-cmd">brew install --cask wezterm</div>
+  <div class="step-note">Or download from <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">wezfurlong.org/wezterm</a>.</div>
+
+  <div class="step-label">2. Install gemini-cli</div>
+  <div class="step-cmd">npm install -g @google/gemini-cli</div>
+  <div class="step-note">Requires Node.js v18+. Get it from <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a>.</div>
+
+  <div class="step-label">3. Get an API key and set it as an env var</div>
+  <div class="step-cmd">export GEMINI_API_KEY=&lt;your-key&gt;</div>
+  <div class="step-note">Free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Add to <code>~/.zshrc</code> so you don't have to set it every shell.</div>
+
+  <div class="step-label">4. Open WezTerm and start it</div>
+  <div class="step-cmd">gemini</div>
+  <div class="step-note">Then just talk to the AI in plain language: <code>Read AI_ONBOARDING.md first, then build [what you want]</code></div>
 </section>
 
 <section class="block tech-note">

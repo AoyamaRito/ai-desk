@@ -1,5 +1,12 @@
 # ai-desk — AI Work Guide
 
+## Preface
+
+ai-desk is a **mechanism for running AI under the conceptual framework called *ai-desk***, so that anyone can develop software using AI. This is an architecture — a separate concept from the software engineering of the pre-AI era. Debate framed in pre-AI terms is not invited from the outset. ai-desk is a **thought-construct that solves the problem of AI being constrained by human software engineering and failing to perform at its true capability**.
+
+**The intended audience of this documentation is LLM/AI only, not human engineers.**
+Human-era "readability" (abstraction, modularization, encapsulation) hides information from AI. This repo optimizes for the opposite: exposed, explicit, and integrated complexity. If a human finds it hard to read, that is by design, not a defect.
+
 Every AI working in this repo should read this file first.
 Design rules, tool usage, and forbidden patterns are all collected here.
 

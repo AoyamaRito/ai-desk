@@ -71,4 +71,4 @@ Hiroyuki OKINOI / [AoyamaRito](https://github.com/AoyamaRito) (Aoyama Rito / 蒼
 > 1. [`README.ai.en.md`](README.ai.en.md) — design philosophy, architecture, four-layer model, metrics, file map (English).
 > 2. [`AI_ONBOARDING.en.md`](AI_ONBOARDING.en.md) — work rules, tools, tag syntax, testing.
 >
-> The deepest source (`AI_NATIVE_MASTER_BIBLE.md`) is currently Japanese only and remains the final canonical reference.
+> The Japanese `AI_NATIVE_MASTER_BIBLE.md` is the final canonical reference. An English mirror lives at [`AI_NATIVE_MASTER_BIBLE.en.md`](AI_NATIVE_MASTER_BIBLE.en.md).

@@ -3,7 +3,7 @@
 > This file is the **AI / architect-facing** spec, design philosophy, and architecture overview.
 > End users should start with [`README.en.md`](README.en.md) (how to ask AI to do work in plain language).
 > AI agents should also read [`AI_ONBOARDING.en.md`](AI_ONBOARDING.en.md) before starting any task.
-> The deepest source of truth (`AI_NATIVE_MASTER_BIBLE.md`) is currently Japanese only.
+> The deepest source of truth is `AI_NATIVE_MASTER_BIBLE.md` (Japanese, canonical) — an English translation lives at [`AI_NATIVE_MASTER_BIBLE.en.md`](AI_NATIVE_MASTER_BIBLE.en.md).
 
 ---
 
@@ -177,7 +177,7 @@ node --test actions/tests/fighter-cancel.test.js
 | File | Content |
 |---|---|
 | [`AI_ONBOARDING.en.md`](AI_ONBOARDING.en.md) | **AI work guide (read first)**. Rules, tools, syntax, testing |
-| [`AI_NATIVE_MASTER_BIBLE.md`](AI_NATIVE_MASTER_BIBLE.md) | The canonical document (Japanese). Asymmetry → Heavy Functions → 4-layer → REAL/SHADOW → 3Dplus → Event Sourcing → double-entry math |
+| [`AI_NATIVE_MASTER_BIBLE.en.md`](AI_NATIVE_MASTER_BIBLE.en.md) | The canonical document (English mirror). Asymmetry → Heavy Functions → 4-layer → REAL/SHADOW → 3Dplus → Event Sourcing → double-entry math. Japanese version stays canonical |
 | [`AI_UNDERSTANDING_MANIFESTO.en.md`](AI_UNDERSTANDING_MANIFESTO.en.md) | AI cognition characteristics: ±300-line spotlight, recency bias, file-switch cost |
 | [`CONSTRAINT_FOLDING_MASTER.md`](CONSTRAINT_FOLDING_MASTER.md) | LLM application guide for the constraint-folding pattern (Japanese) |
 | [`actions/ACTION_NATIVE_FOLDING_GUIDE.md`](actions/ACTION_NATIVE_FOLDING_GUIDE.md) | Action-game application guide |

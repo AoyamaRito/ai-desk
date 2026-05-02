@@ -128,6 +128,9 @@ function BridgeName() { ... }
 
 有効タグ: `#high #mid #low` × `#L1 #L2 #L3 #L4 #physical #intent #logic #draw #verify #OutOfLayers #config`
 
+Aspect タグ（任意・層と併用）: `#auth` `#security`
+プロジェクト固有の aspect は `ai-desk.config.json` の `customTags` で追加する。
+
 ---
 
 ## テスト

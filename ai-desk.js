@@ -63,6 +63,11 @@ Layer tags for emblems:
   #verify            Twin (検証双子) — Bible §4.5。L4直後に表示。
   #OutOfLayers / #config  Explicitly outside the 4-layer model (config, utils, types)
 
+Aspect tags (optional — used alongside layer tags, e.g. #high#L2#auth):
+  #auth              認証・認可
+  #security          セキュリティ（入力検証・暗号・サニタイズ）
+  Project-specific aspects → ai-desk.config.json customTags
+
 Bridge directions:
   L1toL2, L2toL3, L3toL4, L3toPersistent, L3toNetwork, ...
 
@@ -232,7 +237,9 @@ function runCheck(filePath) {
     '#high', '#mid', '#low',
     '#L1', '#L2', '#L3', '#L4',
     '#physical', '#intent', '#logic', '#draw',
-    '#verify', '#OutOfLayers', '#config'
+    '#verify', '#OutOfLayers', '#config',
+    // Aspect tags — 層と直交する横断関心事。最小限のみ。プロジェクト固有は customTags へ。
+    '#auth', '#security'
   ]);
 
   // Emblem 検査（既存ロジックそのまま）。

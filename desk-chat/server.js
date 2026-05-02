@@ -24,7 +24,9 @@ const pty = require('node-pty');
 const { WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT || 4000);
-const CMD = process.env.CMD || 'gemini';
+// Default to the user's shell so the demo works out-of-the-box even if gemini-cli isn't installed.
+// Override with CMD=gemini (or any other CLI) when you actually want to chat.
+const CMD = process.env.CMD || process.env.SHELL || '/bin/bash';
 const CMD_ARGS = (process.env.CMD_ARGS || '').trim().length > 0
   ? process.env.CMD_ARGS.split(/\s+/)
   : [];
@@ -76,14 +78,19 @@ wss.on('connection', (ws, req) => {
       env: { ...process.env, TERM: 'xterm-256color' },
     });
   } catch (e) {
-    // If the configured CMD isn't installed, fall back to a plain shell so the
-    // user can at least see the terminal works and pick a different command.
     console.warn(`[desk-chat] failed to spawn '${overrideCmd}': ${e.message}. Falling back to ${SHELL_FALLBACK}`);
-    term = pty.spawn(SHELL_FALLBACK, [], {
-      name: 'xterm-256color', cols: 80, rows: 24,
-      cwd: process.env.HOME || process.cwd(),
-      env: { ...process.env, TERM: 'xterm-256color' },
-    });
+    try {
+      term = pty.spawn(SHELL_FALLBACK, [], {
+        name: 'xterm-256color', cols: 80, rows: 24,
+        cwd: process.env.HOME || process.cwd(),
+        env: { ...process.env, TERM: 'xterm-256color' },
+      });
+    } catch (e2) {
+      console.error(`[desk-chat] fallback to ${SHELL_FALLBACK} also failed: ${e2.message}`);
+      const msg = `\r\n[desk-chat] failed to spawn any shell.\r\n  primary: ${overrideCmd} → ${e.message}\r\n  fallback: ${SHELL_FALLBACK} → ${e2.message}\r\n`;
+      try { ws.send(msg); ws.close(); } catch {}
+      return;
+    }
   }
 
   console.log(`[desk-chat] spawned pid=${term.pid} (${overrideCmd} ${overrideArgs.join(' ')})`);

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>desk-chat (standalone) — browser-only chat with virtual FS</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif; overflow: hidden; }
+button, input, textarea, select { font: inherit; color: inherit; background: transparent; border: 0; outline: none; }
+header {
+  height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #30363d; background: #161b22; font-size: 13px; flex-shrink: 0;
+}
+header .title { font-weight: 700; }
+header .pill { font-size: 11px; padding: 2px 8px; background: #21262d; border-radius: 99px; color: #8b949e; letter-spacing: 0.04em; }
+header .grow { flex: 1 1 auto; }
+header .icon-btn { padding: 6px 10px; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-size: 12px; color: #8b949e; }
+header .icon-btn:hover { background: #21262d; color: #e6edf3; }
+main { display: flex; height: calc(100% - 44px); }
+#chat-pane { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+#fs-pane {
+  width: 320px; border-left: 1px solid #30363d; background: #0a0f15; display: flex; flex-direction: column;
+  flex-shrink: 0; overflow: hidden;
+}
+#fs-pane.hide { display: none; }
+#fs-header { padding: 10px 14px; border-bottom: 1px solid #30363d; font-size: 12px; color: #8b949e; display: flex; justify-content: space-between; align-items: center; }
+#fs-list { flex: 1 1 auto; overflow-y: auto; padding: 6px 0; }
+.fs-item { padding: 6px 14px; font-family: "SF Mono", Menlo, monospace; font-size: 12px; cursor: pointer; color: #c9d1d9; }
+.fs-item:hover { background: #161b22; }
+.fs-item.active { background: #1f6feb33; color: #79c0ff; }
+.fs-empty { padding: 14px; color: #555; font-size: 12px; text-align: center; }
+#fs-viewer { padding: 10px 14px; border-top: 1px solid #30363d; max-height: 40%; overflow-y: auto; font-family: "SF Mono", Menlo, monospace; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; color: #8b949e; }
+
+#messages { flex: 1 1 auto; overflow-y: auto; padding: 18px 24px; }
+.msg { max-width: 760px; margin: 0 auto 18px; }
+.msg .role { font-size: 11px; color: #8b949e; letter-spacing: 0.06em; margin-bottom: 6px; text-transform: uppercase; font-weight: 700; }
+.msg .body { line-height: 1.65; font-size: 15px; white-space: pre-wrap; word-wrap: break-word; }
+.msg.user .body { color: #e6edf3; }
+.msg.model .body { color: #c9d1d9; }
+.msg.tool .body { font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: #8b949e; background: #161b22; border-left: 2px solid #1f6feb; padding: 8px 12px; border-radius: 0 4px 4px 0; }
+.msg.system .body { color: #f0883e; font-size: 13px; font-style: italic; }
+.msg .body code { font-family: "SF Mono", Menlo, monospace; font-size: 13px; background: #161b22; padding: 1px 5px; border-radius: 3px; }
+.msg .body pre { background: #161b22; padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 8px 0; font-size: 13px; }
+.msg .body pre code { background: transparent; padding: 0; font-size: inherit; }
+
+#composer {
+  border-top: 1px solid #30363d; padding: 12px 24px; display: flex; gap: 10px; align-items: flex-end; background: #0d1117; flex-shrink: 0;
+}
+#composer textarea {
+  flex: 1 1 auto; resize: none; min-height: 24px; max-height: 200px;
+  border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5;
+  background: #161b22;
+}
+#composer textarea:focus { border-color: #1f6feb; }
+#composer button.send { padding: 10px 18px; background: #1f6feb; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
+#composer button.send:disabled { opacity: 0.4; cursor: not-allowed; }
+#composer button.send:hover:not(:disabled) { background: #388bfd; }
+
+dialog { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 10px; padding: 22px 26px; min-width: 440px; }
+dialog::backdrop { background: rgba(0,0,0,0.5); }
+dialog h2 { font-size: 16px; margin-bottom: 14px; }
+dialog label { display: block; font-size: 12px; color: #8b949e; margin: 12px 0 4px; }
+dialog input, dialog select { width: 100%; padding: 8px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; font-size: 13px; }
+dialog .actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
+dialog button { padding: 8px 16px; background: #21262d; border: 1px solid #30363d; border-radius: 6px; cursor: pointer; font-size: 13px; }
+dialog button.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+dialog button:hover { background: #30363d; }
+dialog button.primary:hover { background: #388bfd; }
+.hint { font-size: 11px; color: #8b949e; margin-top: 6px; }
+.hint a { color: #58a6ff; }
+.empty {
+  max-width: 560px; margin: 80px auto; padding: 24px; border: 1px dashed #30363d; border-radius: 10px;
+  text-align: center; color: #8b949e;
+}
+.empty h3 { color: #e6edf3; font-size: 16px; margin-bottom: 8px; }
+.empty p { font-size: 13px; line-height: 1.7; margin-bottom: 6px; }
+.empty button { margin-top: 14px; padding: 8px 16px; background: #1f6feb; color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">desk-chat</span>
+  <span class="pill">standalone · stage B</span>
+  <span class="grow"></span>
+  <button class="icon-btn" id="btn-toggle-fs">files</button>
+  <button class="icon-btn" id="btn-clear">clear chat</button>
+  <button class="icon-btn" id="btn-settings">settings</button>
+</header>
+
+<main>
+  <div id="chat-pane">
+    <div id="messages"></div>
+    <form id="composer">
+      <textarea id="input" rows="1" placeholder="Talk to the AI in plain language…"></textarea>
+      <button class="send" id="send" type="submit">send</button>
+    </form>
+  </div>
+  <aside id="fs-pane">
+    <div id="fs-header">
+      <span>virtual workspace (OPFS)</span>
+      <span id="fs-count">0 files</span>
+    </div>
+    <div id="fs-list"></div>
+    <div id="fs-viewer">click a file to preview</div>
+  </aside>
+</main>
+
+<dialog id="settings-dialog">
+  <h2>Settings</h2>
+  <label>Provider</label>
+  <select id="opt-provider">
+    <option value="gemini">Gemini (Google AI Studio)</option>
+  </select>
+  <label>API key</label>
+  <input id="opt-key" type="password" placeholder="paste key here">
+  <p class="hint">stored only in your browser localStorage. <a href="https://aistudio.google.com/apikey" target="_blank">get a Gemini key</a></p>
+  <label>Model</label>
+  <select id="opt-model">
+    <option value="gemini-2.0-flash">gemini-2.0-flash (fast)</option>
+    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+  </select>
+  <div class="actions">
+    <button type="button" id="opt-cancel">cancel</button>
+    <button type="button" class="primary" id="opt-save">save</button>
+  </div>
+</dialog>
+
+<script>
+// ============================================================
+// desk-chat / standalone (Stage B) — single-file vanilla browser chat
+//
+// Architecture (no server, no PTY, no CLI process):
+//   L1 Physical : DOM, OPFS, fetch, localStorage
+//   L2 Intent   : key / send / file-click → Command
+//   L3 Logic    : (state, command) => newState  (pure reducer for chat history + tool exec orchestration)
+//   L4 Draw     : render chat pane + file pane + composer
+//   Bridge      : fetch → Gemini API ; tools → vfs.* methods
+//
+// Virtual FS (vfs):
+//   - Lives entirely in OPFS (Origin Private File System) under /workspace/.
+//   - LLM never sees the real filesystem. Only the 4 tools exposed below.
+//   - Persists across browser refreshes. Export-as-zip not yet implemented.
+// ============================================================
+
+const STORAGE_KEY = 'desk-chat:state';
+const SETTINGS_KEY = 'desk-chat:settings';
+const WORKSPACE_DIR = 'workspace';
+
+// ---------- Settings (API key, model)
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+if (!settings.provider) settings.provider = 'gemini';
+if (!settings.model)    settings.model    = 'gemini-2.0-flash';
+
+const settingsDialog = document.getElementById('settings-dialog');
+const optProvider = document.getElementById('opt-provider');
+const optKey      = document.getElementById('opt-key');
+const optModel    = document.getElementById('opt-model');
+function openSettings() {
+  optProvider.value = settings.provider;
+  optKey.value      = settings.apiKey || '';
+  optModel.value    = settings.model;
+  settingsDialog.showModal();
+}
+document.getElementById('btn-settings').onclick = openSettings;
+document.getElementById('opt-cancel').onclick   = () => settingsDialog.close();
+document.getElementById('opt-save').onclick = () => {
+  settings = { provider: optProvider.value, apiKey: optKey.value.trim(), model: optModel.value };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  settingsDialog.close();
+  renderEmpty();
+};
+
+// ---------- Virtual FS via OPFS
+const vfs = {
+  async _root() {
+    const root = await navigator.storage.getDirectory();
+    return await root.getDirectoryHandle(WORKSPACE_DIR, { create: true });
+  },
+  async _resolve(path, { create = false } = {}) {
+    // path normalized like 'a/b/c.txt' (no leading slash)
+    const parts = path.replace(/^\/+/, '').split('/').filter(Boolean);
+    if (parts.length === 0) throw new Error('empty path');
+    const filename = parts.pop();
+    let dir = await this._root();
+    for (const p of parts) {
+      dir = await dir.getDirectoryHandle(p, { create });
+    }
+    return { dir, filename };
+  },
+  async list(prefix = '') {
+    // Walk recursively, returning all file paths under the given prefix
+    const results = [];
+    async function walk(dir, base) {
+      for await (const [name, handle] of dir.entries()) {
+        const full = base ? `${base}/${name}` : name;
+        if (handle.kind === 'file') results.push(full);
+        else if (handle.kind === 'directory') await walk(handle, full);
+      }
+    }
+    await walk(await this._root(), '');
+    return results.filter(p => p.startsWith(prefix.replace(/^\/+/, ''))).sort();
+  },
+  async read(path) {
+    const { dir, filename } = await this._resolve(path);
+    const fh = await dir.getFileHandle(filename);
+    const file = await fh.getFile();
+    return await file.text();
+  },
+  async write(path, content) {
+    const { dir, filename } = await this._resolve(path, { create: true });
+    const fh = await dir.getFileHandle(filename, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(content);
+    await writable.close();
+  },
+  async delete(path) {
+    const { dir, filename } = await this._resolve(path);
+    await dir.removeEntry(filename);
+  },
+};
+
+// ---------- Tools exposed to the model
+const TOOL_DEFS = [
+  {
+    name: 'read_file',
+    description: 'Read the full text content of a file in the workspace.',
+    parameters: { type: 'object', properties: { path: { type: 'string', description: 'workspace-relative file path' } }, required: ['path'] },
+  },
+  {
+    name: 'write_file',
+    description: 'Create or overwrite a file in the workspace with the given content.',
+    parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] },
+  },
+  {
+    name: 'list_files',
+    description: 'List all files under an optional prefix in the workspace.',
+    parameters: { type: 'object', properties: { prefix: { type: 'string', description: 'optional path prefix; empty for everything' } } },
+  },
+  {
+    name: 'delete_file',
+    description: 'Delete a file from the workspace.',
+    parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+  },
+];
+
+async function runTool(name, args) {
+  try {
+    if (name === 'read_file')   return { content: await vfs.read(args.path) };
+    if (name === 'write_file')  { await vfs.write(args.path, args.content); return { ok: true, path: args.path, bytes: args.content.length }; }
+    if (name === 'list_files')  { const files = await vfs.list(args.prefix || ''); return { files }; }
+    if (name === 'delete_file') { await vfs.delete(args.path); return { ok: true }; }
+    return { error: `unknown tool: ${name}` };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// ---------- Chat state (persisted)
+// messages: [{ role: 'user'|'model'|'tool'|'system', text?, toolCall?, toolResult? }]
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { messages: [] };
+function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+const messagesEl = document.getElementById('messages');
+function renderMessages() {
+  if (state.messages.length === 0) { renderEmpty(); return; }
+  messagesEl.innerHTML = '';
+  for (const m of state.messages) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + m.role;
+    const role = document.createElement('div');
+    role.className = 'role';
+    role.textContent = m.role === 'tool' ? `tool · ${m.toolName}` : m.role;
+    const body = document.createElement('div');
+    body.className = 'body';
+    if (m.role === 'tool') {
+      body.textContent = JSON.stringify(m.toolResult, null, 2).slice(0, 800) + (JSON.stringify(m.toolResult).length > 800 ? '\n…' : '');
+    } else if (m.toolCall) {
+      body.textContent = `→ ${m.toolCall.name}(${JSON.stringify(m.toolCall.args).slice(0, 200)})`;
+    } else {
+      body.textContent = m.text || '';
+    }
+    div.appendChild(role); div.appendChild(body);
+    messagesEl.appendChild(div);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function renderEmpty() {
+  if (!settings.apiKey) {
+    messagesEl.innerHTML = `<div class="empty">
+      <h3>Set your API key to start</h3>
+      <p>desk-chat (standalone) talks to Gemini directly from your browser.<br>No server, no CLI, no install.</p>
+      <p>Your key is stored only in this browser's localStorage.</p>
+      <button onclick="document.getElementById('btn-settings').click()">open settings</button>
+    </div>`;
+  } else {
+    messagesEl.innerHTML = `<div class="empty">
+      <h3>Ready</h3>
+      <p>Ask the AI to build something. It can read, write, list, and delete files in a virtual workspace (OPFS, browser-local).</p>
+      <p>Examples:<br>
+        <code>じゃんけんゲームを workspace/janken.html に作って</code><br>
+        <code>list all files</code><br>
+        <code>read README.md</code>
+      </p>
+    </div>`;
+  }
+}
+
+// ---------- File pane
+const fsListEl   = document.getElementById('fs-list');
+const fsCountEl  = document.getElementById('fs-count');
+const fsViewerEl = document.getElementById('fs-viewer');
+async function refreshFsPane() {
+  const files = await vfs.list();
+  fsCountEl.textContent = `${files.length} file${files.length === 1 ? '' : 's'}`;
+  if (files.length === 0) {
+    fsListEl.innerHTML = '<div class="fs-empty">empty workspace</div>';
+    return;
+  }
+  fsListEl.innerHTML = '';
+  for (const path of files) {
+    const div = document.createElement('div');
+    div.className = 'fs-item';
+    div.textContent = path;
+    div.onclick = async () => {
+      document.querySelectorAll('.fs-item').forEach(e => e.classList.remove('active'));
+      div.classList.add('active');
+      try {
+        const content = await vfs.read(path);
+        fsViewerEl.textContent = content.slice(0, 4000) + (content.length > 4000 ? '\n…' : '');
+      } catch (e) {
+        fsViewerEl.textContent = '(error: ' + e.message + ')';
+      }
+    };
+    fsListEl.appendChild(div);
+  }
+}
+document.getElementById('btn-toggle-fs').onclick = () => {
+  document.getElementById('fs-pane').classList.toggle('hide');
+};
+
+document.getElementById('btn-clear').onclick = () => {
+  if (confirm('Clear chat history? Workspace files are kept.')) {
+    state = { messages: [] };
+    persist();
+    renderMessages();
+  }
+};
+
+// ---------- Composer
+const inputEl = document.getElementById('input');
+const composerEl = document.getElementById('composer');
+const sendBtn = document.getElementById('send');
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(200, inputEl.scrollHeight) + 'px';
+});
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    composerEl.requestSubmit();
+  }
+});
+composerEl.addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = inputEl.value.trim();
+  if (!text) return;
+  if (!settings.apiKey) { openSettings(); return; }
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  state.messages.push({ role: 'user', text });
+  persist(); renderMessages();
+  await runTurn();
+});
+
+// ---------- Talk to Gemini (with function-calling loop)
+const SYSTEM_PROMPT = `You are an AI coding assistant operating inside desk-chat (browser-only, no real OS access).
+
+You have a virtual workspace (a small OPFS-backed file store, browser-local). You can read, write, list and delete files there using the provided tools.
+
+Style:
+- Be concise. Match the user's language (Japanese or English).
+- When the user asks to build something, just build it: write the file with write_file, then briefly say what you did.
+- When asked to fix or change a file, read_file first, then write_file with the updated content.
+- Prefer single-file vanilla HTML+JS solutions (the desk-chat ai-desk philosophy). Zero dependencies.
+- Don't apologise; don't pad answers; don't restate the question.`;
+
+async function runTurn() {
+  sendBtn.disabled = true;
+  const MAX_HOPS = 8;
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    let resp;
+    try {
+      resp = await callGemini();
+    } catch (e) {
+      state.messages.push({ role: 'system', text: 'API error: ' + e.message });
+      persist(); renderMessages();
+      break;
+    }
+    const part = resp;
+    if (part.text) {
+      state.messages.push({ role: 'model', text: part.text });
+      persist(); renderMessages();
+    }
+    if (!part.toolCalls || part.toolCalls.length === 0) break;
+    for (const tc of part.toolCalls) {
+      state.messages.push({ role: 'model', toolCall: { name: tc.name, args: tc.args } });
+      persist(); renderMessages();
+      const result = await runTool(tc.name, tc.args);
+      state.messages.push({ role: 'tool', toolName: tc.name, toolResult: result });
+      persist(); renderMessages();
+      await refreshFsPane();
+    }
+  }
+  sendBtn.disabled = false;
+}
+
+async function callGemini() {
+  if (!settings.apiKey) throw new Error('API key not set');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`;
+  // Build contents from history. Tool results inline as functionResponse parts.
+  const contents = [];
+  for (const m of state.messages) {
+    if (m.role === 'user') contents.push({ role: 'user', parts: [{ text: m.text }] });
+    else if (m.role === 'model' && m.text) contents.push({ role: 'model', parts: [{ text: m.text }] });
+    else if (m.role === 'model' && m.toolCall) contents.push({ role: 'model', parts: [{ functionCall: { name: m.toolCall.name, args: m.toolCall.args } }] });
+    else if (m.role === 'tool') contents.push({ role: 'user', parts: [{ functionResponse: { name: m.toolName, response: m.toolResult } }] });
+  }
+  const body = {
+    contents,
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    tools: [{ functionDeclarations: TOOL_DEFS }],
+  };
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const t = await r.text();
+    throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  const cand = data.candidates && data.candidates[0];
+  const parts = (cand && cand.content && cand.content.parts) || [];
+  let text = '';
+  const toolCalls = [];
+  for (const p of parts) {
+    if (p.text) text += p.text;
+    if (p.functionCall) toolCalls.push({ name: p.functionCall.name, args: p.functionCall.args || {} });
+  }
+  return { text: text.trim(), toolCalls };
+}
+
+// ---------- init
+renderMessages();
+refreshFsPane();
+</script>
+</body>
+</html>

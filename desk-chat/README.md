@@ -71,3 +71,50 @@ Stage B is the ai-desk-aligned end-state: zero-server, zero-dep, browser-only. E
 ## Status
 
 Stage A MVP. Tested manually with shells (`bash`, `zsh`). Compatibility with the actual `gemini` CLI depends on which interactive features it relies on; bracketed-paste-aware editors and alt-screen redrawing will degrade. Filing precise compatibility notes after first real-CLI session.
+
+---
+
+## Stage B (`standalone.html`) — browser-only, zero-server
+
+`desk-chat/standalone.html` is the Stage B realisation: a single HTML file that talks to Gemini directly from the browser. **No server, no PTY, no CLI process.** Open the file in a browser, paste a Gemini API key (Settings), chat.
+
+### What it does
+
+- Chat UI on the left, virtual workspace pane on the right (toggle with `files` button).
+- The model has 4 tools: `read_file`, `write_file`, `list_files`, `delete_file`.
+- All files live in **OPFS (Origin Private File System)** under `workspace/`. Persists across refreshes.
+- Chat history kept in `localStorage`. API key kept in `localStorage` (never sent anywhere except the Gemini endpoint).
+- ~580 lines, single file, vanilla. Deps: zero.
+
+### Why this is "true Stage B" and not a thin wrapper
+
+Stage A (`server.js` + `index.html`) had to:
+- Spawn `gemini` as a child process via PTY (needs `node-pty`)
+- Bridge stdout/stdin over WebSocket (needs `ws`)
+- Pretend to the CLI that it's running in a real terminal
+
+Stage B drops all of that. The model is invoked directly via HTTPS, tools are JS functions running in the browser, files live in OPFS. No process to spawn, no terminal to emulate. This is the **fully ai-desk-aligned end-state**: zero-server, zero-dep, Web-standards-only, eternal compatibility.
+
+### Run
+
+Just open the file:
+
+```bash
+open desk-chat/standalone.html
+```
+
+Or serve from any static host (GitHub Pages works, since the file is fully static):
+
+```
+https://<your-pages>/desk-chat/standalone.html
+```
+
+Get a Gemini API key from <https://aistudio.google.com/apikey>, paste it in Settings, start chatting.
+
+### Limits / next steps
+
+- Only Gemini provider for now. Adding Anthropic / OpenAI is mostly a `callGemini()` adapter swap.
+- No file upload yet (drag-and-drop into OPFS would be ~30 lines).
+- No export-as-zip yet (build a zip in the browser, trigger download — ~50 lines).
+- No multi-conversation. One chat history per origin.
+- Tool surface is intentionally minimal; the user observation that "LLM only touches a small surface" drove the 4-tool API.

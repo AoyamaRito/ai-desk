@@ -25,6 +25,7 @@ header .grow { flex: 1 1 auto; }
 header .hint { color: var(--fg-dim); font-size: 12px; }
 
 main { height: calc(100% - 44px); display: flex; }
+html.embed main { height: 100%; }
 #sidebar {
   width: 180px; flex-shrink: 0; background: var(--bg-elev); border-right: 2px solid var(--border);
   padding: 14px; display: flex; flex-direction: column; gap: 6px;
@@ -155,7 +156,17 @@ function resize() {
   canvas.width = W * DPR; canvas.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
-new ResizeObserver(resize).observe(stage);
+function onResize() {
+  resize();
+  tryInitialFit();
+  render();
+}
+let _ro = null;
+function startResizeObserver() {
+  if (_ro) return;
+  _ro = new ResizeObserver(onResize);
+  _ro.observe(stage);
+}
 resize();
 
 // node geometry
@@ -492,16 +503,18 @@ document.querySelectorAll('#sidebar button[data-add]').forEach(btn => {
   });
 });
 
-// seed: a working example so the canvas isn't intimidating
+// seed: a working example so the canvas isn't intimidating.
+// Positions are kept compact (first ~640×280 area) so the whole
+// graph is visible even in the LP's narrowest iframe width.
 function seed() {
   if (Object.keys(REAL_state.nodes).length > 0) return;
   // (3 + 4) * 2 = 14
-  const c1 = uid(); REAL_state.nodes[c1] = { id: c1, type: 'const', x: 60,  y: 80,  v: 3 };
-  const c2 = uid(); REAL_state.nodes[c2] = { id: c2, type: 'const', x: 60,  y: 180, v: 4 };
-  const c3 = uid(); REAL_state.nodes[c3] = { id: c3, type: 'const', x: 60,  y: 290, v: 2 };
-  const a1 = uid(); REAL_state.nodes[a1] = { id: a1, type: 'add',   x: 280, y: 110 };
-  const m1 = uid(); REAL_state.nodes[m1] = { id: m1, type: 'mul',   x: 470, y: 170 };
-  const o1 = uid(); REAL_state.nodes[o1] = { id: o1, type: 'out',   x: 660, y: 180 };
+  const c1 = uid(); REAL_state.nodes[c1] = { id: c1, type: 'const', x: 30,  y: 30,  v: 3 };
+  const c2 = uid(); REAL_state.nodes[c2] = { id: c2, type: 'const', x: 30,  y: 110, v: 4 };
+  const c3 = uid(); REAL_state.nodes[c3] = { id: c3, type: 'const', x: 30,  y: 210, v: 2 };
+  const a1 = uid(); REAL_state.nodes[a1] = { id: a1, type: 'add',   x: 190, y: 60 };
+  const m1 = uid(); REAL_state.nodes[m1] = { id: m1, type: 'mul',   x: 350, y: 110 };
+  const o1 = uid(); REAL_state.nodes[o1] = { id: o1, type: 'out',   x: 510, y: 120 };
   REAL_state.wires.push(
     { from: c1, fromOut: 0, to: a1, toIn: 0 },
     { from: c2, fromOut: 0, to: a1, toIn: 1 },
@@ -511,8 +524,38 @@ function seed() {
   );
 }
 
+// auto-pan so all seed nodes fit centred in the current canvas
+function fitToView() {
+  const ids = Object.keys(REAL_state.nodes);
+  if (ids.length === 0) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of ids) {
+    const n = REAL_state.nodes[id];
+    const h = nodeHeight(n);
+    if (n.x < minX) minX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.x + NODE_W > maxX) maxX = n.x + NODE_W;
+    if (n.y + h > maxY) maxY = n.y + h;
+  }
+  const contentW = maxX - minX, contentH = maxY - minY;
+  const pad = 24;
+  // centre if content fits, otherwise align top-left with padding
+  REAL_state.pan.x = (contentW + pad * 2 < W) ? Math.round((W - contentW) / 2 - minX) : pad - minX;
+  REAL_state.pan.y = (contentH + pad * 2 < H) ? Math.round((H - contentH) / 2 - minY) : pad - minY;
+}
+
+let initialFitDone = false;
+function tryInitialFit() {
+  if (initialFitDone) return;
+  if (W === 0 || H === 0) return;
+  fitToView();
+  initialFitDone = true;
+}
+
 seed();
+tryInitialFit();
 render();
+startResizeObserver();
 </script>
 </body>
 </html>

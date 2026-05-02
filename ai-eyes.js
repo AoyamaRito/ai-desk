@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Author: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
+// SPDX-License-Identifier: MIT
+
 // [ai_s_emblem:#low#config Imports]
 const http = require('http');
 const fs = require('fs');
@@ -272,7 +275,12 @@ function popInput() {
 function serveStatic(req, res) {
   const urlPath = req.url.split('?')[0];
   const baseDir = path.resolve(STATIC_DIR);
-  const filePath = path.resolve(baseDir, urlPath === '/' ? 'index.html' : (urlPath.startsWith('/') ? urlPath.slice(1) : urlPath));
+  let filePath = path.resolve(baseDir, urlPath === '/' ? 'index.html' : (urlPath.startsWith('/') ? urlPath.slice(1) : urlPath));
+
+  // Directory index support
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(filePath, 'index.html');
+  }
 
   if (!filePath.startsWith(baseDir + path.sep) && filePath !== baseDir && filePath !== path.join(baseDir, 'index.html')) {
     res.writeHead(403);

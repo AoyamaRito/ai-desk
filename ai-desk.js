@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// Author: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
+// SPDX-License-Identifier: MIT
 // ai-desk (Emblem Edition) — AI-Native Workspace Manager
 //
 // Refactored under Bible §0.1 (Heavy Functions / No-Shared Helpers / Inline > Extract):
@@ -411,7 +413,7 @@ function runApply(filePath, patchPath) {
     }
   }
   if (patchEmblems.length === 0 && patchBridges.length === 0) {
-    console.error('Error: No valid ${EMB_MARK} or ${BRD_MARK} blocks found in patch.');
+    console.error(`Error: No valid ${EMB_MARK} or ${BRD_MARK} blocks found in patch.`);
     process.exit(1);
   }
 

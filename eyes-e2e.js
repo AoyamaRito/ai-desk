@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Author: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
+// SPDX-License-Identifier: MIT
+
 // [ai_s_emblem:#high#logic Eyes-E2E-Runner]
 // Bible §1.5 適合: APIキー不要の観測翻訳機 (Keyless Transducer)
 //   最新状態を最小トークンのテキストに変換して標準出力に吐き出す単機能の翻訳機。

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Author: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
+// SPDX-License-Identifier: MIT
+
 // [ai_s_emblem:#high#logic Janken-Knowledge]
 // Constraint Library Prototype: 3-Player Janken
 // Not a calculator. Not a function. Knowledge with constraints.

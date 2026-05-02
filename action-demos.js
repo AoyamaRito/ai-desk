@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// Author: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
+// SPDX-License-Identifier: MIT
 // action-demos.js
 // AI-Native Action Game Algorithm Demos
 // Date: 2026-04-30

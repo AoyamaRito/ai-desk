@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why ai-desk scales — コードを読まない開発がスケールする理由</title>
+<style>
+:root {
+  --fg: #111111;
+  --fg-dim: #5a5a5a;
+  --bg: #ffffff;
+  --bg-soft: #f6f6f8;
+  --border: #1a1a1a;
+  --border-soft: #d8d8de;
+  --accent: #6b3aff;
+  --accent-soft: #f0eaff;
+  --pink: #ff1d6d;
+  --green: #00a86b;
+  --amber: #f59e0b;
+  --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg);
+  border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(48px, 8vw, 120px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 0.95; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
+}
+.title-slide .tagline { font-size: clamp(18px, 2.4vw, 28px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 28ch; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(30px, 4.2vw, 52px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; color: var(--fg); }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; color: var(--fg); margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul, .slide ol { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+.split .col ul { margin-left: 0; list-style: none; padding: 0; }
+.split .col li { padding: 6px 0 6px 28px; position: relative; }
+.split .col.problem li::before { content: "✗"; position: absolute; left: 4px; color: var(--pink); font-weight: 800; }
+.split .col.solution li::before { content: "✓"; position: absolute; left: 4px; color: var(--green); font-weight: 800; }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(26px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+.flow {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0;
+}
+.flow .stage {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 12px;
+  text-align: center; min-height: 110px; display: flex; flex-direction: column; justify-content: center;
+}
+.flow .stage .who { font-size: clamp(11px, 1.1vw, 13px); color: var(--accent); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.flow .stage .what { font-size: clamp(13px, 1.4vw, 17px); font-weight: 700; line-height: 1.3; }
+.flow .stage.human { background: var(--accent-soft); border-color: var(--accent); }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.objection {
+  border: 2px solid var(--border); padding: 16px 20px; margin: 16px 0;
+}
+.objection .q { font-size: clamp(15px, 1.7vw, 21px); font-weight: 800; color: var(--pink); margin-bottom: 8px; }
+.objection .q::before { content: "Q. "; }
+.objection .a { font-size: clamp(14px, 1.5vw, 18px); color: var(--fg); line-height: 1.6; }
+.objection .a::before { content: "A. "; font-weight: 800; color: var(--green); }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- 1 ===== Title ===== -->
+  <section class="slide title-slide active">
+    <h1>コードを読まない開発はスケールする</h1>
+    <p class="tagline">AI 時代に「人間が PR を読む」が限界に達した時、どこへ行くか</p>
+    <p class="sub">ai-desk 方法論 — 沖井広行 · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <!-- 2 ===== The skepticism ===== -->
+  <section class="slide">
+    <h2><span class="num">1</span>よくある疑問</h2>
+    <div class="callout">
+      AI 並列開発したコードを、人間が読めるの?<br>
+      とてもじゃないけど読める量じゃない。<br>
+      でも AI 任せだと、何作ってるか分からなくなる。
+    </div>
+    <p class="muted">この疑問は正しい。<strong>「人間がコードを読む」前提のままだと AI 並列開発はスケールしない</strong>。</p>
+    <p>では前提を変えるとどうなるか。</p>
+  </section>
+
+  <!-- 3 ===== Volume problem ===== -->
+  <section class="slide">
+    <h2><span class="num">2</span>物量の壁</h2>
+    <p class="lead">AI の生成速度と人間の読解速度の差が、毎年広がる。</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">~50</div><div class="lab">人間が真剣に読める<br>1日あたり行数</div></div>
+      <div class="metric"><div class="num">~50,000</div><div class="lab">AI が生成する<br>1日あたり行数</div></div>
+      <div class="metric"><div class="num">×1,000</div><div class="lab">埋まらない速度差<br>(さらに広がっている)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">「PR を真面目に読む」を維持しようとした瞬間、開発の総スループットは <strong>人間の読解能力で律速</strong> される。チーム拡張しても複数人が同じ PR を読むだけで本質改善しない。</p>
+  </section>
+
+  <!-- 4 ===== Quality problem ===== -->
+  <section class="slide">
+    <h2><span class="num">3</span>質の壁 — 読んでも見つからない</h2>
+    <p class="lead">人間がレビューしたコードでも脆弱性は出る。</p>
+    <ul>
+      <li><strong>Heartbleed (2014)</strong> — OpenSSL、世界中の専門家がレビュー、2 年潜伏</li>
+      <li><strong>Log4Shell (2021)</strong> — 8 年潜伏、Apache Foundation のレビュー通過</li>
+      <li><strong>XZ utils backdoor (2024)</strong> — 数年に渡る計画的攻撃、Linux ディストリビューション全体に侵入</li>
+    </ul>
+    <p>「人間がレビューする」は <strong>必要条件にも十分条件にもなっていない</strong>。安心感の根拠が弱い。</p>
+    <p class="muted" style="margin-top: 18px;">レビューは「やったほうがいい」けど、「やれば安全」ではない。AI が書こうが人間が書こうが、レビューだけで保証されるものは少ない。</p>
+  </section>
+
+  <!-- 5 ===== Reframe what humans do ===== -->
+  <section class="slide">
+    <h2><span class="num">4</span>人間と機械の役割の再分割</h2>
+    <div class="split">
+      <div class="col problem">
+        <h3>従来の役割分担</h3>
+        <ul>
+          <li>人間: コード書く</li>
+          <li>人間: コード読む (レビュー)</li>
+          <li>人間: テスト書く</li>
+          <li>人間: バグ追う</li>
+          <li>機械: ビルド・実行する</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk の役割分担</h3>
+        <ul>
+          <li>人間: <strong>意図を宣言</strong>する</li>
+          <li>人間: <strong>結果を検証</strong>する (動作 / 受入条件)</li>
+          <li>機械 (AI): コード書く・読む・直す</li>
+          <li>機械: テスト大量生成 (E2E 網羅)</li>
+          <li>機械: 実行ログ・スクショ・動画</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">人間が手放すのは「コード行を目で追う作業」、保つのは「何を作りたいか・何が動けば成功か」の判断。</p>
+  </section>
+
+  <!-- 6 ===== Pipeline ===== -->
+  <section class="slide">
+    <h2><span class="num">5</span>新しいパイプライン</h2>
+    <div class="flow">
+      <div class="stage human"><div class="who">人間</div><div class="what">意図宣言<br>「何を作る」</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">コード生成<br>+ 自己テスト</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">E2E 大量生成<br>網羅テスト実行</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">スクショ + 動画<br>履歴記録</div></div>
+      <div class="stage human"><div class="who">人間</div><div class="what">受入確認<br>「動いてる ✓」</div></div>
+    </div>
+    <p class="lead" style="margin-top: 14px;">人間の介入点は <strong>最初と最後の 2 箇所だけ</strong>。間の 3 つは全て AI / 機械。</p>
+    <p class="muted">ai-desk 上の道具:<br>
+      <code>ai-desk.js</code> (コード操作) ・ <code>ai-eyes.js</code> (画面観測 / 入力流し込み / 動画記録) ・ <code>eyes-e2e.js</code> (状態 → text 変換)。
+    </p>
+  </section>
+
+  <!-- 7 ===== Why this scales ===== -->
+  <section class="slide">
+    <h2><span class="num">6</span>なぜスケールするか</h2>
+    <p class="lead">人間の負荷が <strong>意図の数</strong> に比例し、コード量に依存しなくなる。</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>従来 (PR レビュー)</h3>
+        <ul>
+          <li>人間負荷 = O(コード行数)</li>
+          <li>機能 1 個追加 = 数百行 read</li>
+          <li>10 倍の機能 = 10 倍のレビュー時間</li>
+          <li>並列開発が増えるほど詰む</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk</h3>
+        <ul>
+          <li>人間負荷 = O(意図数)</li>
+          <li>機能 1 個追加 = 1 つの意図宣言 + 1 つの受入確認</li>
+          <li>10 倍の機能 = 10 倍の意図 (read 量は変わらず)</li>
+          <li>並列開発で機械側が比例増、人間側は線形増のまま</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">これが「個人開発でフルタイム並列実行」を成立させる構造。</p>
+  </section>
+
+  <!-- 8 ===== Counter 1: maintenance ===== -->
+  <section class="slide">
+    <h2><span class="num">7</span>反論 1 — 「将来の保守どうする?」</h2>
+    <div class="objection">
+      <p class="q">読まずに作ったコード、半年後に直せないだろう?</p>
+      <p class="a">直すのも AI。意図 (元の宣言) と E2E テストが残っている限り、AI が読み直してパッチを当てられる。<br>
+      ai-desk の <strong>Emblem 単位の編集 (skeleton / focus / apply)</strong> がこのための道具。
+      <strong>10 万行のファイルでも該当 emblem だけ AI が読めば修正できる</strong>。
+      </p>
+    </div>
+    <p class="muted">前提: AI が止まらないこと。これは API の問題ではなく、複数 AI ベンダー競合 + ローカルモデル普及で構造的に保証されつつある。</p>
+  </section>
+
+  <!-- 9 ===== Counter 2: handoff ===== -->
+  <section class="slide">
+    <h2><span class="num">8</span>反論 2 — 「メンバー追加 / 引継ぎは?」</h2>
+    <div class="objection">
+      <p class="q">新メンバーが入った時、コード読めないと参加できないだろう?</p>
+      <p class="a">引継ぎ資料 = <strong>意図宣言 + 動く E2E テスト + スクショ + 動画</strong>。<br>
+      新メンバーは「コード」ではなく「<strong>このサービスは何をするか</strong>」を読み、AI に修正を依頼する。<br>
+      従来の「コード読んで内部仕様を察する」より、<strong>意図と実際の挙動が直接見える方が引継ぎは早い</strong>。
+      </p>
+    </div>
+    <p class="muted">これは「個人開発が成立するなら、複数人開発も同じ方法で成立する」という主張。チームスケールは別問題に見えるが、実は同じ問題。</p>
+  </section>
+
+  <!-- 10 ===== Counter 3: trust ===== -->
+  <section class="slide">
+    <h2><span class="num">9</span>反論 3 — 「信頼できない」</h2>
+    <div class="objection">
+      <p class="q">読まないと、AI が何か変なことしても気付けない</p>
+      <p class="a">「読む」は <strong>主観的検査</strong>。気付くこともあれば気付かないこともある (Heartbleed 2 年潜伏)。<br>
+      ai-desk が頼るのは <strong>客観的検査</strong>:<br>
+      ・<strong>網羅 E2E</strong> (1920 世界全部試す)<br>
+      ・<strong>Twin による複式数学検算</strong> (GPU 出力を CPU 純粋関数で再計算)<br>
+      ・<strong>イベントソーシング + ハッシュ連鎖</strong> (改ざん検知)<br>
+      これらは「人間が読む」より <strong>確実な信頼根拠</strong>。
+      </p>
+    </div>
+  </section>
+
+  <!-- 11 ===== Real example ===== -->
+  <section class="slide">
+    <h2><span class="num">10</span>実例 — fighter-cancel.test.js</h2>
+    <p class="lead">アクションゲームのキャンセル・コンボ判定を <strong>1920 世界全部</strong> 網羅テスト。</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">1920</div><div class="lab">テスト対象世界<br>(全可能状態組合せ)</div></div>
+      <div class="metric"><div class="num">19/19</div><div class="lab">テストケース<br>全合格</div></div>
+      <div class="metric"><div class="num">1</div><div class="lab">ファイル<br>(全部 1 ファイルに集約)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">人間がレビューする規模 = 「1920 世界が全部 OK だった」という結果だけ。<br>個別の世界の中身は読まない。<strong>機械的に「全部試した」が保証されている方が、人間が一部読むより強い保証</strong>。</p>
+  </section>
+
+  <!-- 12 ===== Conclusion ===== -->
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(36px, 5.6vw, 72px); margin-bottom: 28px;">パラダイムが変わる</h2>
+    <p style="font-size: clamp(18px, 2.2vw, 30px); font-weight: 600; max-width: 800px; line-height: 1.5;">
+      「コードを読む」を諦めるのではなく、<br>
+      <strong style="color: var(--accent);">機械的に保証できるものに置き換える</strong>。
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(14px, 1.6vw, 19px); color: var(--fg-dim); line-height: 1.6; max-width: 700px;">
+      これは「テクニックの改善」ではなく「<strong>役割分担の再設計</strong>」。<br>
+      AI が書く時代に合わせて、<strong>人間の責任範囲を意図と検証に絞る</strong>。<br>
+      その瞬間、コード量がいくら増えても、人間の負荷は意図の数しか増えない。
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      沖井広行 · 蒼山りと
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="scale.pdf" download>PDF</a>
+<div id="hint">← → / Space で進む · F でフルスクリーン · <a href="scale.pdf" download style="color: var(--accent); font-weight: 700;">PDF</a></div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 12</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

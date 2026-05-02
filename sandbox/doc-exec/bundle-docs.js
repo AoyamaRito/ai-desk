@@ -24,6 +24,10 @@ const ROOT = path.resolve(flag('root', '../..'));
 const OUT = flag('out', 'all-docs.md');
 
 const EXCLUDE_DIRS = new Set(['.git', 'node_modules', '.claude', 'snapshots']);
+// 自分自身 (sandbox/doc-exec/) は walk から完全に除外する。
+// この dir 配下には HANDOFF/README/example/test/eval などが入っており、
+// バンドル対象 (本体ドキュメント) と混ざると AI 評価コンテキストを汚染する。
+const SCRIPT_DIR = path.resolve(__dirname);
 
 // 生成物・glossary 等は bundle に含めない (prepend-deps が別途扱う / 二重包含を防ぐ)
 const EXCLUDE_FILE_RE = [
@@ -41,6 +45,7 @@ function isExcludedFile(name) {
 }
 
 function walk(dir, acc = []) {
+  if (path.resolve(dir) === SCRIPT_DIR) return acc; // sandbox/doc-exec/ 配下は丸ごとスキップ
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {

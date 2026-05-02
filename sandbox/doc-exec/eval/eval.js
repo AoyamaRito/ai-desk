@@ -34,8 +34,10 @@ function loadQuestions() {
 }
 
 function buildContextDirect() {
-  // direct: ../.. の md を素のまま、変換なしで連結。bundle-docs.js のスキップ条件と同じセット。
+  // direct: ../.. の md を素のまま、変換なしで連結。bundle-docs.js のスキップ条件と完全対称にする
+  // (3 context すべて同じ md セットを見ないと A/B 測定が成立しない)。
   const REPO = path.resolve(ROOT, '..', '..');
+  const SANDBOX_DIR = ROOT; // sandbox/doc-exec/ — 丸ごと除外 (bundle-docs と対称)
   const EXCLUDE_DIRS = new Set(['.git', 'node_modules', '.claude', 'snapshots']);
   const EXCLUDE_FILE_RE = [
     /^all-docs.*\.md$/, /^glossary(-deps)?\.md$/, /-deps\.md$/, /-term\.md$/,
@@ -44,6 +46,7 @@ function buildContextDirect() {
   const isExcluded = n => EXCLUDE_FILE_RE.some(re => re.test(n));
   const out = [];
   function walk(dir) {
+    if (path.resolve(dir) === SANDBOX_DIR) return; // sandbox/doc-exec/ 丸ごとスキップ
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {

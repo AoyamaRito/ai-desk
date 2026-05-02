@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Constraint Folding — ai-desk の核</title>
+<title>Constraint Folding — AI が法則を発見して実行するための土台</title>
 <style>
 :root {
   --fg: #111111; --fg-dim: #5a5a5a; --bg: #ffffff; --bg-soft: #f6f6f8;
@@ -33,10 +33,10 @@ a { color: var(--accent); }
 
 .title-slide { justify-content: center; align-items: center; text-align: center; }
 .title-slide h1 {
-  font-size: clamp(48px, 8vw, 120px); font-weight: 900; letter-spacing: -0.04em;
-  line-height: 0.95; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
+  font-size: clamp(40px, 6.6vw, 100px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.0; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
 }
-.title-slide .tagline { font-size: clamp(18px, 2.4vw, 28px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 30ch; }
+.title-slide .tagline { font-size: clamp(17px, 2.2vw, 26px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 32ch; line-height: 1.4; }
 .title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
 .title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
 
@@ -63,8 +63,8 @@ a { color: var(--accent); }
 .split .col.solution h3 { color: var(--green); }
 
 .code-block {
-  background: #0d1117; color: #e6edf3; padding: 18px 22px; margin: 12px 0;
-  font-family: "SF Mono", Menlo, monospace; font-size: clamp(12px, 1.4vw, 15px);
+  background: #0d1117; color: #e6edf3; padding: 16px 20px; margin: 12px 0;
+  font-family: "SF Mono", Menlo, monospace; font-size: clamp(11px, 1.3vw, 14px);
   line-height: 1.55; overflow-x: auto; border-left: 6px solid var(--accent);
   white-space: pre;
 }
@@ -85,13 +85,18 @@ a { color: var(--accent); }
 .metric .num { font-size: clamp(24px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
 .metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
 
+.phase-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+.phase {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 14px;
+  text-align: center; min-height: 130px; display: flex; flex-direction: column; justify-content: center;
+}
+.phase .n { display: inline-block; background: var(--accent); color: #fff; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 800; font-size: 14px; margin: 0 auto 6px; }
+.phase h4 { font-size: clamp(13px, 1.5vw, 17px); font-weight: 800; margin-bottom: 4px; }
+.phase p { font-size: clamp(11px, 1.2vw, 14px); color: var(--fg-dim); margin: 0; line-height: 1.4; }
+
 .benefit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
-.benefit {
-  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 18px;
-}
-.benefit h4 {
-  font-size: clamp(14px, 1.6vw, 18px); font-weight: 800; margin-bottom: 4px; color: var(--accent);
-}
+.benefit { background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 18px; }
+.benefit h4 { font-size: clamp(14px, 1.6vw, 18px); font-weight: 800; margin-bottom: 4px; color: var(--accent); }
 .benefit p { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
 
 #nav {
@@ -108,7 +113,7 @@ a { color: var(--accent); }
 
 @media (max-width: 720px) {
   .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
-  .split, .metrics, .benefit-grid { grid-template-columns: 1fr; }
+  .split, .metrics, .benefit-grid, .phase-flow { grid-template-columns: 1fr; }
 }
 
 @media print {
@@ -136,237 +141,222 @@ a { color: var(--accent); }
   <!-- 1 ===== Title ===== -->
   <section class="slide title-slide active">
     <h1>Constraint Folding</h1>
-    <p class="tagline">複数の入力変数を、複数の状態として畳み込み、状態遷移を駆動する。<br>ai-desk の最深部の機構。</p>
+    <p class="tagline">AI が観測から法則を発見し、その法則がそのまま動くシステムになる ── ai-desk の最深部の機構</p>
     <p class="sub">ai-desk 方法論 — 沖井広行 · 2026-05</p>
     <div class="meta">github.com/AoyamaRito/ai-desk</div>
   </section>
 
-  <!-- 2 ===== The shift ===== -->
+  <!-- 2 ===== Shallow view ===== -->
   <section class="slide">
-    <h2><span class="num">1</span>分岐ではなく、列挙</h2>
-    <p class="lead">if/else / switch を使わない。代わりに <strong>全可能世界をデータとして列挙し、制約で filter</strong>する。</p>
-    <div class="split">
-      <div class="col problem">
-        <h3>従来 (分岐)</h3>
-        <ul>
-          <li>条件を <strong>制御フロー</strong> として書く</li>
-          <li>分岐ツリーで状態を辿る</li>
-          <li>すべてのパスを脳内で追う必要</li>
-          <li>1 箇所追加すると全体の整合性確認が必要</li>
-          <li>逆引き不可 (出力 → 入力は無理)</li>
-        </ul>
-      </div>
-      <div class="col solution">
-        <h3>Constraint Folding</h3>
-        <ul>
-          <li>条件を <strong>データ構造</strong> として持つ</li>
-          <li>filter で生き残った世界が答え</li>
-          <li>すべてのケースが 1 箇所に並ぶ</li>
-          <li>1 行追加すれば全体の整合性は構造的に保証</li>
-          <li>逆引き可能 (どの入力でその状態に行けるか)</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- 3 ===== Pattern ===== -->
-  <section class="slide">
-    <h2><span class="num">2</span>パターン</h2>
-    <p class="lead">「全可能性を data に展開」 → 「制約で filter」 → 「残った世界が結果」</p>
-    <div class="code-block"><span class="com">// 1. 全可能世界を列挙する (data として)</span>
-<span class="kw">const</span> WORLDS = [
-  { state: <span class="str">'title'</span>,    input: <span class="str">'start'</span>, next: <span class="str">'playing'</span> },
-  { state: <span class="str">'playing'</span>,  input: <span class="str">'pause'</span>, next: <span class="str">'paused'</span> },
-  { state: <span class="str">'playing'</span>,  input: <span class="str">'die'</span>,   next: <span class="str">'gameover'</span> },
-  { state: <span class="str">'paused'</span>,   input: <span class="str">'resume'</span>, next: <span class="str">'playing'</span> },
-  { state: <span class="str">'gameover'</span>, input: <span class="str">'reset'</span>, next: <span class="str">'title'</span> },
-];
-
-<span class="com">// 2. 制約で filter する</span>
-<span class="kw">function</span> <span class="fn">reduce</span>(state, input) {
-  <span class="kw">const</span> world = WORLDS.<span class="fn">find</span>(w =&gt; w.state === state &amp;&amp; w.input === input);
-  <span class="kw">return</span> world ? world.next : state;  <span class="com">// 該当世界がなければ現状維持</span>
-}</div>
-    <p class="muted">分岐ゼロ。<strong>データを変えるだけで状態機械が更新できる</strong>。</p>
-  </section>
-
-  <!-- 4 ===== Multiple variables → multiple states ===== -->
-  <section class="slide">
-    <h2><span class="num">3</span>複数変数 → 複数状態</h2>
-    <p class="lead">入力が増えるほど分岐は爆発する。畳み込みなら <strong>データ次元が増えるだけ</strong>。</p>
-    <div class="code-block"><span class="com">// 例: 3 変数 (画面 / 入力 / 装備) で次状態を決める</span>
-<span class="kw">const</span> WORLDS = [
-  { screen: <span class="str">'playing'</span>, input: <span class="str">'attack'</span>, weapon: <span class="str">'sword'</span>,  effect: <span class="str">'slash'</span>,  next: <span class="str">'attacking'</span> },
-  { screen: <span class="str">'playing'</span>, input: <span class="str">'attack'</span>, weapon: <span class="str">'bow'</span>,    effect: <span class="str">'shoot'</span>,  next: <span class="str">'shooting'</span> },
-  { screen: <span class="str">'playing'</span>, input: <span class="str">'attack'</span>, weapon: <span class="str">'magic'</span>,  effect: <span class="str">'cast'</span>,   next: <span class="str">'casting'</span> },
-  { screen: <span class="str">'paused'</span>,  input: <span class="str">'attack'</span>, weapon: <span class="str">'*'</span>,      effect: <span class="kw">null</span>,        next: <span class="str">'paused'</span> },
+    <h2><span class="num">1</span>表面に見える顔 — 「分岐を data に置く」</h2>
+    <p class="lead">第一印象では、Constraint Folding はただの「if/else を テーブルに置き換えるテクニック」に見える。</p>
+    <div class="code-block"><span class="com">// よくある「分岐 → データ化」の見せ方</span>
+<span class="kw">const</span> TRANSITIONS = [
+  { from: <span class="str">'title'</span>,    input: <span class="str">'start'</span>, to: <span class="str">'playing'</span>  },
+  { from: <span class="str">'playing'</span>,  input: <span class="str">'pause'</span>, to: <span class="str">'paused'</span>   },
   <span class="com">// ...</span>
 ];
-<span class="kw">function</span> <span class="fn">resolve</span>(s, i, w) {
-  <span class="kw">return</span> WORLDS.<span class="fn">find</span>(x =&gt;
-    x.screen === s &amp;&amp; x.input === i &amp;&amp; (x.weapon === w || x.weapon === <span class="str">'*'</span>)
-  );
+<span class="kw">function</span> <span class="fn">reduce</span>(state, input) {
+  <span class="kw">return</span> TRANSITIONS.<span class="fn">find</span>(t =&gt; t.from === state &amp;&amp; t.input === input)?.to ?? state;
 }</div>
-    <p>3 変数 × N 値の組合せが <strong>テーブル 1 つ</strong>に収まる。新しい武器を足す = 行を 1 個増やす、それだけ。</p>
+    <p class="muted">これは <strong>入口</strong> にすぎない。本当の力はその先にある。</p>
   </section>
 
-  <!-- 5 ===== Real example: screen transitions ===== -->
+  <!-- 3 ===== Real view ===== -->
   <section class="slide">
-    <h2><span class="num">4</span>実例 1 — 画面遷移</h2>
-    <p class="lead"><code>canvas-ui-sample.js</code> の画面遷移。if/else ゼロ。</p>
-    <div class="code-block"><span class="kw">const</span> SCREEN_TRANSITIONS = [
-  { from: <span class="str">'title'</span>,    input: <span class="str">'start'</span>, to: <span class="str">'playing'</span>  },
-  { from: <span class="str">'playing'</span>,  input: <span class="str">'pause'</span>, to: <span class="str">'pause'</span>    },
-  { from: <span class="str">'playing'</span>,  input: <span class="str">'die'</span>,   to: <span class="str">'gameover'</span> },
-  { from: <span class="str">'pause'</span>,    input: <span class="str">'resume'</span>, to: <span class="str">'playing'</span>  },
-  { from: <span class="str">'pause'</span>,    input: <span class="str">'quit'</span>,  to: <span class="str">'title'</span>    },
-  { from: <span class="str">'gameover'</span>, input: <span class="str">'retry'</span>, to: <span class="str">'playing'</span>  },
-  { from: <span class="str">'gameover'</span>, input: <span class="str">'title'</span>, to: <span class="str">'title'</span>    },
-];
-<span class="kw">function</span> <span class="fn">reduceScreen</span>(state, input) {
-  <span class="kw">return</span> SCREEN_TRANSITIONS.<span class="fn">find</span>(t =&gt; t.from === state &amp;&amp; t.input === input)?.to ?? state;
-}</div>
-    <p class="muted">遷移の <strong>全ケースが 1 箇所</strong>にある。AI が読むのもこの 7 行だけ。<br>遷移を追加する = 行を 1 つ増やす。<strong>制御フローを書き換える必要なし</strong>。</p>
-  </section>
-
-  <!-- 6 ===== Real example: 27 worlds ===== -->
-  <section class="slide">
-    <h2><span class="num">5</span>実例 2 — 27 世界の最小実証</h2>
-    <p class="lead"><code>constraint-janken.js</code> — 3 人ジャンケン、全 27 世界。</p>
-    <div class="code-block"><span class="kw">const</span> HANDS = [<span class="str">'rock'</span>, <span class="str">'paper'</span>, <span class="str">'scissors'</span>];
-
-<span class="com">// 全可能世界を列挙 (3 × 3 × 3 = 27 通り)</span>
-<span class="kw">const</span> WORLDS = HANDS.<span class="fn">flatMap</span>(a =&gt;
-  HANDS.<span class="fn">flatMap</span>(b =&gt;
-    HANDS.<span class="fn">map</span>(c =&gt; ({ a, b, c }))
-  )
-);
-
-<span class="com">// 制約で filter</span>
-<span class="kw">function</span> <span class="fn">winners</span>(state) {
-  <span class="kw">return</span> WORLDS
-    .<span class="fn">filter</span>(w =&gt; w.a === state.a &amp;&amp; w.b === state.b &amp;&amp; w.c === state.c)
-    .<span class="fn">map</span>(w =&gt; <span class="fn">judge</span>(w));  <span class="com">// 勝者を出す</span>
-}</div>
-    <p>if 文ゼロで「全パターンを網羅した」状態判定が建つ。<strong>分岐の組合せ爆発が消える</strong>。</p>
-  </section>
-
-  <!-- 7 ===== Real example: 1920 worlds ===== -->
-  <section class="slide">
-    <h2><span class="num">6</span>実例 3 — 1920 世界の実用規模</h2>
-    <p class="lead"><code>fighter-cancel.test.js</code> — 格闘ゲームのキャンセル判定、全 1920 世界。</p>
-    <div class="metrics">
-      <div class="metric"><div class="num">1920</div><div class="lab">全可能世界<br>(状態 × 入力 × タイミング)</div></div>
-      <div class="metric"><div class="num">19/19</div><div class="lab">テスト合格<br>全網羅</div></div>
-      <div class="metric"><div class="num">1</div><div class="lab">ファイル<br>(全データが 1 箇所)</div></div>
-    </div>
-    <p class="muted" style="margin-top: 22px;">1920 世界全てが「正しい結果」と「実際の結果」が一致するか機械的に検査。<br><strong>「全部試した」という保証 = 人間が一部読むより遥かに強い</strong>。<br>これが <code>fighter-cancel</code> の本質。</p>
-  </section>
-
-  <!-- 8 ===== Why it's the unit ===== -->
-  <section class="slide">
-    <h2><span class="num">7</span>なぜこれが ai-desk の核か</h2>
-    <p class="lead">Constraint Folding は「テクニック」ではない。<strong>計算の単位</strong>そのもの。</p>
+    <h2><span class="num">2</span>本当の顔 — 「観測から法則を発見する基盤」</h2>
+    <p class="lead">Constraint Folding の核心は、<strong>AI が観測データから世界 (テーブル) を推測し、それがそのまま動く</strong>こと。</p>
     <div class="callout">
-      <code>(state, command) =&gt; newState</code><br>
-      この単一の式が、ai-desk のすべてに現れる。
+      人間が <strong>意図と観測サンプル</strong>を渡す<br>→ AI が <strong>法則を抽出してテーブルを生成</strong>する<br>→ そのテーブルが <strong>そのまま動く state machine</strong> になる
     </div>
-    <ul>
-      <li><strong>L3 Logic 層 (Bible §2)</strong>: 純粋 Reducer = まさにこの式</li>
-      <li><strong>Twin (§4.5)</strong>: 同じ式を別実装で再計算 → 突合せて検証</li>
-      <li><strong>Event Sourcing (§5)</strong>: state = events を全部この式で reduce した結果</li>
-      <li><strong>状態遷移</strong>: 上記の例の通り</li>
-      <li><strong>網羅テスト</strong>: 全可能 (state, command) で reduce して検証</li>
-      <li><strong>逆引き</strong>: 「このsを得るには、どの (state, command) があり得るか」</li>
-    </ul>
-    <p class="muted" style="margin-top: 12px;">→ ai-desk が 5 公理から導出された方法論というより、<strong>1 つのプリミティブから導出された体系</strong>。</p>
+    <p>「コードを書く」というフェーズが消える。代わりに「<strong>観測から法則を抽出する</strong>」フェーズが生まれる。</p>
+    <p class="muted">これは Bible §6「鉱脈採掘パラダイム」と Constraint Folding が結合した時に現れる挙動。</p>
   </section>
 
-  <!-- 9 ===== What it enables ===== -->
+  <!-- 4 ===== Four phases ===== -->
   <section class="slide">
-    <h2><span class="num">8</span>これが可能にすること</h2>
-    <div class="benefit-grid">
-      <div class="benefit">
-        <h4>網羅テスト</h4>
-        <p>全可能世界を列挙してあるので、テストは「全行を回す」だけ。漏れが原理的に発生しない。</p>
+    <h2><span class="num">3</span>4 フェーズ</h2>
+    <div class="phase-flow">
+      <div class="phase">
+        <span class="n">1</span>
+        <h4>観測</h4>
+        <p>既存システムや業務ルールから (入力, 出力) のサンプルを集める</p>
       </div>
-      <div class="benefit">
-        <h4>逆引き</h4>
-        <p>出力 → 入力の検索が可能 (filter の方向を変えるだけ)。分岐ツリーでは原理的に不可能。</p>
+      <div class="phase">
+        <span class="n">2</span>
+        <h4>候補生成</h4>
+        <p>LLM + Monte Carlo で「ありうる法則」を多数列挙</p>
       </div>
-      <div class="benefit">
-        <h4>静的検証</h4>
-        <p>「すべての state に対して入力が定義されているか」をデータの完全性で検査できる。</p>
+      <div class="phase">
+        <span class="n">3</span>
+        <h4>検証</h4>
+        <p>各候補を全観測サンプルに通し、整合するもの以外を捨てる</p>
       </div>
-      <div class="benefit">
-        <h4>可視化</h4>
-        <p>データを graph として描画可能。状態遷移図が自動生成される。</p>
-      </div>
-      <div class="benefit">
-        <h4>AI による拡張</h4>
-        <p>「新しい状態を追加して」 = AI が行を 1 つ追加する。コード書き換えゼロ、データ追記のみ。</p>
-      </div>
-      <div class="benefit">
-        <h4>仕様 = 実装</h4>
-        <p>仕様書とコードが分離しない (データ自体が両方)。ドキュメント同期問題が消える。</p>
+      <div class="phase">
+        <span class="n">4</span>
+        <h4>構築</h4>
+        <p>残った法則 = 制約テーブル = 即動く state machine</p>
       </div>
     </div>
+    <p class="lead" style="margin-top: 14px;">人間が触るのは <strong>1 (観測を渡す) と 4 (動作確認)</strong> だけ。間の <strong>2 と 3 は完全に AI</strong>。</p>
   </section>
 
-  <!-- 10 ===== Why AI loves it ===== -->
+  <!-- 5 ===== PoC ===== -->
   <section class="slide">
-    <h2><span class="num">9</span>なぜ AI と親和性が高いか</h2>
-    <p class="lead">分岐 = 認知の分裂。畳み込み = 認知の集約。</p>
+    <h2><span class="num">4</span>実例 — 送料計算 50 サンプル → 100% 復元</h2>
+    <p class="lead">レガシー送料ロジックのソースが失われた状態から、観測 50 件で完全復元。</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">50</div><div class="lab">観測サンプル数<br>(入力 → 出力ペア)</div></div>
+      <div class="metric"><div class="num">100%</div><div class="lab">復元精度<br>(全 50 件で整合)</div></div>
+      <div class="metric"><div class="num">0</div><div class="lab">人間が書いた if 文<br>(テーブルだけで実装)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">具体: <code>examples/</code> ディレクトリに PoC コードあり。<br>50 件の (重さ, 距離, 区分, 送料) ペアから、AI が「閾値・基本値・加算ルール」のテーブルを推論。<br>復元されたテーブルを reduce 関数に通すだけで全観測が再現される。<strong>ソースコードを読まずにシステムを再構築した</strong>。</p>
+  </section>
+
+  <!-- 6 ===== Why folding enables it ===== -->
+  <section class="slide">
+    <h2><span class="num">5</span>なぜ「畳み込み」だから推測が可能か</h2>
+    <p class="lead">純粋な reducer 関数だから、AI が <strong>機械的に候補を試して絞り込める</strong>。</p>
     <ul>
-      <li><strong>分岐コードを読む AI</strong>: 各 if/else を順に追い、メンタルモデルを構築。10 段ネストで context 食い尽くし</li>
-      <li><strong>畳み込みコードを読む AI</strong>: 1 つの table を見て全パターン一望。reduce 関数 1 つで挙動完全把握</li>
-      <li>分岐は <strong>制御フロー = 時系列的</strong>、AI は時系列追跡が苦手</li>
-      <li>畳み込みは <strong>データ = 空間的</strong>、AI は同時並行的処理が得意</li>
+      <li><strong>同じ入力 → 同じ出力</strong> (純粋性) → 観測は再現可能、検証も再現可能</li>
+      <li><strong>状態と入力が data</strong> → 全可能組合せが列挙可能 → 候補生成時に「考えられるすべての組合せ」を網羅できる</li>
+      <li><strong>制約は filter の述語</strong> → 候補を「サンプルを通すか」でふるい落とす操作が単純な filter</li>
+      <li><strong>逆方向に走らせられる</strong> → 「この出力にするにはどんな入力ありうるか」を逆引きで生成 → これが推測候補の幅を広げる</li>
     </ul>
-    <p class="muted" style="margin-top: 18px;">Bible §0.0 「認知非対称性」の最も具体的な現れ。<strong>分岐を畳み込みにする = 人間のためのコードを AI のためのコードにする</strong>。</p>
+    <p class="muted" style="margin-top: 18px;">分岐ツリーだとこれらが原理的に不可能 (制御フローは逆走できない、組合せは爆発、検証は副作用込み)。<br><strong>畳み込みだから AI が推論を回せる</strong>。</p>
   </section>
 
-  <!-- 11 ===== Application range ===== -->
+  <!-- 7 ===== Inferred table = state machine ===== -->
   <section class="slide">
-    <h2><span class="num">10</span>適用範囲</h2>
+    <h2><span class="num">6</span>推測されたテーブル = 即動く state machine</h2>
+    <p class="lead">推論結果がそのまま実行可能。「コード生成」フェーズが要らない。</p>
+    <div class="code-block"><span class="com">// AI が推論で生成したテーブル (人間は書いてない)</span>
+<span class="kw">const</span> SHIPPING_RULES = [
+  { weight_max: <span class="num">1</span>,  zone: <span class="str">'kanto'</span>,    base: <span class="num">300</span>, per_kg: <span class="num">0</span>   },
+  { weight_max: <span class="num">5</span>,  zone: <span class="str">'kanto'</span>,    base: <span class="num">500</span>, per_kg: <span class="num">100</span> },
+  { weight_max: <span class="num">1</span>,  zone: <span class="str">'kansai'</span>,   base: <span class="num">350</span>, per_kg: <span class="num">0</span>   },
+  <span class="com">// ...</span>
+];
+
+<span class="com">// この reducer は固定 (汎用)。テーブルを変えるだけで挙動が変わる</span>
+<span class="kw">function</span> <span class="fn">resolve</span>(weight, zone) {
+  <span class="kw">const</span> rule = SHIPPING_RULES.<span class="fn">find</span>(r =&gt; r.zone === zone &amp;&amp; weight &lt;= r.weight_max);
+  <span class="kw">return</span> rule ? rule.base + (weight * rule.per_kg) : <span class="kw">null</span>;
+}</div>
+    <p class="muted">AI が推論した瞬間に、すでに動いている。<strong>「推論結果を人間がコードに書き写す」が消える</strong>。</p>
+  </section>
+
+  <!-- 8 ===== Two tier ===== -->
+  <section class="slide">
+    <h2><span class="num">7</span>二段構造 — 列挙 (基本) + 推測 (応用)</h2>
     <div class="split">
       <div class="col solution">
-        <h3>強く効く領域</h3>
+        <h3>基本: 列挙生成</h3>
+        <p style="margin-bottom: 6px;">人間が軸を定義 → cartesian product でテーブル展開</p>
+        <div class="code-block" style="margin-top: 6px; font-size: 11px;">HANDS.<span class="fn">flatMap</span>(a =&gt;
+  HANDS.<span class="fn">flatMap</span>(b =&gt;
+    HANDS.<span class="fn">map</span>(c =&gt; ({a,b,c}))
+  )
+);  <span class="com">// 27 世界</span></div>
+        <p class="muted" style="font-size: 13px;">既知ドメインの全網羅</p>
+      </div>
+      <div class="col solution">
+        <h3>応用: 推測生成</h3>
+        <p style="margin-bottom: 6px;">観測サンプル → AI が制約を逆推論 → テーブル自動生成</p>
+        <div class="code-block" style="margin-top: 6px; font-size: 11px;"><span class="com">// 50 サンプルから</span>
+<span class="kw">const</span> rules = <span class="fn">infer</span>(observations);
+<span class="com">// AI が SHIPPING_RULES を生成</span>
+<span class="com">// → そのまま reducer に渡せる</span></div>
+        <p class="muted" style="font-size: 13px;">未知ドメインの法則発見</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">どちらもアウトプットは同じ「テーブル + reducer」。<strong>同じ実行基盤を、人間が書く / AI が推測する、の二系統で使える</strong>。</p>
+  </section>
+
+  <!-- 9 ===== What changes ===== -->
+  <section class="slide">
+    <h2><span class="num">8</span>何が変わるか</h2>
+    <p class="lead">「コードを書く」が「観測から法則を抽出する」に置き換わる。</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>従来の開発</h3>
         <ul>
-          <li>有限離散状態 (UI 画面遷移 / ゲームロジック)</li>
-          <li>業務ルール (税計算 / 割引判定 / 送料)</li>
-          <li>権限・アクセス制御 (RBAC)</li>
-          <li>状態機械 (workflow / approval flow)</li>
-          <li>条件分岐の多いビジネスロジック</li>
+          <li>仕様を読む / 書く</li>
+          <li>仕様を if/else に翻訳する</li>
+          <li>分岐を全網羅的にテストする</li>
+          <li>仕様変更で全分岐を見直す</li>
+          <li>動かしてバグ修正</li>
         </ul>
       </div>
-      <div class="col problem">
-        <h3>効かない領域</h3>
+      <div class="col solution">
+        <h3>Constraint Folding + 推測</h3>
         <ul>
-          <li>連続値の物理計算・補間</li>
-          <li>リアルタイム描画ループ (60fps の中身)</li>
-          <li>木探索・グラフ探索 (将棋 AI の読み等)</li>
-          <li>機械学習の forward pass</li>
+          <li>動くサンプル / 観測を用意する</li>
+          <li>AI が法則を推論 → テーブル生成</li>
+          <li>テーブルがそのまま reducer で動く</li>
+          <li>仕様変更 = サンプル追加 → 再推論</li>
+          <li>バグ = 観測との不整合として即検知</li>
         </ul>
       </div>
     </div>
-    <p class="muted" style="margin-top: 18px;">アクションゲーム全体のバグ件数の <strong>50-60%</strong> がこの構造で構造的に絶滅する (PROMPT_constraint_folding 測定値)。</p>
+    <p class="muted" style="margin-top: 14px;">人間が「翻訳作業」をしなくなる。観測と動作確認だけ持つ。</p>
+  </section>
+
+  <!-- 10 ===== Application ===== -->
+  <section class="slide">
+    <h2><span class="num">9</span>適用領域</h2>
+    <div class="benefit-grid">
+      <div class="benefit">
+        <h4>レガシー復元</h4>
+        <p>ソースが失われた業務ロジックを観測から再構築。送料・税計算・割引判定など。</p>
+      </div>
+      <div class="benefit">
+        <h4>新規ドメイン発見</h4>
+        <p>「こういう挙動が欲しい」サンプルから AI がルールを推測 → 即動く実装。</p>
+      </div>
+      <div class="benefit">
+        <h4>既存システム監査</h4>
+        <p>運用中システムの観測から「実装が想定通りか」を逆検証。仕様と実装の差分検出。</p>
+      </div>
+      <div class="benefit">
+        <h4>業務ルール自動化</h4>
+        <p>担当者の判断履歴 → ルール推論 → 自動化。「暗黙のノウハウ」をデータ化。</p>
+      </div>
+      <div class="benefit">
+        <h4>ゲームバランス調整</h4>
+        <p>プレイログから「楽しい状態の組合せ」を抽出 → ルール調整。</p>
+      </div>
+      <div class="benefit">
+        <h4>制約ソルバとしての汎用利用</h4>
+        <p>有限離散ドメイン全般。スケジューリング・配置・組合せ最適化。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 ===== Final form ===== -->
+  <section class="slide">
+    <h2><span class="num">10</span>ai-desk の最終形 — 「コード」概念の解体</h2>
+    <p class="lead">究極的には「コードを書く」というステップが消える。</p>
+    <div class="callout">
+      残るのは <strong>3 つだけ</strong>:<br>
+      ・人間の <strong>意図 + 観測サンプル</strong><br>
+      ・AI の <strong>法則推論</strong><br>
+      ・固定の <strong>reducer 実行基盤</strong>
+    </div>
+    <p>「コードベース」が「<strong>制約テーブルの集合</strong>」になる。<br>「リファクタリング」が「<strong>サンプル追加して再推論</strong>」になる。<br>「バグ修正」が「<strong>失敗観測を加えて再構築</strong>」になる。</p>
+    <p class="muted" style="margin-top: 16px;">これは Bible §0.0 「複雑性は人の問題、隠匿は AI の問題」を最終的に解決する形。<br>人間は <strong>意図と観測</strong>、AI は <strong>推論と構築</strong>、機械は <strong>純粋実行</strong>。役割が完全に分離する。</p>
   </section>
 
   <!-- 12 ===== Conclusion ===== -->
   <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
-    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">ひとつの式</h2>
-    <p style="font-size: clamp(28px, 3.4vw, 48px); font-weight: 800; max-width: 900px; line-height: 1.2; color: var(--accent); font-family: 'SF Mono', Menlo, monospace;">
-      (state, command) ⇒ newState
+    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">観測 → 法則 → 実行</h2>
+    <p style="font-size: clamp(20px, 2.4vw, 32px); font-weight: 700; max-width: 900px; line-height: 1.4;">
+      Constraint Folding は「データ化テクニック」じゃなく、<br>
+      <strong style="color: var(--accent);">AI が法則を発見し、それがそのまま動く</strong> ための土台。
     </p>
-    <p style="font-size: clamp(17px, 2vw, 24px); font-weight: 600; max-width: 800px; line-height: 1.5; margin-top: 28px;">
-      これが ai-desk の <strong style="color: var(--accent);">計算の単位</strong>。<br>
-      Reducer · Twin · Event Sourcing · 状態遷移 · 網羅テスト ·<br>
-      全部この式から導出される。
-    </p>
-    <p style="margin-top: 28px; font-size: clamp(14px, 1.6vw, 19px); color: var(--fg-dim); line-height: 1.6; max-width: 720px;">
-      「畳み込み関数で複数変数を複数状態に展開して状態遷移する」<br>
-      ── これが <strong>分岐を捨てる</strong>覚悟そのもの。
+    <p style="margin-top: 30px; font-size: clamp(16px, 2vw, 24px); color: var(--fg-dim); line-height: 1.6; max-width: 800px;">
+      列挙は入口、<strong>推測こそが本丸</strong>。<br>
+      この機構の上では、開発は「書く」ではなく「<strong>抽出する</strong>」になる。
     </p>
     <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
       <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>

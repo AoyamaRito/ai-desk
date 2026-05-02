@@ -34,6 +34,7 @@ html, body {
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
 }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
 a { color: var(--accent-4); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code, pre, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
@@ -90,22 +91,22 @@ section { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
 
 /* sister-site strip */
 .strip {
-  background: var(--accent-3);
-  border-bottom: 3px solid var(--fg);
-  padding: 16px 24px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
   text-align: center;
 }
-.strip p { margin: 0; font-size: 15px; color: var(--fg); }
+.strip p { margin: 0; font-size: 14px; color: var(--fg-dim); }
 .strip-label {
   display: inline-block;
   background: var(--fg);
   color: var(--accent-3);
   font-weight: 800;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.08em;
-  padding: 3px 10px;
-  margin-right: 12px;
-  vertical-align: 0.05em;
+  padding: 2px 8px;
+  margin-right: 10px;
+  vertical-align: 0.1em;
 }
 .strip a { color: var(--fg); font-weight: 700; }
 .strip a:hover { background: var(--fg); color: var(--accent-3); text-decoration: none; padding: 0 4px; }
@@ -203,6 +204,7 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
   height: 540px;
   overflow: hidden;
 }
+.demo-frame.tall { height: 660px; }
 .demo-frame iframe {
   width: 100%;
   height: 100%;
@@ -211,6 +213,7 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
 }
 @media (max-width: 600px) {
   .demo-frame { height: 420px; }
+  .demo-frame.tall { height: 520px; }
 }
 
 /* docs links */
@@ -274,7 +277,7 @@ footer a:hover { color: var(--fg); }
     コードの読み書き・修正・テストはAIが担当する開発体系。
   </p>
   <div class="cta">
-    <a class="btn btn-primary" href="https://aoyamarito.github.io/ai-desk/actions/index.html">デモを触る</a>
+    <a class="btn btn-primary" href="#demos">デモを触る</a>
     <a class="btn btn-secondary" href="https://github.com/AoyamaRito/ai-desk">GitHubを見る</a>
   </div>
 </header>
@@ -316,7 +319,7 @@ ai-eyes を起動して、[バグの現象] を直してください。</div>
 app.js の [機能名] を [変更内容] してください。</div>
 </section>
 
-<section class="block">
+<section class="block" id="demos">
   <h2>触れるデモ</h2>
   <p class="lead">このページ上でそのまま遊べます。別タブを開きたい場合は各タイトルからどうぞ。</p>
 
@@ -335,7 +338,7 @@ app.js の [機能名] を [変更内容] してください。</div>
   <div class="demo-block">
     <h3 class="demo-title"><a href="3dplus/examples/point-projection.html">3Dplus 検証層</a></h3>
     <p class="demo-desc">GPU描画と並走するCPU側の純粋関数による突合デモ。</p>
-    <div class="demo-frame"><iframe src="3dplus/examples/point-projection.html?embed=1" loading="lazy" title="3Dplus point projection"></iframe></div>
+    <div class="demo-frame tall"><iframe src="3dplus/examples/point-projection.html?embed=1" loading="lazy" title="3Dplus point projection"></iframe></div>
   </div>
 </section>
 

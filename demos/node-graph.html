@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Node Graph — ai-desk demo (vanilla, single file)</title>
+<style>
+:root {
+  --fg: #1a0f24; --fg-dim: #5a4d6a; --bg: #f8f6fb; --bg-elev: #ffffff;
+  --border: #1a0f24; --port: #6b3aff; --port-hover: #ff1d6d;
+  --wire: #6b3aff; --wire-hot: #ff1d6d;
+  --c-const: #ffcc00; --c-add: #00c4cc; --c-mul: #00d97e; --c-sub: #ff8d3a; --c-div: #a78bfa; --c-out: #ff1d6d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html.embed body > header { display: none; }
+html, body { height: 100%; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif; overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+header {
+  height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--border); background: var(--bg-elev); font-size: 13px; flex-shrink: 0;
+}
+header .title { font-weight: 800; }
+header .pill { font-size: 11px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; color: var(--fg-dim); letter-spacing: 0.04em; }
+header .grow { flex: 1 1 auto; }
+header .hint { color: var(--fg-dim); font-size: 12px; }
+
+main { height: calc(100% - 44px); display: flex; }
+#sidebar {
+  width: 180px; flex-shrink: 0; background: var(--bg-elev); border-right: 2px solid var(--border);
+  padding: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+#sidebar h3 { font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; font-weight: 800; }
+#sidebar button {
+  padding: 8px 12px; background: var(--bg); border: 2px solid var(--border); cursor: pointer;
+  text-align: left; font-size: 13px; font-weight: 700;
+}
+#sidebar button:hover { background: var(--fg); color: var(--bg); }
+#sidebar .help { margin-top: auto; font-size: 11px; color: var(--fg-dim); line-height: 1.6; }
+
+#stage { flex: 1 1 auto; position: relative; overflow: hidden; cursor: grab; }
+#stage.panning { cursor: grabbing; }
+canvas { display: block; }
+
+.toast {
+  position: absolute; bottom: 14px; right: 14px; padding: 8px 14px;
+  background: var(--fg); color: #fff; border-radius: 4px; font-size: 12px;
+  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <span class="title">Node Graph</span>
+  <span class="pill">vanilla · 1 file · zero deps</span>
+  <span class="grow"></span>
+  <span class="hint">drag nodes · drag from output port to input port to wire · double-click Const to edit · Delete = remove selected · middle-drag/space-drag = pan</span>
+</header>
+
+<main>
+  <aside id="sidebar">
+    <h3>add node</h3>
+    <button data-add="const">Const</button>
+    <button data-add="add">Add</button>
+    <button data-add="sub">Sub</button>
+    <button data-add="mul">Mul</button>
+    <button data-add="div">Div</button>
+    <button data-add="out">Output</button>
+    <div class="help">
+      Drag from a colored output dot to an input dot to make a wire.<br>
+      Double-click a <b>Const</b> node to edit its value.<br>
+      Click a wire to delete.<br>
+      <b>Output</b> shows the live computed value.
+    </div>
+  </aside>
+  <div id="stage"><canvas id="c"></canvas></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// Node Graph — vanilla 1-file demo for ai-desk
+//
+// Visual programming: drag nodes, wire ports, watch computed
+// values flow through. No proprietary node-graph-editor library
+// involved. Pure canvas + reducer + DAG evaluator.
+//
+// Layers (Bible §2):
+//   L1 Physical : canvas, mouse, keyboard
+//   L2 Intent   : raw events → Command (Add/Move/Wire/Unwire/Edit/Pan/Delete)
+//   L3 Logic    : pure reducer (state, command) => newState  +  evaluate()
+//   L4 Draw     : full canvas render from state
+//
+// Cycle detection: evaluate() walks the DAG with a 'seen' set per
+// path; cycles short-circuit to NaN on the wire (drawn dim).
+// ============================================================
+
+const TYPES = {
+  const: { color: '#ffcc00', inputs: 0, outputs: 1, label: 'Const',  fn: n => n.v ?? 0 },
+  add:   { color: '#00c4cc', inputs: 2, outputs: 1, label: 'Add',    fn: (n, a, b) => a + b },
+  sub:   { color: '#ff8d3a', inputs: 2, outputs: 1, label: 'Sub',    fn: (n, a, b) => a - b },
+  mul:   { color: '#00d97e', inputs: 2, outputs: 1, label: 'Mul',    fn: (n, a, b) => a * b },
+  div:   { color: '#a78bfa', inputs: 2, outputs: 1, label: 'Div',    fn: (n, a, b) => b === 0 ? NaN : a / b },
+  out:   { color: '#ff1d6d', inputs: 1, outputs: 0, label: 'Output', fn: (n, a) => a },
+};
+const NODE_W = 130, NODE_H_BASE = 56, PORT_R = 7, PORT_GAP = 22, TITLE_H = 22;
+
+// REAL state
+let nextId = 1;
+const REAL_state = {
+  nodes: {},  // id → { id, type, x, y, v }   (v only for const)
+  wires: [],  // { from: nodeId, fromOut: 0, to: nodeId, toIn: 0 }
+  pan: { x: 0, y: 0 },
+  selected: null, // { kind: 'node'|'wire', id }
+  drag: null, // { kind: 'node', id, dx, dy } | { kind: 'wire', from, fromOut, mx, my } | { kind: 'pan', sx, sy }
+};
+
+function uid() { return 'n' + (nextId++); }
+
+// L3: evaluate the DAG
+function evaluate() {
+  const cache = {};
+  function valueOf(nodeId, outIdx, seen) {
+    const key = nodeId + ':' + outIdx;
+    if (cache[key] !== undefined) return cache[key];
+    if (seen.has(nodeId)) return NaN; // cycle
+    const seen2 = new Set(seen); seen2.add(nodeId);
+    const n = REAL_state.nodes[nodeId];
+    if (!n) return NaN;
+    const def = TYPES[n.type];
+    const ins = [];
+    for (let i = 0; i < def.inputs; i++) {
+      const w = REAL_state.wires.find(w => w.to === nodeId && w.toIn === i);
+      ins.push(w ? valueOf(w.from, w.fromOut, seen2) : 0);
+    }
+    const v = def.fn(n, ...ins);
+    cache[key] = v;
+    return v;
+  }
+  return { valueOf };
+}
+
+// canvas / view
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+let DPR = window.devicePixelRatio || 1;
+let W = 0, H = 0;
+function resize() {
+  const r = stage.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+// node geometry
+function nodeHeight(n) {
+  const def = TYPES[n.type];
+  const ports = Math.max(def.inputs, def.outputs);
+  return TITLE_H + Math.max(NODE_H_BASE - TITLE_H, ports * PORT_GAP) + 8;
+}
+function portPos(n, kind, idx) {
+  const x = n.x + (kind === 'in' ? 0 : NODE_W);
+  const y = n.y + TITLE_H + 8 + idx * PORT_GAP + PORT_R;
+  return { x, y };
+}
+function world(p) { return { x: p.x - REAL_state.pan.x, y: p.y - REAL_state.pan.y }; }
+function screen(p) { return { x: p.x + REAL_state.pan.x, y: p.y + REAL_state.pan.y }; }
+
+// hit testing
+function hitNode(wx, wy) {
+  // iterate from last (top-most) to first
+  const ids = Object.keys(REAL_state.nodes);
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const n = REAL_state.nodes[ids[i]];
+    const h = nodeHeight(n);
+    if (wx >= n.x && wx <= n.x + NODE_W && wy >= n.y && wy <= n.y + h) return n;
+  }
+  return null;
+}
+function hitPort(wx, wy) {
+  for (const id of Object.keys(REAL_state.nodes)) {
+    const n = REAL_state.nodes[id];
+    const def = TYPES[n.type];
+    for (let i = 0; i < def.inputs; i++) {
+      const p = portPos(n, 'in', i);
+      if ((wx - p.x) ** 2 + (wy - p.y) ** 2 < (PORT_R + 4) ** 2) return { node: id, kind: 'in', idx: i };
+    }
+    for (let i = 0; i < def.outputs; i++) {
+      const p = portPos(n, 'out', i);
+      if ((wx - p.x) ** 2 + (wy - p.y) ** 2 < (PORT_R + 4) ** 2) return { node: id, kind: 'out', idx: i };
+    }
+  }
+  return null;
+}
+function hitWire(wx, wy) {
+  // sample points along each bezier; pick closest if within 8px
+  for (const w of REAL_state.wires) {
+    const a = portPos(REAL_state.nodes[w.from], 'out', w.fromOut);
+    const b = portPos(REAL_state.nodes[w.to],   'in',  w.toIn);
+    const STEPS = 24;
+    for (let s = 0; s <= STEPS; s++) {
+      const t = s / STEPS;
+      const cx1 = a.x + 60, cy1 = a.y, cx2 = b.x - 60, cy2 = b.y;
+      const x = (1-t)**3 * a.x + 3*(1-t)**2*t*cx1 + 3*(1-t)*t**2*cx2 + t**3*b.x;
+      const y = (1-t)**3 * a.y + 3*(1-t)**2*t*cy1 + 3*(1-t)*t**2*cy2 + t**3*b.y;
+      if ((wx - x) ** 2 + (wy - y) ** 2 < 64) return w;
+    }
+  }
+  return null;
+}
+
+// L2 → L3
+function dispatch(cmd) {
+  switch (cmd.type) {
+    case 'ADD_NODE': {
+      const id = uid();
+      REAL_state.nodes[id] = { id, type: cmd.kind, x: cmd.x, y: cmd.y, v: cmd.kind === 'const' ? 1 : undefined };
+      REAL_state.selected = { kind: 'node', id };
+      break;
+    }
+    case 'MOVE_NODE': {
+      const n = REAL_state.nodes[cmd.id]; if (!n) break;
+      n.x = cmd.x; n.y = cmd.y;
+      break;
+    }
+    case 'ADD_WIRE': {
+      // remove any existing wire into the same input
+      REAL_state.wires = REAL_state.wires.filter(w => !(w.to === cmd.to && w.toIn === cmd.toIn));
+      REAL_state.wires.push({ from: cmd.from, fromOut: cmd.fromOut, to: cmd.to, toIn: cmd.toIn });
+      break;
+    }
+    case 'REMOVE_WIRE': {
+      const i = REAL_state.wires.findIndex(w => w === cmd.wire);
+      if (i >= 0) REAL_state.wires.splice(i, 1);
+      break;
+    }
+    case 'REMOVE_NODE': {
+      delete REAL_state.nodes[cmd.id];
+      REAL_state.wires = REAL_state.wires.filter(w => w.from !== cmd.id && w.to !== cmd.id);
+      REAL_state.selected = null;
+      break;
+    }
+    case 'EDIT_CONST': {
+      const n = REAL_state.nodes[cmd.id]; if (!n || n.type !== 'const') break;
+      n.v = cmd.v;
+      break;
+    }
+    case 'SELECT': REAL_state.selected = cmd.sel; break;
+    case 'PAN': REAL_state.pan.x += cmd.dx; REAL_state.pan.y += cmd.dy; break;
+  }
+  render();
+}
+
+// L4: render
+function render() {
+  ctx.fillStyle = getCSS('--bg');
+  ctx.fillRect(0, 0, W, H);
+  // grid
+  ctx.strokeStyle = 'rgba(26, 15, 36, 0.06)';
+  ctx.lineWidth = 1;
+  const GRID = 24;
+  const ox = REAL_state.pan.x % GRID, oy = REAL_state.pan.y % GRID;
+  for (let x = ox; x < W; x += GRID) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = oy; y < H; y += GRID) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // wires (under nodes)
+  const ev = evaluate();
+  for (const w of REAL_state.wires) {
+    const a = portPos(REAL_state.nodes[w.from], 'out', w.fromOut);
+    const b = portPos(REAL_state.nodes[w.to], 'in', w.toIn);
+    const sa = screen(a), sb = screen(b);
+    const v = ev.valueOf(w.from, w.fromOut, new Set());
+    drawWire(sa, sb, isFinite(v) ? '#6b3aff' : '#999', REAL_state.selected?.kind === 'wire' && REAL_state.selected.wire === w);
+  }
+
+  // dragging wire preview
+  if (REAL_state.drag?.kind === 'wire') {
+    const a = REAL_state.drag.from;
+    const sa = { x: a.x + REAL_state.pan.x, y: a.y + REAL_state.pan.y };
+    const sb = { x: REAL_state.drag.mx, y: REAL_state.drag.my };
+    drawWire(sa, sb, '#ff1d6d', false);
+  }
+
+  // nodes (top of wires)
+  for (const id of Object.keys(REAL_state.nodes)) {
+    const n = REAL_state.nodes[id];
+    drawNode(n, ev);
+  }
+}
+function drawWire(a, b, color, hot) {
+  ctx.strokeStyle = hot ? '#ff1d6d' : color;
+  ctx.lineWidth = hot ? 3 : 2;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.bezierCurveTo(a.x + 60, a.y, b.x - 60, b.y, b.x, b.y);
+  ctx.stroke();
+}
+function drawNode(n, ev) {
+  const def = TYPES[n.type];
+  const sx = n.x + REAL_state.pan.x;
+  const sy = n.y + REAL_state.pan.y;
+  const h = nodeHeight(n);
+  const sel = REAL_state.selected?.kind === 'node' && REAL_state.selected.id === n.id;
+  // body
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = sel ? '#ff1d6d' : '#1a0f24';
+  ctx.lineWidth = sel ? 3 : 2;
+  ctx.fillRect(sx, sy, NODE_W, h);
+  ctx.strokeRect(sx, sy, NODE_W, h);
+  // title bar
+  ctx.fillStyle = def.color;
+  ctx.fillRect(sx, sy, NODE_W, TITLE_H);
+  ctx.strokeRect(sx, sy, NODE_W, TITLE_H);
+  ctx.fillStyle = '#1a0f24';
+  ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(def.label, sx + 10, sy + TITLE_H / 2);
+  // body content
+  ctx.font = '14px "SF Mono", Menlo, monospace';
+  ctx.fillStyle = '#1a0f24';
+  if (n.type === 'const') {
+    ctx.textAlign = 'right';
+    ctx.fillText(String(n.v ?? 0), sx + NODE_W - 14, sy + TITLE_H + 22);
+    ctx.textAlign = 'left';
+  } else if (n.type === 'out') {
+    const v = ev.valueOf(n.id, 0, new Set());
+    const display = isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(3)) : 'NaN';
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 16px "SF Mono", Menlo, monospace';
+    ctx.fillStyle = '#ff1d6d';
+    ctx.fillText(display, sx + NODE_W - 14, sy + TITLE_H + 22);
+    ctx.textAlign = 'left';
+  }
+  // ports (input on left, output on right)
+  for (let i = 0; i < def.inputs; i++) {
+    const p = portPos(n, 'in', i);
+    const ps = screen(p);
+    ctx.beginPath();
+    ctx.arc(ps.x, ps.y, PORT_R, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#1a0f24';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  for (let i = 0; i < def.outputs; i++) {
+    const p = portPos(n, 'out', i);
+    const ps = screen(p);
+    ctx.beginPath();
+    ctx.arc(ps.x, ps.y, PORT_R, 0, Math.PI * 2);
+    ctx.fillStyle = def.color;
+    ctx.fill();
+    ctx.strokeStyle = '#1a0f24';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+}
+function getCSS(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#fff'; }
+
+// ----- L1 events
+let mousePos = { x: 0, y: 0 };
+canvas.addEventListener('mousedown', e => {
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const wx = sx - REAL_state.pan.x, wy = sy - REAL_state.pan.y;
+  // pan with middle button or space
+  if (e.button === 1 || spaceDown) {
+    REAL_state.drag = { kind: 'pan', sx, sy };
+    stage.classList.add('panning');
+    return;
+  }
+  // port?
+  const port = hitPort(wx, wy);
+  if (port) {
+    if (port.kind === 'out') {
+      const startWorld = portPos(REAL_state.nodes[port.node], 'out', port.idx);
+      REAL_state.drag = { kind: 'wire', node: port.node, idx: port.idx, from: startWorld, mx: sx, my: sy };
+      render();
+      return;
+    } else {
+      // dragging FROM input: also allow, snap to that input
+      const startWorld = portPos(REAL_state.nodes[port.node], 'in', port.idx);
+      // remove any wire to this input first
+      REAL_state.wires = REAL_state.wires.filter(w => !(w.to === port.node && w.toIn === port.idx));
+      REAL_state.drag = { kind: 'wire-rev', node: port.node, idx: port.idx, from: startWorld, mx: sx, my: sy };
+      render();
+      return;
+    }
+  }
+  // node?
+  const n = hitNode(wx, wy);
+  if (n) {
+    REAL_state.selected = { kind: 'node', id: n.id };
+    REAL_state.drag = { kind: 'node', id: n.id, dx: wx - n.x, dy: wy - n.y };
+    render();
+    return;
+  }
+  // wire?
+  const w = hitWire(wx, wy);
+  if (w) {
+    REAL_state.selected = { kind: 'wire', wire: w };
+    render();
+    return;
+  }
+  // empty: deselect
+  REAL_state.selected = null;
+  render();
+});
+
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  mousePos = { x: sx, y: sy };
+  const d = REAL_state.drag;
+  if (!d) return;
+  if (d.kind === 'node') {
+    const wx = sx - REAL_state.pan.x, wy = sy - REAL_state.pan.y;
+    dispatch({ type: 'MOVE_NODE', id: d.id, x: wx - d.dx, y: wy - d.dy });
+  } else if (d.kind === 'wire' || d.kind === 'wire-rev') {
+    d.mx = sx; d.my = sy; render();
+  } else if (d.kind === 'pan') {
+    const dx = sx - d.sx, dy = sy - d.sy;
+    d.sx = sx; d.sy = sy;
+    dispatch({ type: 'PAN', dx, dy });
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const wx = sx - REAL_state.pan.x, wy = sy - REAL_state.pan.y;
+  const d = REAL_state.drag;
+  if (d?.kind === 'wire') {
+    const target = hitPort(wx, wy);
+    if (target && target.kind === 'in' && target.node !== d.node) {
+      dispatch({ type: 'ADD_WIRE', from: d.node, fromOut: d.idx, to: target.node, toIn: target.idx });
+    }
+  } else if (d?.kind === 'wire-rev') {
+    const target = hitPort(wx, wy);
+    if (target && target.kind === 'out' && target.node !== d.node) {
+      dispatch({ type: 'ADD_WIRE', from: target.node, fromOut: target.idx, to: d.node, toIn: d.idx });
+    }
+  }
+  REAL_state.drag = null;
+  stage.classList.remove('panning');
+  render();
+});
+
+canvas.addEventListener('dblclick', e => {
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const wx = sx - REAL_state.pan.x, wy = sy - REAL_state.pan.y;
+  const n = hitNode(wx, wy);
+  if (n && n.type === 'const') {
+    const cur = String(n.v ?? 0);
+    const v = prompt('Value:', cur);
+    if (v !== null && v !== '') {
+      const num = parseFloat(v);
+      if (!isNaN(num)) dispatch({ type: 'EDIT_CONST', id: n.id, v: num });
+    }
+  }
+});
+
+// keyboard
+let spaceDown = false;
+window.addEventListener('keydown', e => {
+  if (e.key === ' ' && !e.repeat && document.activeElement === document.body) { spaceDown = true; e.preventDefault(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (REAL_state.selected?.kind === 'node') { dispatch({ type: 'REMOVE_NODE', id: REAL_state.selected.id }); }
+    else if (REAL_state.selected?.kind === 'wire') { dispatch({ type: 'REMOVE_WIRE', wire: REAL_state.selected.wire }); }
+  }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; });
+
+// sidebar buttons
+document.querySelectorAll('#sidebar button[data-add]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const kind = btn.dataset.add;
+    const x = (W / 2 - REAL_state.pan.x - NODE_W / 2) + (Math.random() - 0.5) * 80;
+    const y = (H / 2 - REAL_state.pan.y - 30) + (Math.random() - 0.5) * 60;
+    dispatch({ type: 'ADD_NODE', kind, x, y });
+  });
+});
+
+// seed: a working example so the canvas isn't intimidating
+function seed() {
+  if (Object.keys(REAL_state.nodes).length > 0) return;
+  // (3 + 4) * 2 = 14
+  const c1 = uid(); REAL_state.nodes[c1] = { id: c1, type: 'const', x: 60,  y: 80,  v: 3 };
+  const c2 = uid(); REAL_state.nodes[c2] = { id: c2, type: 'const', x: 60,  y: 180, v: 4 };
+  const c3 = uid(); REAL_state.nodes[c3] = { id: c3, type: 'const', x: 60,  y: 290, v: 2 };
+  const a1 = uid(); REAL_state.nodes[a1] = { id: a1, type: 'add',   x: 280, y: 110 };
+  const m1 = uid(); REAL_state.nodes[m1] = { id: m1, type: 'mul',   x: 470, y: 170 };
+  const o1 = uid(); REAL_state.nodes[o1] = { id: o1, type: 'out',   x: 660, y: 180 };
+  REAL_state.wires.push(
+    { from: c1, fromOut: 0, to: a1, toIn: 0 },
+    { from: c2, fromOut: 0, to: a1, toIn: 1 },
+    { from: a1, fromOut: 0, to: m1, toIn: 0 },
+    { from: c3, fromOut: 0, to: m1, toIn: 1 },
+    { from: m1, fromOut: 0, to: o1, toIn: 0 },
+  );
+}
+
+seed();
+render();
+</script>
+</body>
+</html>

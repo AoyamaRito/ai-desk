@@ -190,6 +190,29 @@ section.block:nth-of-type(4) h2::before { background: var(--accent-4); }
 .demo-card h3 { margin: 0 0 8px; font-size: 19px; font-weight: 800; color: #ffffff; }
 .demo-card p { margin: 0; font-size: 15px; color: #ffffff; line-height: 1.55; }
 
+/* inline demo blocks */
+.demo-block { margin: 32px 0 48px; }
+.demo-title { margin: 0 0 6px; font-size: 21px; font-weight: 800; color: var(--fg); }
+.demo-title a { color: var(--accent-4); }
+.demo-title a:hover { color: var(--accent); text-decoration: none; }
+.demo-desc { margin: 0 0 14px; color: var(--fg-dim); font-size: 15px; }
+.demo-frame {
+  border: 3px solid var(--fg);
+  background: var(--bg-elev);
+  width: 100%;
+  height: 540px;
+  overflow: hidden;
+}
+.demo-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+@media (max-width: 600px) {
+  .demo-frame { height: 420px; }
+}
+
 /* docs links */
 .docs-links {
   display: grid;
@@ -295,19 +318,24 @@ app.js の [機能名] を [変更内容] してください。</div>
 
 <section class="block">
   <h2>触れるデモ</h2>
-  <div class="demos">
-    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/actions/index.html">
-      <h3>Action Constraint Lab</h3>
-      <p>格闘ゲームのキャンセル・コンボを19種の網羅テストで検証する実装デモ。</p>
-    </a>
-    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/action-demos.html">
-      <h3>Action Demos</h3>
-      <p>9種のアクションゲームアルゴリズムをブラウザで触れる。</p>
-    </a>
-    <a class="demo-card" href="https://aoyamarito.github.io/ai-desk/3dplus/examples/point-projection.html">
-      <h3>3Dplus 検証層</h3>
-      <p>GPU描画と並走するCPU側の純粋関数による突合デモ。</p>
-    </a>
+  <p class="lead">このページ上でそのまま遊べます。別タブを開きたい場合は各タイトルからどうぞ。</p>
+
+  <div class="demo-block">
+    <h3 class="demo-title"><a href="actions/index.html">Action Constraint Lab</a></h3>
+    <p class="demo-desc">格闘ゲームのキャンセル・コンボを19種の網羅テストで検証する実装デモ。</p>
+    <div class="demo-frame"><iframe src="actions/index.html" loading="lazy" title="Action Constraint Lab"></iframe></div>
+  </div>
+
+  <div class="demo-block">
+    <h3 class="demo-title"><a href="action-demos.html">Action Demos</a></h3>
+    <p class="demo-desc">9種のアクションゲームアルゴリズムをブラウザで触れる。</p>
+    <div class="demo-frame"><iframe src="action-demos.html" loading="lazy" title="Action Demos"></iframe></div>
+  </div>
+
+  <div class="demo-block">
+    <h3 class="demo-title"><a href="3dplus/examples/point-projection.html">3Dplus 検証層</a></h3>
+    <p class="demo-desc">GPU描画と並走するCPU側の純粋関数による突合デモ。</p>
+    <div class="demo-frame"><iframe src="3dplus/examples/point-projection.html" loading="lazy" title="3Dplus point projection"></iframe></div>
   </div>
 </section>
 

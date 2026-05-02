@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>desk-chat — browser terminal for gemini-cli</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; overflow: hidden; }
+header {
+  height: 38px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid #30363d; background: #161b22; font-size: 12px; color: #8b949e;
+  letter-spacing: 0.04em; flex-shrink: 0;
+}
+header .title { font-weight: 700; color: #e6edf3; }
+header .status { display: flex; align-items: center; gap: 8px; }
+header .dot { width: 8px; height: 8px; border-radius: 50%; background: #f85149; transition: background 0.15s; }
+header .dot.on { background: #3fb950; }
+main { position: relative; height: calc(100% - 38px); overflow: hidden; }
+canvas { display: block; cursor: text; outline: none; image-rendering: pixelated; }
+.banner {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  padding: 14px 22px; background: rgba(255,255,255,0.04); border: 1px solid #30363d; border-radius: 6px;
+  color: #8b949e; font-size: 13px; pointer-events: none; text-align: center; max-width: 80%;
+}
+.banner.hide { display: none; }
+.banner code { color: #e6edf3; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="title">desk-chat</span>
+  <span class="status"><span id="status-text">connecting…</span><span class="dot" id="status-dot"></span></span>
+</header>
+
+<main>
+  <canvas id="term" tabindex="0"></canvas>
+  <div class="banner" id="banner">
+    Connecting to <code>ws://localhost:4000/pty</code>…<br>
+    Make sure <code>node server.js</code> is running.
+  </div>
+</main>
+
+<script>
+// ============================================================
+// desk-chat — browser-side terminal (single file, vanilla)
+//
+// Layered the same way as the ai-desk demos:
+//   L1 Physical    : Canvas, keyboard events, WebSocket
+//   L2 Intent      : key → byte sequence translation, ws → parser feed
+//   L3 Logic       : ANSI parser state machine + grid mutation reducer
+//   L4 Draw        : redraw grid → canvas
+//   Bridge         : input bytes ws.send(); pty bytes parser.feed()
+//
+// Limits (Stage A MVP): single screen buffer (no alt screen swap),
+// no scrollback, basic CSI/SGR/OSC handling sufficient to run
+// gemini-cli / claude-cli style chat sessions. Does NOT support:
+// bracketed-paste-aware editors, mouse reporting, sixel/kitty image,
+// font ligatures, RTL text. Codes for these are silently ignored.
+// ============================================================
+
+const ws_url = `ws://${location.host}/pty`;
+const canvas = document.getElementById('term');
+const ctx = canvas.getContext('2d', { alpha: false });
+const banner = document.getElementById('banner');
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+
+// --- font + cell geometry
+const FONT_FAMILY = '"SF Mono", Menlo, "Courier New", monospace';
+const FONT_SIZE = 14;
+const LINE_HEIGHT = 18;
+let CELL_W = 0;          // measured below
+const CELL_H = LINE_HEIGHT;
+let COLS = 80, ROWS = 24;
+let DPR = window.devicePixelRatio || 1;
+
+function measureCell() {
+  ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+  const m = ctx.measureText('M');
+  CELL_W = Math.ceil(m.width);
+}
+measureCell();
+
+// --- color palette (xterm-style 16 + 256)
+const PALETTE = (() => {
+  const base = [
+    '#000000', '#cd0000', '#00cd00', '#cdcd00', '#0000ee', '#cd00cd', '#00cdcd', '#e5e5e5',
+    '#7f7f7f', '#ff0000', '#00ff00', '#ffff00', '#5c5cff', '#ff00ff', '#00ffff', '#ffffff',
+  ];
+  // 6x6x6 color cube
+  const cube = [];
+  const levels = [0, 95, 135, 175, 215, 255];
+  for (let r = 0; r < 6; r++) for (let g = 0; g < 6; g++) for (let b = 0; b < 6; b++) {
+    cube.push(`rgb(${levels[r]},${levels[g]},${levels[b]})`);
+  }
+  // 24 grayscale ramp
+  const gray = [];
+  for (let i = 0; i < 24; i++) {
+    const v = 8 + i * 10;
+    gray.push(`rgb(${v},${v},${v})`);
+  }
+  return [...base, ...cube, ...gray];
+})();
+const FG_DEFAULT = '#e6edf3';
+const BG_DEFAULT = '#0d1117';
+
+// --- grid state
+// each cell: { ch, fg, bg, bold, italic, underline, inverse }
+let grid = [];
+let cursor = { row: 0, col: 0, visible: true };
+let saved = null;
+let attr = { fg: null, bg: null, bold: false, italic: false, underline: false, inverse: false };
+let scrollTop = 0, scrollBot = ROWS - 1;
+let dirty = false;
+
+function newCell() { return { ch: ' ', fg: null, bg: null, bold: false, italic: false, underline: false, inverse: false }; }
+function newGrid(cols, rows) {
+  const g = new Array(rows);
+  for (let r = 0; r < rows; r++) {
+    g[r] = new Array(cols);
+    for (let c = 0; c < cols; c++) g[r][c] = newCell();
+  }
+  return g;
+}
+
+function resizeGrid(cols, rows) {
+  const ng = newGrid(cols, rows);
+  const minR = Math.min(rows, grid.length);
+  const minC = Math.min(cols, grid[0]?.length || 0);
+  for (let r = 0; r < minR; r++) for (let c = 0; c < minC; c++) ng[r][c] = grid[r][c];
+  grid = ng;
+  COLS = cols; ROWS = rows;
+  scrollTop = 0; scrollBot = ROWS - 1;
+  cursor.row = Math.min(cursor.row, ROWS - 1);
+  cursor.col = Math.min(cursor.col, COLS - 1);
+  dirty = true;
+}
+
+function fitCanvas() {
+  const W = canvas.parentElement.clientWidth;
+  const H = canvas.parentElement.clientHeight;
+  const cols = Math.max(20, Math.floor(W / CELL_W));
+  const rows = Math.max(5, Math.floor(H / CELL_H));
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+  ctx.textBaseline = 'top';
+  if (cols !== COLS || rows !== ROWS) {
+    resizeGrid(cols, rows);
+    sendResize(cols, rows);
+  } else {
+    dirty = true;
+  }
+}
+
+// --- ANSI parser (state machine)
+const ST = { GROUND: 0, ESC: 1, CSI: 2, OSC: 3, DCS: 4, CHARSET: 5 };
+let pst = ST.GROUND;
+let csiParams = '';
+let csiInter = '';
+let oscBuf = '';
+
+function feed(bytes) {
+  // bytes: string of raw chars from PTY
+  for (let i = 0; i < bytes.length; i++) {
+    const ch = bytes[i];
+    const code = ch.charCodeAt(0);
+
+    if (pst === ST.GROUND) {
+      if (code === 0x1b) { pst = ST.ESC; continue; }
+      if (code < 0x20) { handleControl(code); continue; }
+      putChar(ch);
+      continue;
+    }
+    if (pst === ST.ESC) {
+      if (ch === '[') { pst = ST.CSI; csiParams = ''; csiInter = ''; continue; }
+      if (ch === ']') { pst = ST.OSC; oscBuf = ''; continue; }
+      if (ch === 'P') { pst = ST.DCS; continue; }
+      if (ch === '(' || ch === ')' || ch === '*' || ch === '+') { pst = ST.CHARSET; continue; }
+      if (ch === '=') { pst = ST.GROUND; continue; } // app keypad mode (ignore)
+      if (ch === '>') { pst = ST.GROUND; continue; } // numeric keypad mode (ignore)
+      if (ch === '7') { saved = { row: cursor.row, col: cursor.col, attr: { ...attr } }; pst = ST.GROUND; continue; }
+      if (ch === '8') { if (saved) { cursor.row = saved.row; cursor.col = saved.col; attr = { ...saved.attr }; } pst = ST.GROUND; continue; }
+      if (ch === 'D') { lineFeed(); pst = ST.GROUND; continue; } // index
+      if (ch === 'M') { reverseIndex(); pst = ST.GROUND; continue; }
+      if (ch === 'E') { cursor.col = 0; lineFeed(); pst = ST.GROUND; continue; }
+      if (ch === 'c') { reset(); pst = ST.GROUND; continue; }
+      pst = ST.GROUND;
+      continue;
+    }
+    if (pst === ST.CSI) {
+      if (code >= 0x30 && code <= 0x3f) { csiParams += ch; continue; } // 0-9 ; : < = > ?
+      if (code >= 0x20 && code <= 0x2f) { csiInter += ch; continue; }  // intermediates
+      if (code >= 0x40 && code <= 0x7e) { handleCSI(ch, csiParams, csiInter); pst = ST.GROUND; continue; }
+      pst = ST.GROUND; continue;
+    }
+    if (pst === ST.OSC) {
+      // terminated by BEL (0x07) or ST (ESC \)
+      if (code === 0x07) { handleOSC(oscBuf); pst = ST.GROUND; continue; }
+      if (code === 0x1b && bytes[i + 1] === '\\') { handleOSC(oscBuf); i++; pst = ST.GROUND; continue; }
+      oscBuf += ch;
+      continue;
+    }
+    if (pst === ST.DCS) {
+      if (code === 0x1b && bytes[i + 1] === '\\') { i++; pst = ST.GROUND; continue; }
+      continue; // DCS body ignored
+    }
+    if (pst === ST.CHARSET) {
+      pst = ST.GROUND; continue; // designator byte consumed
+    }
+  }
+  dirty = true;
+}
+
+function handleControl(code) {
+  switch (code) {
+    case 0x07: /* BEL */ break;
+    case 0x08: /* BS */ if (cursor.col > 0) cursor.col--; break;
+    case 0x09: /* TAB */ cursor.col = Math.min(COLS - 1, (Math.floor(cursor.col / 8) + 1) * 8); break;
+    case 0x0a: /* LF */ lineFeed(); break;
+    case 0x0b: case 0x0c: lineFeed(); break;
+    case 0x0d: /* CR */ cursor.col = 0; break;
+  }
+}
+
+function putChar(ch) {
+  if (cursor.col >= COLS) { cursor.col = 0; lineFeed(); }
+  const cell = grid[cursor.row][cursor.col];
+  cell.ch = ch;
+  cell.fg = attr.fg;
+  cell.bg = attr.bg;
+  cell.bold = attr.bold;
+  cell.italic = attr.italic;
+  cell.underline = attr.underline;
+  cell.inverse = attr.inverse;
+  cursor.col++;
+}
+
+function lineFeed() {
+  cursor.row++;
+  if (cursor.row > scrollBot) {
+    // scroll
+    for (let r = scrollTop; r < scrollBot; r++) grid[r] = grid[r + 1];
+    grid[scrollBot] = new Array(COLS); for (let c = 0; c < COLS; c++) grid[scrollBot][c] = newCell();
+    cursor.row = scrollBot;
+  }
+}
+function reverseIndex() {
+  cursor.row--;
+  if (cursor.row < scrollTop) {
+    for (let r = scrollBot; r > scrollTop; r--) grid[r] = grid[r - 1];
+    grid[scrollTop] = new Array(COLS); for (let c = 0; c < COLS; c++) grid[scrollTop][c] = newCell();
+    cursor.row = scrollTop;
+  }
+}
+
+function handleCSI(final, params, inter) {
+  const isPrivate = params.startsWith('?');
+  const raw = isPrivate ? params.slice(1) : params;
+  const ps = raw.length === 0 ? [] : raw.split(';').map(s => s === '' ? 0 : parseInt(s, 10));
+  const p = (i, dflt) => (ps[i] === undefined ? dflt : ps[i]);
+
+  if (isPrivate) {
+    // private mode set/reset
+    if (final === 'h' || final === 'l') {
+      // mostly ignore, but track cursor visibility
+      for (const m of ps) {
+        if (m === 25) cursor.visible = (final === 'h');
+        // 1049 alt screen — not implemented (single buffer); silently ignore
+        // 2004 bracketed paste — silently ignore
+      }
+      return;
+    }
+  }
+
+  switch (final) {
+    case 'A': cursor.row = Math.max(scrollTop, cursor.row - p(0, 1)); break;
+    case 'B': cursor.row = Math.min(scrollBot, cursor.row + p(0, 1)); break;
+    case 'C': cursor.col = Math.min(COLS - 1, cursor.col + p(0, 1)); break;
+    case 'D': cursor.col = Math.max(0, cursor.col - p(0, 1)); break;
+    case 'E': cursor.row = Math.min(scrollBot, cursor.row + p(0, 1)); cursor.col = 0; break;
+    case 'F': cursor.row = Math.max(scrollTop, cursor.row - p(0, 1)); cursor.col = 0; break;
+    case 'G': cursor.col = Math.min(COLS - 1, p(0, 1) - 1); break;
+    case 'H': case 'f':
+      cursor.row = Math.max(0, Math.min(ROWS - 1, p(0, 1) - 1));
+      cursor.col = Math.max(0, Math.min(COLS - 1, p(1, 1) - 1));
+      break;
+    case 'J': eraseDisplay(p(0, 0)); break;
+    case 'K': eraseLine(p(0, 0)); break;
+    case 'L': insertLines(p(0, 1)); break;
+    case 'M': deleteLines(p(0, 1)); break;
+    case 'P': deleteChars(p(0, 1)); break;
+    case '@': insertChars(p(0, 1)); break;
+    case 'X': eraseChars(p(0, 1)); break;
+    case 'd': cursor.row = Math.max(0, Math.min(ROWS - 1, p(0, 1) - 1)); break;
+    case 'm': handleSGR(ps); break;
+    case 'r':
+      scrollTop = Math.max(0, p(0, 1) - 1);
+      scrollBot = Math.min(ROWS - 1, p(1, ROWS) - 1);
+      cursor.row = 0; cursor.col = 0;
+      break;
+    case 's': saved = { row: cursor.row, col: cursor.col, attr: { ...attr } }; break;
+    case 'u': if (saved) { cursor.row = saved.row; cursor.col = saved.col; attr = { ...saved.attr }; } break;
+    case 'n':
+      if (p(0, 0) === 6) { // device status report — cursor pos
+        send(`\x1b[${cursor.row + 1};${cursor.col + 1}R`);
+      }
+      break;
+    // 'c' device attributes — respond as VT100
+    case 'c': send('\x1b[?1;0c'); break;
+  }
+}
+
+function eraseDisplay(mode) {
+  if (mode === 0) {
+    // cursor → end
+    for (let c = cursor.col; c < COLS; c++) grid[cursor.row][c] = newCell();
+    for (let r = cursor.row + 1; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = newCell();
+  } else if (mode === 1) {
+    for (let c = 0; c <= cursor.col; c++) grid[cursor.row][c] = newCell();
+    for (let r = 0; r < cursor.row; r++) for (let c = 0; c < COLS; c++) grid[r][c] = newCell();
+  } else if (mode === 2 || mode === 3) {
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) grid[r][c] = newCell();
+  }
+}
+function eraseLine(mode) {
+  if (mode === 0) for (let c = cursor.col; c < COLS; c++) grid[cursor.row][c] = newCell();
+  else if (mode === 1) for (let c = 0; c <= cursor.col; c++) grid[cursor.row][c] = newCell();
+  else if (mode === 2) for (let c = 0; c < COLS; c++) grid[cursor.row][c] = newCell();
+}
+function insertLines(n) {
+  for (let i = 0; i < n; i++) {
+    for (let r = scrollBot; r > cursor.row; r--) grid[r] = grid[r - 1];
+    grid[cursor.row] = new Array(COLS); for (let c = 0; c < COLS; c++) grid[cursor.row][c] = newCell();
+  }
+}
+function deleteLines(n) {
+  for (let i = 0; i < n; i++) {
+    for (let r = cursor.row; r < scrollBot; r++) grid[r] = grid[r + 1];
+    grid[scrollBot] = new Array(COLS); for (let c = 0; c < COLS; c++) grid[scrollBot][c] = newCell();
+  }
+}
+function deleteChars(n) {
+  const row = grid[cursor.row];
+  for (let c = cursor.col; c < COLS - n; c++) row[c] = row[c + n];
+  for (let c = COLS - n; c < COLS; c++) row[c] = newCell();
+}
+function insertChars(n) {
+  const row = grid[cursor.row];
+  for (let c = COLS - 1; c >= cursor.col + n; c--) row[c] = row[c - n];
+  for (let c = cursor.col; c < cursor.col + n && c < COLS; c++) row[c] = newCell();
+}
+function eraseChars(n) {
+  for (let c = cursor.col; c < cursor.col + n && c < COLS; c++) grid[cursor.row][c] = newCell();
+}
+
+function handleSGR(ps) {
+  if (ps.length === 0) ps = [0];
+  for (let i = 0; i < ps.length; i++) {
+    const n = ps[i];
+    if (n === 0) attr = { fg: null, bg: null, bold: false, italic: false, underline: false, inverse: false };
+    else if (n === 1) attr.bold = true;
+    else if (n === 3) attr.italic = true;
+    else if (n === 4) attr.underline = true;
+    else if (n === 7) attr.inverse = true;
+    else if (n === 22) attr.bold = false;
+    else if (n === 23) attr.italic = false;
+    else if (n === 24) attr.underline = false;
+    else if (n === 27) attr.inverse = false;
+    else if (n >= 30 && n <= 37) attr.fg = PALETTE[n - 30];
+    else if (n === 38) {
+      if (ps[i + 1] === 5) { attr.fg = PALETTE[ps[i + 2]]; i += 2; }
+      else if (ps[i + 1] === 2) { attr.fg = `rgb(${ps[i+2]},${ps[i+3]},${ps[i+4]})`; i += 4; }
+    }
+    else if (n === 39) attr.fg = null;
+    else if (n >= 40 && n <= 47) attr.bg = PALETTE[n - 40];
+    else if (n === 48) {
+      if (ps[i + 1] === 5) { attr.bg = PALETTE[ps[i + 2]]; i += 2; }
+      else if (ps[i + 1] === 2) { attr.bg = `rgb(${ps[i+2]},${ps[i+3]},${ps[i+4]})`; i += 4; }
+    }
+    else if (n === 49) attr.bg = null;
+    else if (n >= 90 && n <= 97) attr.fg = PALETTE[n - 90 + 8];
+    else if (n >= 100 && n <= 107) attr.bg = PALETTE[n - 100 + 8];
+  }
+}
+
+function handleOSC(buf) {
+  // OSC <num> ; <text>
+  const i = buf.indexOf(';');
+  if (i < 0) return;
+  const num = parseInt(buf.slice(0, i), 10);
+  const txt = buf.slice(i + 1);
+  if (num === 0 || num === 2) document.title = `desk-chat — ${txt}`;
+  // others (palette set, hyperlinks, etc.) ignored
+}
+
+function reset() {
+  grid = newGrid(COLS, ROWS);
+  cursor = { row: 0, col: 0, visible: true };
+  attr = { fg: null, bg: null, bold: false, italic: false, underline: false, inverse: false };
+  scrollTop = 0; scrollBot = ROWS - 1;
+  dirty = true;
+}
+
+// --- renderer
+function render() {
+  if (!dirty) return;
+  dirty = false;
+  ctx.fillStyle = BG_DEFAULT;
+  ctx.fillRect(0, 0, canvas.width / DPR, canvas.height / DPR);
+  for (let r = 0; r < ROWS; r++) {
+    const row = grid[r];
+    if (!row) continue;
+    const y = r * CELL_H;
+    for (let c = 0; c < COLS; c++) {
+      const cell = row[c];
+      if (!cell) continue;
+      const x = c * CELL_W;
+      let fg = cell.fg || FG_DEFAULT;
+      let bg = cell.bg || BG_DEFAULT;
+      if (cell.inverse) { const t = fg; fg = bg; bg = t; }
+      if (bg !== BG_DEFAULT) {
+        ctx.fillStyle = bg;
+        ctx.fillRect(x, y, CELL_W, CELL_H);
+      }
+      if (cell.ch !== ' ' || cell.underline) {
+        let style = '';
+        if (cell.bold) style += 'bold ';
+        if (cell.italic) style += 'italic ';
+        ctx.font = `${style}${FONT_SIZE}px ${FONT_FAMILY}`;
+        ctx.fillStyle = fg;
+        ctx.fillText(cell.ch, x, y + 1);
+        if (cell.underline) {
+          ctx.fillRect(x, y + CELL_H - 2, CELL_W, 1);
+        }
+      }
+    }
+  }
+  // cursor
+  if (cursor.visible) {
+    const x = cursor.col * CELL_W;
+    const y = cursor.row * CELL_H;
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = FG_DEFAULT;
+    ctx.fillRect(x, y, CELL_W, CELL_H);
+    ctx.globalAlpha = 1;
+    // overlay the underlying char in inverse so it's still readable
+    const row = grid[cursor.row];
+    const cell = row && row[cursor.col];
+    if (cell && cell.ch !== ' ') {
+      ctx.fillStyle = BG_DEFAULT;
+      ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+      ctx.fillText(cell.ch, x, y + 1);
+    }
+  }
+}
+
+function loop() { render(); requestAnimationFrame(loop); }
+loop();
+
+// --- WebSocket
+let ws = null;
+function connect() {
+  ws = new WebSocket(ws_url);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => {
+    statusDot.classList.add('on');
+    statusText.textContent = 'connected';
+    banner.classList.add('hide');
+    sendResize(COLS, ROWS);
+    canvas.focus();
+  };
+  ws.onmessage = ev => {
+    if (typeof ev.data === 'string') {
+      // could be control JSON (e.g., {type:'exit'}) or text data
+      try { const obj = JSON.parse(ev.data); if (obj && obj.type === 'exit') { statusText.textContent = `exited (${obj.exitCode})`; return; } } catch {}
+      feed(ev.data);
+    } else {
+      feed(new TextDecoder().decode(new Uint8Array(ev.data)));
+    }
+  };
+  ws.onclose = () => {
+    statusDot.classList.remove('on');
+    statusText.textContent = 'disconnected — refresh to reconnect';
+  };
+  ws.onerror = () => {
+    statusText.textContent = 'connection error';
+  };
+}
+function send(data) {
+  if (ws && ws.readyState === ws.OPEN) ws.send(data);
+}
+function sendResize(cols, rows) {
+  if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+}
+
+// --- keyboard input → escape sequences
+canvas.addEventListener('keydown', e => {
+  if (!ws || ws.readyState !== ws.OPEN) return;
+  const k = e.key;
+  let out = null;
+  if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    out = k;
+  } else if (e.ctrlKey && !e.metaKey && k.length === 1) {
+    const lc = k.toLowerCase();
+    if (lc >= 'a' && lc <= 'z') out = String.fromCharCode(lc.charCodeAt(0) - 96);
+    else if (k === ' ') out = '\0';
+    else if (k === '[') out = '\x1b';
+    else if (k === '\\') out = '\x1c';
+    else if (k === ']') out = '\x1d';
+    else if (k === '^') out = '\x1e';
+    else if (k === '_') out = '\x1f';
+  } else {
+    switch (k) {
+      case 'Enter':     out = '\r'; break;
+      case 'Backspace': out = e.ctrlKey ? '\x08' : '\x7f'; break;
+      case 'Tab':       out = e.shiftKey ? '\x1b[Z' : '\t'; break;
+      case 'Escape':    out = '\x1b'; break;
+      case 'ArrowUp':   out = '\x1b[A'; break;
+      case 'ArrowDown': out = '\x1b[B'; break;
+      case 'ArrowRight':out = '\x1b[C'; break;
+      case 'ArrowLeft': out = '\x1b[D'; break;
+      case 'Home':      out = '\x1b[H'; break;
+      case 'End':       out = '\x1b[F'; break;
+      case 'PageUp':    out = '\x1b[5~'; break;
+      case 'PageDown':  out = '\x1b[6~'; break;
+      case 'Delete':    out = '\x1b[3~'; break;
+      case 'Insert':    out = '\x1b[2~'; break;
+    }
+  }
+  if (out !== null) {
+    e.preventDefault();
+    send(out);
+  }
+});
+canvas.addEventListener('paste', async (e) => {
+  e.preventDefault();
+  const text = e.clipboardData?.getData('text') || (await navigator.clipboard.readText().catch(() => ''));
+  if (text) send(text);
+});
+
+// --- init
+new ResizeObserver(fitCanvas).observe(canvas.parentElement);
+grid = newGrid(COLS, ROWS);
+fitCanvas();
+canvas.focus();
+connect();
+</script>
+</body>
+</html>

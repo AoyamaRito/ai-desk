@@ -1,0 +1,17 @@
+{
+  "name": "desk-chat",
+  "version": "0.1.0",
+  "description": "Browser-UI terminal that fronts gemini-cli (or any TTY-aware CLI). Stage A of A→B plan: needs a small local Node server for PTY; Stage B will drop the server entirely.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}

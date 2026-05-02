@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vector Pad — ai-desk demo (vanilla, single file)</title>
+<style>
+:root {
+  --fg: #1a1a1a; --fg-dim: #6e6e7a; --bg: #f4f4f6; --panel: #ffffff;
+  --border: #e1e1e6; --accent: #5a4cdb; --accent-soft: #ede9fe;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 1px 6px rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html.embed body > header { display: none; }
+html, body { height: 100%; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif; font-size: 13px; overflow: hidden; }
+button, input, textarea, select { font: inherit; color: inherit; background: transparent; border: 0; outline: none; }
+
+header {
+  height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border); background: var(--panel); flex-shrink: 0;
+}
+header .title { font-weight: 700; font-size: 14px; }
+header .pill { font-size: 11px; padding: 2px 8px; background: var(--accent-soft); color: var(--accent); border-radius: 99px; font-weight: 600; }
+header .grow { flex: 1 1 auto; }
+header .btn {
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: var(--bg); border: 1px solid var(--border);
+}
+header .btn:hover { background: var(--panel); border-color: #d0d0d8; }
+header .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+header .btn.primary:hover { background: #4a3dcb; }
+
+main { display: flex; height: calc(100% - 44px); }
+html.embed main { height: 100%; }
+
+#tools {
+  width: 56px; flex-shrink: 0; padding: 8px 6px; display: flex; flex-direction: column; gap: 4px;
+  background: var(--panel); border-right: 1px solid var(--border);
+}
+#tools .tool {
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; cursor: pointer; color: var(--fg-dim); transition: background 0.1s, color 0.1s;
+}
+#tools .tool:hover { background: var(--bg); color: var(--fg); }
+#tools .tool.active { background: var(--accent-soft); color: var(--accent); }
+#tools .tool svg { width: 18px; height: 18px; pointer-events: none; }
+
+#stage { flex: 1 1 auto; position: relative; overflow: hidden; background: #fafafc; }
+#stage canvas { display: block; cursor: crosshair; }
+#stage.tool-select canvas { cursor: default; }
+#stage.tool-select canvas.over-shape { cursor: move; }
+#stage.dragging canvas { cursor: grabbing; }
+
+aside {
+  width: 240px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel { padding: 12px; border-bottom: 1px solid var(--border); }
+.panel h3 { font-size: 10px; font-weight: 700; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+
+#layers-list {
+  max-height: 240px; overflow-y: auto; display: flex; flex-direction: column-reverse; gap: 2px;
+}
+.layer-row {
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer;
+  font-size: 12px;
+}
+.layer-row:hover { background: var(--bg); }
+.layer-row.active { background: var(--accent-soft); color: var(--accent); }
+.layer-row .swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1); }
+.layer-row .name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-row .icon { padding: 2px 4px; cursor: pointer; opacity: 0.5; }
+.layer-row .icon:hover { opacity: 1; }
+.layer-row .icon.x:hover { color: #e63946; }
+
+#props { flex: 1 1 auto; overflow-y: auto; }
+.prop-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.prop-row label { width: 50px; font-size: 11px; color: var(--fg-dim); flex-shrink: 0; }
+.prop-row input[type="number"], .prop-row input[type="text"] {
+  flex: 1 1 auto; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 12px; min-width: 0; background: var(--bg);
+}
+.prop-row input[type="color"] {
+  width: 28px; height: 24px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; padding: 1px;
+}
+.prop-row .pos-pair { display: flex; gap: 4px; flex: 1 1 auto; }
+.prop-row .pos-pair input { flex: 1 1 0; min-width: 0; }
+.empty-props { color: var(--fg-dim); font-size: 12px; padding: 8px 0; }
+
+.toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  padding: 8px 14px; background: var(--fg); color: #fff; border-radius: 6px;
+  font-size: 12px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 100;
+}
+.toast.show { opacity: 1; }
+</style>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <span class="title">Vector Pad</span>
+  <span class="pill">vanilla · 1 file · zero deps</span>
+  <span class="grow"></span>
+  <button class="btn" id="btn-undo">undo</button>
+  <button class="btn" id="btn-clear">clear</button>
+  <button class="btn primary" id="btn-export">export PNG</button>
+</header>
+
+<main>
+  <div id="tools">
+    <!-- icons inline so the file stays one file with zero deps -->
+    <div class="tool" data-tool="select" title="Select / move (V)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 19 2-9 9-2z"/></svg>
+    </div>
+    <div class="tool" data-tool="rect" title="Rectangle (R)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="1"/></svg>
+    </div>
+    <div class="tool" data-tool="ellipse" title="Ellipse (O)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>
+    </div>
+    <div class="tool" data-tool="line" title="Line (L)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+    </div>
+  </div>
+
+  <div id="stage"><canvas id="c"></canvas></div>
+
+  <aside>
+    <div class="panel">
+      <h3>layers</h3>
+      <div id="layers-list"></div>
+    </div>
+    <div class="panel" id="props">
+      <h3>properties</h3>
+      <div id="props-body"><div class="empty-props">select a shape</div></div>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// Vector Pad — vanilla 1-file vector drawing demo for ai-desk
+//
+// Layered (Bible §2):
+//   L1 Physical : canvas, mouse, keyboard, file (PNG export)
+//   L2 Intent   : events → Command
+//                   (Add / Move / Resize / Reorder / Delete /
+//                    SetProp / SelectTool / Select / Undo /
+//                    Clear / Load)
+//   L3 Logic    : pure reducer over a flat list of shape objects,
+//                 history stack for undo, persistence trigger
+//   L4 Draw     : full canvas re-render + layers/props panel
+//                 sync from REAL_state on every dispatch
+//
+// Tools: Select / Rectangle / Ellipse / Line.
+// Resize handles: 4 corners + 4 edge midpoints (8 total).
+// PNG export: canvas.toDataURL → <a download>.
+// Auto-save to localStorage.
+// ============================================================
+
+const STORAGE_KEY = 'ai-desk:vector-pad:v1';
+let nextId = 1;
+function uid() { return 's' + (nextId++); }
+
+const REAL_state = {
+  shapes: [],   // [{ id, type, x, y, w, h, fill, stroke, strokeW, name, visible }]
+  tool: 'select',
+  selected: null, // shape id
+  history: [],
+  drag: null,   // { mode: 'create'|'move'|'resize', ... }
+};
+
+function defaultProps() {
+  return { fill: '#a78bfa', stroke: '#1a1a1a', strokeW: 2, visible: true };
+}
+
+// ----- L3 reducer -------------------------------------------
+function snapshot() { return structuredClone({ shapes: REAL_state.shapes }); }
+function pushHistory() { REAL_state.history.push(snapshot()); if (REAL_state.history.length > 60) REAL_state.history.shift(); }
+
+function dispatch(cmd) {
+  if (cmd.type !== 'UNDO' && cmd.type !== 'LOAD' && cmd.type !== 'SELECT_TOOL' && cmd.type !== 'SELECT') pushHistory();
+  switch (cmd.type) {
+    case 'ADD_SHAPE': {
+      const base = { id: uid(), name: cmd.shape.type + ' ' + REAL_state.shapes.length, ...defaultProps() };
+      REAL_state.shapes.push({ ...base, ...cmd.shape });
+      REAL_state.selected = REAL_state.shapes.at(-1).id;
+      break;
+    }
+    case 'MOVE_SHAPE': {
+      const s = REAL_state.shapes.find(s => s.id === cmd.id); if (!s) break;
+      s.x = cmd.x; s.y = cmd.y;
+      break;
+    }
+    case 'RESIZE_SHAPE': {
+      const s = REAL_state.shapes.find(s => s.id === cmd.id); if (!s) break;
+      s.x = cmd.x; s.y = cmd.y; s.w = cmd.w; s.h = cmd.h;
+      break;
+    }
+    case 'SET_PROP': {
+      const s = REAL_state.shapes.find(s => s.id === cmd.id); if (!s) break;
+      s[cmd.key] = cmd.value;
+      break;
+    }
+    case 'DELETE_SHAPE':
+      REAL_state.shapes = REAL_state.shapes.filter(s => s.id !== cmd.id);
+      if (REAL_state.selected === cmd.id) REAL_state.selected = null;
+      break;
+    case 'REORDER': {
+      const i = REAL_state.shapes.findIndex(s => s.id === cmd.id); if (i < 0) break;
+      const [s] = REAL_state.shapes.splice(i, 1);
+      const j = Math.max(0, Math.min(REAL_state.shapes.length, cmd.toIdx));
+      REAL_state.shapes.splice(j, 0, s);
+      break;
+    }
+    case 'SELECT': REAL_state.selected = cmd.id; break;
+    case 'SELECT_TOOL': REAL_state.tool = cmd.tool; REAL_state.selected = cmd.tool === 'select' ? REAL_state.selected : null; break;
+    case 'UNDO': {
+      const prev = REAL_state.history.pop();
+      if (!prev) { toast('nothing to undo'); break; }
+      REAL_state.shapes = prev.shapes;
+      if (!REAL_state.shapes.find(s => s.id === REAL_state.selected)) REAL_state.selected = null;
+      break;
+    }
+    case 'CLEAR':
+      REAL_state.shapes = [];
+      REAL_state.selected = null;
+      break;
+    case 'LOAD':
+      REAL_state.shapes = cmd.shapes;
+      break;
+  }
+  if (cmd.type !== 'LOAD') bridgePersist();
+  render();
+}
+
+function bridgePersist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ shapes: REAL_state.shapes, nextId }));
+}
+function loadPersistent() {
+  const s = localStorage.getItem(STORAGE_KEY);
+  if (!s) return false;
+  try {
+    const data = JSON.parse(s);
+    if (Array.isArray(data.shapes)) {
+      if (data.nextId) nextId = data.nextId;
+      dispatch({ type: 'LOAD', shapes: data.shapes });
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// ----- canvas + render --------------------------------------
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let DPR = window.devicePixelRatio || 1;
+let W = 0, H = 0;
+function resize() {
+  const r = stage.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  render();
+}
+new ResizeObserver(resize).observe(stage);
+
+function render() {
+  // canvas
+  ctx.fillStyle = '#fafafc';
+  ctx.fillRect(0, 0, W, H);
+  drawGrid();
+  for (const s of REAL_state.shapes) drawShape(s);
+  // selection chrome
+  if (REAL_state.selected) {
+    const s = REAL_state.shapes.find(x => x.id === REAL_state.selected);
+    if (s) drawSelection(s);
+  }
+  // dragging-create preview
+  if (REAL_state.drag && REAL_state.drag.mode === 'create' && REAL_state.drag.preview) {
+    drawShape(REAL_state.drag.preview, true);
+  }
+  renderTools();
+  renderLayers();
+  renderProps();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+  ctx.lineWidth = 1;
+  const STEP = 24;
+  for (let x = 0; x <= W; x += STEP) { ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += STEP) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke(); }
+}
+
+function drawShape(s, ghost) {
+  if (!s.visible && !ghost) return;
+  ctx.save();
+  if (ghost) ctx.globalAlpha = 0.6;
+  ctx.fillStyle = s.fill;
+  ctx.strokeStyle = s.stroke;
+  ctx.lineWidth = s.strokeW;
+  ctx.lineCap = 'round';
+  if (s.type === 'rect') {
+    ctx.beginPath(); ctx.rect(s.x, s.y, s.w, s.h);
+    ctx.fill(); ctx.stroke();
+  } else if (s.type === 'ellipse') {
+    const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
+    ctx.beginPath(); ctx.ellipse(cx, cy, Math.abs(s.w) / 2, Math.abs(s.h) / 2, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  } else if (s.type === 'line') {
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSelection(s) {
+  // bounding box for non-line shapes; line shapes get endpoint handles
+  ctx.save();
+  ctx.strokeStyle = '#5a4cdb';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  if (s.type === 'line') {
+    // endpoints
+    drawHandle(s.x, s.y);
+    drawHandle(s.x + s.w, s.y + s.h);
+  } else {
+    const x = Math.min(s.x, s.x + s.w), y = Math.min(s.y, s.y + s.h);
+    const w = Math.abs(s.w), h = Math.abs(s.h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    // 8 handles (4 corners + 4 edges)
+    [[x,y], [x+w/2,y], [x+w,y], [x,y+h/2], [x+w,y+h/2], [x,y+h], [x+w/2,y+h], [x+w,y+h]]
+      .forEach(([hx, hy]) => drawHandle(hx, hy));
+  }
+  ctx.restore();
+}
+function drawHandle(x, y) {
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#5a4cdb';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.rect(x - 4, y - 4, 8, 8); ctx.fill(); ctx.stroke();
+}
+
+// ----- hit testing ------------------------------------------
+function hitTest(mx, my) {
+  // top-down
+  for (let i = REAL_state.shapes.length - 1; i >= 0; i--) {
+    const s = REAL_state.shapes[i];
+    if (!s.visible) continue;
+    if (s.type === 'rect') {
+      const x = Math.min(s.x, s.x + s.w), y = Math.min(s.y, s.y + s.h);
+      const w = Math.abs(s.w), h = Math.abs(s.h);
+      if (mx >= x && mx <= x + w && my >= y && my <= y + h) return s;
+    } else if (s.type === 'ellipse') {
+      const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
+      const rx = Math.abs(s.w) / 2, ry = Math.abs(s.h) / 2;
+      if (rx === 0 || ry === 0) continue;
+      const dx = (mx - cx) / rx, dy = (my - cy) / ry;
+      if (dx * dx + dy * dy <= 1) return s;
+    } else if (s.type === 'line') {
+      // distance from point to segment
+      const x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+      const dx = x2 - x1, dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) continue;
+      const t = Math.max(0, Math.min(1, ((mx - x1) * dx + (my - y1) * dy) / lenSq));
+      const px = x1 + t * dx, py = y1 + t * dy;
+      const d2 = (mx - px) ** 2 + (my - py) ** 2;
+      if (d2 < (s.strokeW / 2 + 4) ** 2) return s;
+    }
+  }
+  return null;
+}
+function hitHandle(s, mx, my) {
+  if (!s) return null;
+  if (s.type === 'line') {
+    if ((mx - s.x) ** 2 + (my - s.y) ** 2 < 36) return 'p1';
+    if ((mx - (s.x + s.w)) ** 2 + (my - (s.y + s.h)) ** 2 < 36) return 'p2';
+    return null;
+  }
+  const x = Math.min(s.x, s.x + s.w), y = Math.min(s.y, s.y + s.h);
+  const w = Math.abs(s.w), h = Math.abs(s.h);
+  const handles = {
+    nw:[x,y], n:[x+w/2,y], ne:[x+w,y],
+    w:[x,y+h/2],            e:[x+w,y+h/2],
+    sw:[x,y+h], s:[x+w/2,y+h], se:[x+w,y+h],
+  };
+  for (const [name, [hx, hy]] of Object.entries(handles)) {
+    if ((mx - hx) ** 2 + (my - hy) ** 2 < 36) return name;
+  }
+  return null;
+}
+
+// ----- L1 input ---------------------------------------------
+function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const p = pos(e);
+  if (REAL_state.tool === 'select') {
+    if (REAL_state.selected) {
+      const s = REAL_state.shapes.find(x => x.id === REAL_state.selected);
+      const handle = hitHandle(s, p.x, p.y);
+      if (handle) { REAL_state.drag = { mode: 'resize', id: s.id, handle, sx: p.x, sy: p.y, orig: { x: s.x, y: s.y, w: s.w, h: s.h } }; stage.classList.add('dragging'); return; }
+    }
+    const hit = hitTest(p.x, p.y);
+    if (hit) {
+      dispatch({ type: 'SELECT', id: hit.id });
+      REAL_state.drag = { mode: 'move', id: hit.id, sx: p.x, sy: p.y, orig: { x: hit.x, y: hit.y } };
+      stage.classList.add('dragging');
+    } else {
+      dispatch({ type: 'SELECT', id: null });
+    }
+    return;
+  }
+  // create new shape
+  const t = REAL_state.tool;
+  REAL_state.drag = { mode: 'create', startX: p.x, startY: p.y, type: t, preview: null };
+  stage.classList.add('dragging');
+});
+
+canvas.addEventListener('mousemove', e => {
+  const p = pos(e);
+  // hover cursor
+  if (REAL_state.tool === 'select' && !REAL_state.drag) {
+    canvas.classList.toggle('over-shape', !!hitTest(p.x, p.y));
+  }
+  const d = REAL_state.drag;
+  if (!d) return;
+  if (d.mode === 'create') {
+    d.preview = { id: '_preview', type: d.type, x: d.startX, y: d.startY, w: p.x - d.startX, h: p.y - d.startY, ...defaultProps() };
+    render();
+  } else if (d.mode === 'move') {
+    const dx = p.x - d.sx, dy = p.y - d.sy;
+    const s = REAL_state.shapes.find(x => x.id === d.id); if (!s) return;
+    s.x = d.orig.x + dx; s.y = d.orig.y + dy;
+    render();
+  } else if (d.mode === 'resize') {
+    const s = REAL_state.shapes.find(x => x.id === d.id); if (!s) return;
+    if (s.type === 'line') {
+      if (d.handle === 'p1') { const dx = p.x - d.sx, dy = p.y - d.sy; s.x = d.orig.x + dx; s.y = d.orig.y + dy; s.w = d.orig.w - dx; s.h = d.orig.h - dy; }
+      if (d.handle === 'p2') { const dx = p.x - d.sx, dy = p.y - d.sy; s.w = d.orig.w + dx; s.h = d.orig.h + dy; }
+    } else {
+      const x0 = Math.min(d.orig.x, d.orig.x + d.orig.w), y0 = Math.min(d.orig.y, d.orig.y + d.orig.h);
+      const w0 = Math.abs(d.orig.w), h0 = Math.abs(d.orig.h);
+      let x = x0, y = y0, w = w0, h = h0;
+      if (d.handle.includes('w')) { x = p.x; w = (x0 + w0) - p.x; }
+      if (d.handle.includes('e')) { w = p.x - x0; }
+      if (d.handle.includes('n')) { y = p.y; h = (y0 + h0) - p.y; }
+      if (d.handle.includes('s')) { h = p.y - y0; }
+      s.x = x; s.y = y; s.w = w; s.h = h;
+    }
+    render();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  const p = pos(e);
+  const d = REAL_state.drag;
+  REAL_state.drag = null;
+  stage.classList.remove('dragging');
+  if (!d) return;
+  if (d.mode === 'create') {
+    const w = p.x - d.startX, h = p.y - d.startY;
+    if (Math.abs(w) < 3 && Math.abs(h) < 3) { render(); return; } // stray click
+    const finalW = Math.abs(w) < 4 ? (w >= 0 ? 80 : -80) : w;
+    const finalH = Math.abs(h) < 4 ? (h >= 0 ? 50 : -50) : h;
+    dispatch({ type: 'ADD_SHAPE', shape: { type: d.type, x: d.startX, y: d.startY, w: finalW, h: finalH } });
+  } else if (d.mode === 'move' || d.mode === 'resize') {
+    // already mutated; persist + history
+    pushHistory();
+    bridgePersist();
+  }
+});
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); dispatch({ type: 'UNDO' }); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (REAL_state.selected) { e.preventDefault(); dispatch({ type: 'DELETE_SHAPE', id: REAL_state.selected }); }
+  }
+  // tool shortcuts
+  const map = { v: 'select', r: 'rect', o: 'ellipse', l: 'line' };
+  if (map[e.key]) dispatch({ type: 'SELECT_TOOL', tool: map[e.key] });
+});
+
+// ----- panels (tools / layers / props) ----------------------
+const toolsEl = document.getElementById('tools');
+const layersEl = document.getElementById('layers-list');
+const propsBody = document.getElementById('props-body');
+
+toolsEl.addEventListener('click', e => {
+  const el = e.target.closest('.tool'); if (!el) return;
+  dispatch({ type: 'SELECT_TOOL', tool: el.dataset.tool });
+});
+
+function renderTools() {
+  for (const el of toolsEl.querySelectorAll('.tool')) {
+    el.classList.toggle('active', el.dataset.tool === REAL_state.tool);
+  }
+  stage.className = 'tool-' + REAL_state.tool;
+}
+
+function renderLayers() {
+  layersEl.innerHTML = '';
+  for (const s of REAL_state.shapes) {
+    const row = document.createElement('div');
+    row.className = 'layer-row' + (s.id === REAL_state.selected ? ' active' : '');
+    const sw = document.createElement('span'); sw.className = 'swatch'; sw.style.background = s.fill;
+    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = s.name;
+    nm.contentEditable = 'true'; nm.spellcheck = false;
+    nm.addEventListener('mousedown', e => e.stopPropagation());
+    nm.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); nm.blur(); } });
+    nm.addEventListener('blur', () => {
+      const v = nm.textContent.trim() || s.name;
+      if (v !== s.name) dispatch({ type: 'SET_PROP', id: s.id, key: 'name', value: v });
+    });
+    const eye = document.createElement('span'); eye.className = 'icon'; eye.textContent = s.visible ? '◉' : '◌';
+    eye.addEventListener('mousedown', e => e.stopPropagation());
+    eye.addEventListener('click', e => { e.stopPropagation(); dispatch({ type: 'SET_PROP', id: s.id, key: 'visible', value: !s.visible }); });
+    const x = document.createElement('span'); x.className = 'icon x'; x.textContent = '×';
+    x.addEventListener('mousedown', e => e.stopPropagation());
+    x.addEventListener('click', e => { e.stopPropagation(); dispatch({ type: 'DELETE_SHAPE', id: s.id }); });
+    row.appendChild(sw); row.appendChild(nm); row.appendChild(eye); row.appendChild(x);
+    row.addEventListener('click', () => dispatch({ type: 'SELECT', id: s.id }));
+    layersEl.appendChild(row);
+  }
+}
+
+function renderProps() {
+  if (!REAL_state.selected) { propsBody.innerHTML = '<div class="empty-props">select a shape</div>'; return; }
+  const s = REAL_state.shapes.find(x => x.id === REAL_state.selected);
+  if (!s) { propsBody.innerHTML = '<div class="empty-props">select a shape</div>'; return; }
+  propsBody.innerHTML = `
+    <div class="prop-row"><label>fill</label><input type="color" id="p-fill" value="${s.fill}"></div>
+    <div class="prop-row"><label>stroke</label><input type="color" id="p-stroke" value="${s.stroke}"></div>
+    <div class="prop-row"><label>width</label><input type="number" id="p-strokeW" value="${s.strokeW}" min="0" max="20" step="0.5"></div>
+    <div class="prop-row"><label>position</label><div class="pos-pair"><input type="number" id="p-x" value="${Math.round(s.x)}"><input type="number" id="p-y" value="${Math.round(s.y)}"></div></div>
+    <div class="prop-row"><label>size</label><div class="pos-pair"><input type="number" id="p-w" value="${Math.round(s.w)}"><input type="number" id="p-h" value="${Math.round(s.h)}"></div></div>
+  `;
+  bind('p-fill',    'fill',    v => v);
+  bind('p-stroke',  'stroke',  v => v);
+  bind('p-strokeW', 'strokeW', v => parseFloat(v) || 0);
+  bind('p-x',       'x',       v => parseFloat(v) || 0);
+  bind('p-y',       'y',       v => parseFloat(v) || 0);
+  bind('p-w',       'w',       v => parseFloat(v) || 0);
+  bind('p-h',       'h',       v => parseFloat(v) || 0);
+}
+function bind(id, key, parse) {
+  const el = document.getElementById(id); if (!el) return;
+  el.addEventListener('change', () => dispatch({ type: 'SET_PROP', id: REAL_state.selected, key, value: parse(el.value) }));
+  el.addEventListener('input', () => {
+    // live preview without history pollution
+    const s = REAL_state.shapes.find(x => x.id === REAL_state.selected);
+    if (s) { s[key] = parse(el.value); render(); }
+  });
+}
+
+// ----- toolbar buttons --------------------------------------
+document.getElementById('btn-undo').onclick = () => dispatch({ type: 'UNDO' });
+document.getElementById('btn-clear').onclick = () => { if (REAL_state.shapes.length === 0 || confirm('Clear canvas?')) dispatch({ type: 'CLEAR' }); };
+document.getElementById('btn-export').onclick = () => {
+  // export: re-render at current size to a temp canvas without selection chrome
+  const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+  const tctx = tmp.getContext('2d');
+  tctx.fillStyle = '#ffffff'; tctx.fillRect(0, 0, W, H);
+  for (const s of REAL_state.shapes) {
+    if (!s.visible) continue;
+    tctx.save();
+    tctx.fillStyle = s.fill; tctx.strokeStyle = s.stroke; tctx.lineWidth = s.strokeW; tctx.lineCap = 'round';
+    if (s.type === 'rect') { tctx.beginPath(); tctx.rect(s.x, s.y, s.w, s.h); tctx.fill(); tctx.stroke(); }
+    else if (s.type === 'ellipse') { const cx = s.x + s.w/2, cy = s.y + s.h/2; tctx.beginPath(); tctx.ellipse(cx, cy, Math.abs(s.w)/2, Math.abs(s.h)/2, 0, 0, Math.PI*2); tctx.fill(); tctx.stroke(); }
+    else if (s.type === 'line') { tctx.beginPath(); tctx.moveTo(s.x, s.y); tctx.lineTo(s.x + s.w, s.y + s.h); tctx.stroke(); }
+    tctx.restore();
+  }
+  const a = document.createElement('a');
+  a.href = tmp.toDataURL('image/png');
+  a.download = 'vector-pad-' + Date.now() + '.png';
+  a.click();
+  toast('exported PNG');
+};
+
+// ----- toast -----------------------------------------------
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1300);
+}
+
+// ----- seed --------------------------------------------------
+function seed() {
+  if (REAL_state.shapes.length > 0) return;
+  REAL_state.shapes = [
+    { id: uid(), name: 'background', type: 'rect',    x:  60, y:  40, w: 280, h: 180, fill: '#ede9fe', stroke: '#5a4cdb', strokeW: 2, visible: true },
+    { id: uid(), name: 'circle',     type: 'ellipse', x: 100, y:  80, w: 100, h: 100, fill: '#fcd34d', stroke: '#1a1a1a', strokeW: 2, visible: true },
+    { id: uid(), name: 'square',     type: 'rect',    x: 220, y: 100, w:  80, h:  80, fill: '#fb7185', stroke: '#1a1a1a', strokeW: 2, visible: true },
+    { id: uid(), name: 'diagonal',   type: 'line',    x:  80, y: 240, w: 240, h:  60, fill: '#000',    stroke: '#5a4cdb', strokeW: 4, visible: true },
+  ];
+}
+
+// ----- init --------------------------------------------------
+if (!loadPersistent()) seed();
+resize();
+</script>
+</body>
+</html>

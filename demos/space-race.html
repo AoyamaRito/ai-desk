@@ -84,7 +84,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 <main>
   <canvas id="c"></canvas>
-  <div class="hud">通過: <span class="num" id="num">0</span></div>
+  <div class="hud">通過 <span class="num" id="num">0</span>　|　速度 <span class="num" id="spd">240</span></div>
   <div class="help">drag / arrow keys: 旋回<br>auto-thrust forward</div>
   <div class="win" id="win">RING PASSED!</div>
 </main>
@@ -102,19 +102,25 @@ canvas { display: block; width: 100%; height: 100%; }
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const numEl = document.getElementById('num');
+const spdEl = document.getElementById('spd');
 const winEl = document.getElementById('win');
 let W = 0, H = 0, FOCAL = 600;
 
 // camera
 const cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
-const SPEED = 240; // units/sec forward
+const BASE_SPEED = 240;
+const MAX_SPEED  = 1100;
+let SPEED = BASE_SPEED;
 
 // world
 const STAR_COUNT = 600;
 const STAR_RANGE = 3000;
+const RING_COUNT = 8;
 let stars = [];
 let rings = [];
+let meteors = [];
 let passed = 0;
+let nextMeteorIn = 0.6;
 
 // input
 const keys = {};
@@ -146,24 +152,29 @@ function initStars() {
     });
   }
 }
+// pick a vivid hue for each ring so the tunnel rainbows ahead
+const RING_HUES = [350, 200, 50, 280, 130, 25, 310, 170];
+let ringSeq = 0;
 function spawnRing(distance) {
   // place ahead of camera at ~distance, with a random offset perpendicular
   const fwd = forward();
   const right = rightVec();
   const up = upVec();
-  const offX = (Math.random() - 0.5) * 600;
-  const offY = (Math.random() - 0.5) * 400;
+  const offX = (Math.random() - 0.5) * 700;
+  const offY = (Math.random() - 0.5) * 450;
+  const hue = RING_HUES[ringSeq++ % RING_HUES.length];
   return {
     x: cam.x + fwd[0] * distance + right[0] * offX + up[0] * offY,
     y: cam.y + fwd[1] * distance + right[1] * offX + up[1] * offY,
     z: cam.z + fwd[2] * distance + right[2] * offX + up[2] * offY,
     radius: 90,
-    age: 0,
+    hue,
+    pulse: Math.random() * Math.PI * 2,
   };
 }
 function initRings() {
   rings = [];
-  for (let i = 0; i < 4; i++) rings.push(spawnRing(600 + i * 700));
+  for (let i = 0; i < RING_COUNT; i++) rings.push(spawnRing(500 + i * 550));
 }
 
 // vector helpers (inline, ai-desk style)
@@ -242,15 +253,13 @@ function recycleStar(s) {
 }
 
 // draw ring as projected circle: sample N points around ring perimeter
-// (in ring's local plane perpendicular to camera path, approx) and project
+// (in ring's local plane perpendicular to camera path) and project.
+// Three-pass stroke (wide soft halo + medium bloom + crisp white core)
+// gives the rings a strong neon glow. Next ring is brighter and pulses.
 function drawRing(ring, isNext) {
-  const f = forward();
-  // ring axis = forward (rings always face the player path approx)
-  const axis = [-f[0], -f[1], -f[2]]; // from ring toward camera
-  // build two basis vectors perpendicular to axis (use right and up)
   const rb = rightVec();
   const ub = upVec();
-  const N = 36;
+  const N = 40;
   const pts = [];
   let visible = false;
   for (let i = 0; i < N; i++) {
@@ -263,23 +272,45 @@ function drawRing(ring, isNext) {
     if (p) visible = true;
   }
   if (!visible) return;
-  // distance fade
+
   const center = project(ring.x, ring.y, ring.z);
   const z = center ? center.z : 1000;
-  const alpha = Math.max(0.15, Math.min(1, 1 - z / 3500));
-  ctx.lineWidth = isNext ? 4 : 2;
-  ctx.strokeStyle = isNext ? `rgba(255, 29, 109, ${alpha})` : `rgba(0, 196, 204, ${alpha * 0.7})`;
-  ctx.shadowColor = isNext ? '#ff1d6d' : '#00c4cc';
-  ctx.shadowBlur = isNext ? 18 : 10;
-  ctx.beginPath();
-  let started = false;
-  for (const p of pts) {
-    if (!p) { started = false; continue; }
-    if (!started) { ctx.moveTo(p.x, p.y); started = true; }
-    else ctx.lineTo(p.x, p.y);
+  const distFade = Math.max(0.18, Math.min(1, 1 - z / 4500));
+  const pulse = isNext ? (0.65 + 0.35 * Math.sin(ring.pulse)) : 1;
+
+  function tracePath() {
+    ctx.beginPath();
+    let started = false;
+    for (const p of pts) {
+      if (!p) { started = false; continue; }
+      if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+      else ctx.lineTo(p.x, p.y);
+    }
+    if (pts[0]) ctx.lineTo(pts[0].x, pts[0].y);
   }
-  if (pts[0]) ctx.lineTo(pts[0].x, pts[0].y);
-  ctx.stroke();
+
+  const baseColor = `hsl(${ring.hue}, 95%, 60%)`;
+  const lightColor = `hsl(${ring.hue}, 100%, 75%)`;
+  ctx.shadowColor = baseColor;
+
+  // pass 1: wide soft halo
+  ctx.lineWidth = (isNext ? 14 : 8) * pulse;
+  ctx.strokeStyle = `hsla(${ring.hue}, 100%, 60%, ${0.18 * distFade})`;
+  ctx.shadowBlur = isNext ? 36 : 22;
+  tracePath(); ctx.stroke();
+
+  // pass 2: medium bloom
+  ctx.lineWidth = (isNext ? 6 : 4) * pulse;
+  ctx.strokeStyle = `hsla(${ring.hue}, 100%, 65%, ${0.55 * distFade})`;
+  ctx.shadowBlur = isNext ? 22 : 14;
+  tracePath(); ctx.stroke();
+
+  // pass 3: crisp inner core (white-hot for next ring)
+  ctx.lineWidth = isNext ? 2.2 : 1.6;
+  ctx.strokeStyle = isNext ? `rgba(255,255,255,${distFade})` : `rgba(255,255,255,${0.7 * distFade})`;
+  ctx.shadowBlur = 6;
+  tracePath(); ctx.stroke();
+
   ctx.shadowBlur = 0;
 }
 
@@ -349,6 +380,35 @@ function spawnRingBurst(x, y, z) {
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
     });
   }
+}
+function spawnMeteor() {
+  // emit somewhere within the bubble around the camera, moving fast
+  // perpendicular-ish to the camera's forward direction so it streaks
+  // across the visible field rather than into/out of the screen.
+  const f = forward(), r = rightVec(), u = upVec();
+  const aheadDist = 800 + Math.random() * 1200;
+  const sideDir = Math.random() < 0.5 ? -1 : 1;
+  const startSide = sideDir * (1100 + Math.random() * 600);
+  const startUp   = (Math.random() - 0.5) * 800;
+  const startX = cam.x + f[0] * aheadDist + r[0] * startSide + u[0] * startUp;
+  const startY = cam.y + f[1] * aheadDist + r[1] * startSide + u[1] * startUp;
+  const startZ = cam.z + f[2] * aheadDist + r[2] * startSide + u[2] * startUp;
+  const speed = 700 + Math.random() * 500;
+  // travel mainly perpendicular to forward (cross the screen), with slight
+  // forward bias so it doesn't immediately leave behind the camera
+  const dirSide = -sideDir;
+  const dirUp   = (Math.random() - 0.5) * 0.7;
+  const dirFwd  = (Math.random() - 0.5) * 0.4;
+  const norm = Math.hypot(dirSide, dirUp, dirFwd);
+  const palette = ['#ffffff', '#ffcc00', '#00f5ff', '#ff8d3a'];
+  meteors.push({
+    x: startX, y: startY, z: startZ,
+    vx: (r[0] * dirSide + u[0] * dirUp + f[0] * dirFwd) / norm * speed,
+    vy: (r[1] * dirSide + u[1] * dirUp + f[1] * dirFwd) / norm * speed,
+    vz: (r[2] * dirSide + u[2] * dirUp + f[2] * dirFwd) / norm * speed,
+    life: 1,
+    color: palette[Math.floor(Math.random() * palette.length)],
+  });
 }
 function spawnEnginePlume() {
   const r = rightVec(), u = upVec(), f = forward();
@@ -443,16 +503,55 @@ function step(now) {
   if (rings.length > 0 && checkRingPass(rings[0])) {
     const passedRing = rings.shift();
     spawnRingBurst(passedRing.x, passedRing.y, passedRing.z);
-    rings.push(spawnRing(2400));
+    // queue next ring at the back of the lineup
+    const lastZ = rings.length ? rings[rings.length - 1] : null;
+    rings.push(spawnRing(2600));
     passed++;
     numEl.textContent = passed;
+    // speed up — diminishing returns, capped
+    SPEED = Math.min(MAX_SPEED, SPEED + 28);
+    spdEl.textContent = Math.round(SPEED);
     flash = 1;
     winEl.classList.add('show');
     setTimeout(() => winEl.classList.remove('show'), 600);
   }
+  // animate ring pulse for the next ring
+  if (rings.length > 0) rings[0].pulse += dt * 6;
 
-  // continuous engine plume
-  spawnEnginePlume();
+  // continuous engine plume (rate scales with speed for more thrust at high SPEED)
+  const plumeRate = 1 + Math.floor((SPEED - BASE_SPEED) / 120);
+  for (let i = 0; i < plumeRate; i++) spawnEnginePlume();
+
+  // meteors — periodic streaks across the bubble
+  nextMeteorIn -= dt;
+  if (nextMeteorIn <= 0) {
+    nextMeteorIn = 0.4 + Math.random() * 1.4;
+    spawnMeteor();
+  }
+  // update meteors (own array — emit trail particles each frame)
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.x += m.vx * dt;
+    m.y += m.vy * dt;
+    m.z += m.vz * dt;
+    m.life -= dt * 0.4;
+    // trail particles
+    for (let j = 0; j < 2; j++) {
+      particles.push({
+        x: m.x + (Math.random() - 0.5) * 4,
+        y: m.y + (Math.random() - 0.5) * 4,
+        z: m.z + (Math.random() - 0.5) * 4,
+        vx: m.vx * 0.05 + (Math.random() - 0.5) * 8,
+        vy: m.vy * 0.05 + (Math.random() - 0.5) * 8,
+        vz: m.vz * 0.05 + (Math.random() - 0.5) * 8,
+        life: 0.7,
+        decay: 1.6,
+        r: 1.5 + Math.random() * 1.5,
+        color: m.color,
+      });
+    }
+    if (m.life <= 0) meteors.splice(i, 1);
+  }
 
   // update particles
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -496,6 +595,22 @@ function step(now) {
     return bz - az;
   });
   for (const { r, i } of sortedRings) drawRing(r, i === 0);
+
+  // meteors — bright glowing head (drawn before particles so trail bursts on top)
+  for (const m of meteors) {
+    const p = project(m.x, m.y, m.z);
+    if (!p) continue;
+    const sz = Math.max(2, (3 - p.z / 2000) * 2.2);
+    ctx.globalAlpha = Math.min(1, m.life * 1.4);
+    ctx.fillStyle = m.color;
+    ctx.shadowColor = m.color;
+    ctx.shadowBlur = 30;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
 
   // 3D particles (drawn after rings, before ship)
   // sort approximately back-to-front by local z so glow blends sanely

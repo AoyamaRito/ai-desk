@@ -44,7 +44,13 @@ canvas { display: block; width: 100%; height: 100%; }
   pointer-events: none;
   letter-spacing: 0.04em;
 }
-.hud .num { color: var(--accent); font-size: 22px; vertical-align: -2px; margin-left: 4px; }
+.hud .num { color: var(--accent); font-size: 22px; vertical-align: -2px; margin-left: 4px; display: inline-block; transition: color 0.25s ease; }
+.hud .num.pulse { animation: numpulse 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes numpulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.7); }
+  100% { transform: scale(1); }
+}
 .help {
   position: absolute;
   top: 12px; right: 12px;
@@ -106,11 +112,15 @@ const spdEl = document.getElementById('spd');
 const winEl = document.getElementById('win');
 let W = 0, H = 0, FOCAL = 600;
 
-// camera
+// camera (cam.yaw/pitch lerp toward targetYaw/Pitch for inertia feel)
 const cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+let targetYaw = 0, targetPitch = 0;
 const BASE_SPEED = 240;
 const MAX_SPEED  = 1100;
 let SPEED = BASE_SPEED;
+// FOV punch on ring pass: focalCurrent dips, lerps back up
+let baseFocal = 600;
+let focalCurrent = 600;
 
 // world
 const STAR_COUNT = 600;
@@ -135,7 +145,8 @@ function resize() {
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  FOCAL = Math.min(W, H) * 0.85;
+  baseFocal = Math.min(W, H) * 0.85;
+  FOCAL = focalCurrent = baseFocal;
 }
 window.addEventListener('resize', resize);
 
@@ -218,8 +229,8 @@ function project(wx, wy, wz) {
   const lx = dx*r[0] + dy*r[1] + dz*r[2];
   const ly = dx*u[0] + dy*u[1] + dz*u[2];
   return {
-    x: (lx / lz) * FOCAL + W / 2,
-    y: -(ly / lz) * FOCAL + H / 2,
+    x: (lx / lz) * focalCurrent + W / 2,
+    y: -(ly / lz) * focalCurrent + H / 2,
     z: lz,
   };
 }
@@ -498,13 +509,19 @@ function step(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
-  // input → camera rotation
-  const yawSpeed = 1.4, pitchSpeed = 1.0;
-  if (keys['ArrowLeft']  || keys['a']) cam.yaw -= yawSpeed * dt;
-  if (keys['ArrowRight'] || keys['d']) cam.yaw += yawSpeed * dt;
-  if (keys['ArrowUp']    || keys['w']) cam.pitch -= pitchSpeed * dt;
-  if (keys['ArrowDown']  || keys['s']) cam.pitch += pitchSpeed * dt;
-  cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch));
+  // input → target angles (cam lerps toward target for inertia feel)
+  const yawSpeed = 1.6, pitchSpeed = 1.2;
+  if (keys['ArrowLeft']  || keys['a']) targetYaw   -= yawSpeed * dt;
+  if (keys['ArrowRight'] || keys['d']) targetYaw   += yawSpeed * dt;
+  if (keys['ArrowUp']    || keys['w']) targetPitch -= pitchSpeed * dt;
+  if (keys['ArrowDown']  || keys['s']) targetPitch += pitchSpeed * dt;
+  targetPitch = Math.max(-1.3, Math.min(1.3, targetPitch));
+  // smoothing — frame-rate independent ~6Hz follow
+  const k = 1 - Math.pow(0.0006, dt);
+  cam.yaw   += (targetYaw   - cam.yaw)   * k;
+  cam.pitch += (targetPitch - cam.pitch) * k;
+  // FOV recovery
+  focalCurrent += (baseFocal - focalCurrent) * (1 - Math.pow(0.05, dt));
 
   // forward thrust
   const f = forward();
@@ -522,9 +539,17 @@ function step(now) {
     rings.push(spawnRing(360, tail));
     passed++;
     numEl.textContent = passed;
-    // speed up — diminishing returns, capped
-    SPEED = Math.min(MAX_SPEED, SPEED + 28);
+    // speed up — bigger boost so the player feels it; capped
+    SPEED = Math.min(MAX_SPEED, SPEED + 45);
     spdEl.textContent = Math.round(SPEED);
+    // colour-shift: yellow → orange → red as speed climbs
+    const t = (SPEED - BASE_SPEED) / (MAX_SPEED - BASE_SPEED);
+    spdEl.style.color = `hsl(${60 - t * 60}, 100%, 60%)`;
+    // pulse animation on both numbers
+    numEl.classList.remove('pulse'); void numEl.offsetWidth; numEl.classList.add('pulse');
+    spdEl.classList.remove('pulse'); void spdEl.offsetWidth; spdEl.classList.add('pulse');
+    // FOV punch — focal dips wide then recovers, feels like acceleration
+    focalCurrent = baseFocal * 0.72;
     flash = 1;
     winEl.classList.add('show');
     setTimeout(() => winEl.classList.remove('show'), 600);
@@ -677,9 +702,10 @@ canvas.addEventListener('pointermove', e => {
   const p = pointerXY(e);
   const dx = p.x - dragLast.x;
   const dy = p.y - dragLast.y;
-  cam.yaw   += dx * 0.005;
-  cam.pitch += dy * 0.005;
-  cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch));
+  // feed into target so inertia smoothing handles the actual motion
+  targetYaw   += dx * 0.005;
+  targetPitch += dy * 0.005;
+  targetPitch = Math.max(-1.3, Math.min(1.3, targetPitch));
   dragLast = p;
 });
 canvas.addEventListener('pointerup',   () => { dragging = false; });

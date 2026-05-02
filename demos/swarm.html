@@ -64,20 +64,34 @@ canvas { display: block; width: 100%; height: 100%; }
 .btn:hover { background: var(--fg); color: #ffffff; }
 .btn.on { background: var(--accent); color: #ffffff; border-color: var(--accent); }
 </style>
-<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<script>
+(function() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+  window.__I18N = { lang: q.get('lang') === 'en' ? 'en' : 'ja' };
+  if (window.__I18N.lang === 'en') {
+    const T = { intro: 'Move the cursor to attract the colorful particles. Click to scatter them.', label: 'Particles:', attract: 'Attract', repel: 'Repel' };
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (T[k]) el.textContent = T[k]; });
+      document.documentElement.lang = 'en';
+    });
+    window.__I18N.T = T;
+  }
+})();
+</script>
 </head>
 <body>
 
 <header>
   <h1>Color Swarm</h1>
-  <p>カーソルを動かすとカラフルな粒子が引き寄せられる。クリックで弾けて散る。</p>
+  <p data-i18n="intro">カーソルを動かすとカラフルな粒子が引き寄せられる。クリックで弾けて散る。</p>
 </header>
 
 <main>
   <canvas id="c"></canvas>
-  <div class="hud">粒子: <span id="num">—</span></div>
+  <div class="hud"><span data-i18n="label">粒子:</span> <span id="num">—</span></div>
   <div class="controls">
-    <button class="btn on" id="mode">引き寄せ</button>
+    <button class="btn on" id="mode" data-i18n="attract">引き寄せ</button>
     <button class="btn" id="reset">Reset</button>
   </div>
 </main>
@@ -190,7 +204,8 @@ canvas.addEventListener('pointerdown', e => {
 
 modeBtn.addEventListener('click', () => {
   attract = !attract;
-  modeBtn.textContent = attract ? '引き寄せ' : '反発';
+  const T = (window.__I18N && window.__I18N.T) || { attract: '引き寄せ', repel: '反発' };
+  modeBtn.textContent = attract ? T.attract : T.repel;
   modeBtn.classList.toggle('on', attract);
 });
 

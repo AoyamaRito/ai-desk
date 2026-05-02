@@ -79,19 +79,34 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .win.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
 </style>
-<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<script>
+(function() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+  if (q.get('lang') === 'en') {
+    const T = {
+      intro: 'Drag (or arrow keys) to steer through the rings. Radar is bottom-left; the next ring is shown in pink.',
+      passed: 'Passed', speed: 'Speed', help: 'drag / arrow keys: rotate'
+    };
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (T[k]) el.innerHTML = T[k].replace(/\n/g, '<br>'); });
+      document.documentElement.lang = 'en';
+    });
+  }
+})();
+</script>
 </head>
 <body>
 
 <header>
   <h1>Space Race</h1>
-  <p>ドラッグ (or 矢印キー) で進行方向を変えながらリングをくぐる。レーダーは左下、次のリングはピンクで表示。</p>
+  <p data-i18n="intro">ドラッグ (or 矢印キー) で進行方向を変えながらリングをくぐる。レーダーは左下、次のリングはピンクで表示。</p>
 </header>
 
 <main>
   <canvas id="c"></canvas>
-  <div class="hud">通過 <span class="num" id="num">0</span>　|　速度 <span class="num" id="spd">240</span></div>
-  <div class="help">drag / arrow keys: 旋回<br>auto-thrust forward</div>
+  <div class="hud"><span data-i18n="passed">通過</span> <span class="num" id="num">0</span>　|　<span data-i18n="speed">速度</span> <span class="num" id="spd">240</span></div>
+  <div class="help" data-i18n="help">drag / arrow keys: 旋回<br>auto-thrust forward</div>
   <div class="win" id="win">RING PASSED!</div>
 </main>
 

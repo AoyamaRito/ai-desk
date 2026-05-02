@@ -97,18 +97,31 @@ canvas { display: block; width: 100%; height: 100%; }
 .sw:hover { transform: translateY(-2px); }
 .sw.active { transform: translateY(-4px) scale(1.15); }
 </style>
-<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<script>
+(function() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+  const lang = q.get('lang') === 'en' ? 'en' : 'ja';
+  if (lang === 'en') {
+    const T = { intro: 'Click to spread color. Win when every ball is one color.', label: 'Colors:' };
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (T[k]) el.textContent = T[k]; });
+      document.documentElement.lang = 'en';
+    });
+  }
+})();
+</script>
 </head>
 <body>
 
 <header>
   <h1>Constraint Burst</h1>
-  <p>クリックで色を伝播。全部ひとつの色になったら勝ち。</p>
+  <p data-i18n="intro">クリックで色を伝播。全部ひとつの色になったら勝ち。</p>
 </header>
 
 <main>
   <canvas id="c"></canvas>
-  <div class="hud">残り色: <span class="num" id="num">—</span></div>
+  <div class="hud"><span data-i18n="label">残り色:</span> <span class="num" id="num">—</span></div>
   <div class="win" id="win">ALL ONE!</div>
   <div class="swatches" id="swatches"></div>
   <div class="controls">

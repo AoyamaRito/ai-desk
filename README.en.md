@@ -68,7 +68,7 @@ Hiroyuki OKINOI / [AoyamaRito](https://github.com/AoyamaRito) (Aoyama Rito / 蒼
 > **For AI** — this README is for end users.
 > To understand the design philosophy, architecture, and tooling, continue with:
 >
-> 1. [`README.ai.md`](README.ai.md) — design philosophy, architecture, four-layer model, metrics, file map. **Japanese only.**
+> 1. [`README.ai.en.md`](README.ai.en.md) — design philosophy, architecture, four-layer model, metrics, file map (English).
 > 2. [`AI_ONBOARDING.en.md`](AI_ONBOARDING.en.md) — work rules, tools, tag syntax, testing.
 >
-> Deeper architecture / philosophy docs (Bible, README.ai) are currently Japanese only. For non-trivial work in this repo, the Japanese sources are the canonical reference.
+> The deepest source (`AI_NATIVE_MASTER_BIBLE.md`) is currently Japanese only and remains the final canonical reference.

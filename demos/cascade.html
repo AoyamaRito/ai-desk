@@ -64,19 +64,31 @@ canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
 }
 .btn:hover { background: var(--fg); color: #ffffff; }
 </style>
-<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<script>
+(function() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+  if (q.get('lang') === 'en') {
+    const T = { intro: 'Click a cell — same-color neighbors flip in a domino chain. How many can you topple in one move?', label: 'Chain:' };
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (T[k]) el.textContent = T[k]; });
+      document.documentElement.lang = 'en';
+    });
+  }
+})();
+</script>
 </head>
 <body>
 
 <header>
   <h1>Color Cascade</h1>
-  <p>セルをクリック → 同じ色の隣がドミノみたいに連鎖反転。一手で何個倒せるか。</p>
+  <p data-i18n="intro">セルをクリック → 同じ色の隣がドミノみたいに連鎖反転。一手で何個倒せるか。</p>
 </header>
 
 <main>
   <canvas id="c"></canvas>
   <div class="hud">
-    <span>連鎖: <span class="num" id="chain">0</span></span>
+    <span><span data-i18n="label">連鎖:</span> <span class="num" id="chain">0</span></span>
     <span>Best: <span class="best" id="best">0</span></span>
   </div>
   <div class="controls">

@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Constraint Folding — the substrate where AI discovers the law and runs it</title>
+<style>
+:root {
+  --fg: #111111; --fg-dim: #5a5a5a; --bg: #ffffff; --bg-soft: #f6f6f8;
+  --border: #1a1a1a; --border-soft: #d8d8de;
+  --accent: #6b3aff; --accent-soft: #f0eaff;
+  --pink: #ff1d6d; --green: #00a86b; --amber: #f59e0b; --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg); border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(40px, 6.6vw, 100px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.0; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
+}
+.title-slide .tagline { font-size: clamp(17px, 2.2vw, 26px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 32ch; line-height: 1.4; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(28px, 4vw, 50px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+
+.code-block {
+  background: #0d1117; color: #e6edf3; padding: 16px 20px; margin: 12px 0;
+  font-family: "SF Mono", Menlo, monospace; font-size: clamp(11px, 1.3vw, 14px);
+  line-height: 1.55; overflow-x: auto; border-left: 6px solid var(--accent);
+  white-space: pre;
+}
+.code-block .kw { color: #ff7b72; }
+.code-block .str { color: #a5d6ff; }
+.code-block .com { color: #8b949e; }
+.code-block .fn { color: #d2a8ff; }
+.code-block .num { color: #79c0ff; }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(24px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+.phase-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+.phase {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 14px;
+  text-align: center; min-height: 130px; display: flex; flex-direction: column; justify-content: center;
+}
+.phase .n { display: inline-block; background: var(--accent); color: #fff; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 800; font-size: 14px; margin: 0 auto 6px; }
+.phase h4 { font-size: clamp(13px, 1.5vw, 17px); font-weight: 800; margin-bottom: 4px; }
+.phase p { font-size: clamp(11px, 1.2vw, 14px); color: var(--fg-dim); margin: 0; line-height: 1.4; }
+
+.benefit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+.benefit { background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 18px; }
+.benefit h4 { font-size: clamp(14px, 1.6vw, 18px); font-weight: 800; margin-bottom: 4px; color: var(--accent); }
+.benefit p { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics, .benefit-grid, .phase-flow { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- 1 ===== Title ===== -->
+  <section class="slide title-slide active">
+    <h1>Constraint Folding</h1>
+    <p class="tagline">AI discovers the law from observation, and that law itself becomes the running system — the deepest mechanism of ai-desk</p>
+    <p class="sub">ai-desk methodology — Hiroyuki OKINOI · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <!-- 2 ===== Shallow view ===== -->
+  <section class="slide">
+    <h2><span class="num">1</span>The surface face — "put branches in data"</h2>
+    <p class="lead">At first glance, Constraint Folding looks like just a technique for replacing if/else with a table.</p>
+    <div class="code-block"><span class="com">// the typical "branches → data" presentation</span>
+<span class="kw">const</span> TRANSITIONS = [
+  { from: <span class="str">'title'</span>,    input: <span class="str">'start'</span>, to: <span class="str">'playing'</span>  },
+  { from: <span class="str">'playing'</span>,  input: <span class="str">'pause'</span>, to: <span class="str">'paused'</span>   },
+  <span class="com">// ...</span>
+];
+<span class="kw">function</span> <span class="fn">reduce</span>(state, input) {
+  <span class="kw">return</span> TRANSITIONS.<span class="fn">find</span>(t =&gt; t.from === state &amp;&amp; t.input === input)?.to ?? state;
+}</div>
+    <p class="muted">This is only the <strong>entrance</strong>. The real power lies beyond.</p>
+  </section>
+
+  <!-- 3 ===== Real view ===== -->
+  <section class="slide">
+    <h2><span class="num">2</span>The real face — "a substrate for discovering laws from observation"</h2>
+    <p class="lead">The core of Constraint Folding is that <strong>AI infers the world (the table) from observed data, and that table runs as-is</strong>.</p>
+    <div class="callout">
+      Humans hand over <strong>intent + observation samples</strong><br>→ AI <strong>extracts the law and generates the table</strong><br>→ that table <strong>is itself the running state machine</strong>
+    </div>
+    <p>The phase called "writing code" disappears. In its place comes a new phase: "<strong>extracting the law from observation</strong>."</p>
+    <p class="muted">This behavior emerges when Bible §6 "Mine and Verify" combines with Constraint Folding.</p>
+  </section>
+
+  <!-- 4 ===== Four phases ===== -->
+  <section class="slide">
+    <h2><span class="num">3</span>Four phases</h2>
+    <div class="phase-flow">
+      <div class="phase">
+        <span class="n">1</span>
+        <h4>Observe</h4>
+        <p>Collect (input, output) samples from existing systems or business rules</p>
+      </div>
+      <div class="phase">
+        <span class="n">2</span>
+        <h4>Generate</h4>
+        <p>LLM + Monte Carlo enumerate many candidate laws</p>
+      </div>
+      <div class="phase">
+        <span class="n">3</span>
+        <h4>Verify</h4>
+        <p>Run each candidate against every observation, discard whatever doesn't fit</p>
+      </div>
+      <div class="phase">
+        <span class="n">4</span>
+        <h4>Build</h4>
+        <p>The surviving laws = the constraint table = a state machine that already runs</p>
+      </div>
+    </div>
+    <p class="lead" style="margin-top: 14px;">Humans only touch <strong>1 (provide observations) and 4 (confirm behavior)</strong>. <strong>2 and 3 are entirely AI</strong>.</p>
+  </section>
+
+  <!-- 5 ===== PoC ===== -->
+  <section class="slide">
+    <h2><span class="num">4</span>Proof — shipping cost: 50 samples → 100% reconstruction</h2>
+    <p class="lead">From a state where the source of a legacy shipping rule was lost, full reconstruction from 50 observations.</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">50</div><div class="lab">observation samples<br>(input → output pairs)</div></div>
+      <div class="metric"><div class="num">100%</div><div class="lab">reconstruction accuracy<br>(consistent on all 50)</div></div>
+      <div class="metric"><div class="num">0</div><div class="lab">if statements written by humans<br>(implementation is just the table)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">Concretely: PoC code lives in <code>examples/</code>.<br>From 50 (weight, distance, zone, fee) pairs, AI infers a table of "thresholds, base values, additive rules."<br>Feeding the reconstructed table into the reducer reproduces every observation. <strong>The system was rebuilt without ever reading the source code</strong>.</p>
+  </section>
+
+  <!-- 6 ===== Why folding enables it ===== -->
+  <section class="slide">
+    <h2><span class="num">5</span>Why "folding" makes inference possible</h2>
+    <p class="lead">Because it's a pure reducer, AI can <strong>mechanically try and prune candidates</strong>.</p>
+    <ul>
+      <li><strong>Same input → same output</strong> (purity) → observations are reproducible, verification is reproducible</li>
+      <li><strong>State and input are data</strong> → all combinations are enumerable → candidate generation can cover the entire combinatorial space</li>
+      <li><strong>Constraints are filter predicates</strong> → "does this candidate pass the samples" is a simple filter</li>
+      <li><strong>It can be run in reverse</strong> → "what inputs would produce this output" can be enumerated → this widens the candidate space for inference</li>
+    </ul>
+    <p class="muted" style="margin-top: 18px;">A branch tree makes all of these structurally impossible (control flow can't run backward, combinations explode, verification has side effects).<br><strong>Folding is what lets AI run inference</strong>.</p>
+  </section>
+
+  <!-- 7 ===== Inferred table = state machine ===== -->
+  <section class="slide">
+    <h2><span class="num">6</span>The inferred table = a running state machine</h2>
+    <p class="lead">The inference result is directly executable. No "code generation" phase needed.</p>
+    <div class="code-block"><span class="com">// table generated by AI inference (no human wrote this)</span>
+<span class="kw">const</span> SHIPPING_RULES = [
+  { weight_max: <span class="num">1</span>,  zone: <span class="str">'kanto'</span>,    base: <span class="num">300</span>, per_kg: <span class="num">0</span>   },
+  { weight_max: <span class="num">5</span>,  zone: <span class="str">'kanto'</span>,    base: <span class="num">500</span>, per_kg: <span class="num">100</span> },
+  { weight_max: <span class="num">1</span>,  zone: <span class="str">'kansai'</span>,   base: <span class="num">350</span>, per_kg: <span class="num">0</span>   },
+  <span class="com">// ...</span>
+];
+
+<span class="com">// the reducer is fixed (generic). swap the table to swap the behavior</span>
+<span class="kw">function</span> <span class="fn">resolve</span>(weight, zone) {
+  <span class="kw">const</span> rule = SHIPPING_RULES.<span class="fn">find</span>(r =&gt; r.zone === zone &amp;&amp; weight &lt;= r.weight_max);
+  <span class="kw">return</span> rule ? rule.base + (weight * rule.per_kg) : <span class="kw">null</span>;
+}</div>
+    <p class="muted">The moment AI infers it, the system already runs. <strong>"Human transcribes inference into code" disappears</strong>.</p>
+  </section>
+
+  <!-- 8 ===== Two tier ===== -->
+  <section class="slide">
+    <h2><span class="num">7</span>Two tiers — enumeration (basic) + inference (advanced)</h2>
+    <div class="split">
+      <div class="col solution">
+        <h3>Basic: enumeration</h3>
+        <p style="margin-bottom: 6px;">Humans declare the axes → cartesian product expands the table</p>
+        <div class="code-block" style="margin-top: 6px; font-size: 11px;">HANDS.<span class="fn">flatMap</span>(a =&gt;
+  HANDS.<span class="fn">flatMap</span>(b =&gt;
+    HANDS.<span class="fn">map</span>(c =&gt; ({a,b,c}))
+  )
+);  <span class="com">// 27 worlds</span></div>
+        <p class="muted" style="font-size: 13px;">Total coverage of a known domain</p>
+      </div>
+      <div class="col solution">
+        <h3>Advanced: inference</h3>
+        <p style="margin-bottom: 6px;">Observations → AI back-infers constraints → table generated automatically</p>
+        <div class="code-block" style="margin-top: 6px; font-size: 11px;"><span class="com">// from 50 samples</span>
+<span class="kw">const</span> rules = <span class="fn">infer</span>(observations);
+<span class="com">// AI generates SHIPPING_RULES</span>
+<span class="com">// → can be passed straight to the reducer</span></div>
+        <p class="muted" style="font-size: 13px;">Law discovery in unknown domains</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">Both produce the same output: "table + reducer". <strong>The same execution substrate is usable through two paths — humans writing it, or AI inferring it</strong>.</p>
+  </section>
+
+  <!-- 9 ===== What changes ===== -->
+  <section class="slide">
+    <h2><span class="num">8</span>What changes</h2>
+    <p class="lead">"Writing code" is replaced by "extracting the law from observation."</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>Traditional development</h3>
+        <ul>
+          <li>Read / write the spec</li>
+          <li>Translate the spec into if/else</li>
+          <li>Test every branch combinatorially</li>
+          <li>Spec change → revisit every branch</li>
+          <li>Run, find bugs, fix</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>Constraint Folding + inference</h3>
+        <ul>
+          <li>Prepare working samples / observations</li>
+          <li>AI infers laws → generates the table</li>
+          <li>The table runs in the reducer as-is</li>
+          <li>Spec change = add samples → re-infer</li>
+          <li>Bugs = mismatch with observations, detected immediately</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">Humans stop doing translation work. They keep observation and confirmation.</p>
+  </section>
+
+  <!-- 10 ===== Application ===== -->
+  <section class="slide">
+    <h2><span class="num">9</span>Where it applies</h2>
+    <div class="benefit-grid">
+      <div class="benefit">
+        <h4>Legacy reconstruction</h4>
+        <p>Rebuild business logic with lost source from observation. Shipping fees, tax computation, discount logic.</p>
+      </div>
+      <div class="benefit">
+        <h4>New-domain discovery</h4>
+        <p>From "I want behavior like this" samples, AI infers the rule → an immediately running implementation.</p>
+      </div>
+      <div class="benefit">
+        <h4>Auditing live systems</h4>
+        <p>From observations of a running system, reverse-verify "is the implementation what was intended?" Detect spec/impl drift.</p>
+      </div>
+      <div class="benefit">
+        <h4>Automating business rules</h4>
+        <p>Operator decision history → rule inference → automation. Turn "tacit know-how" into data.</p>
+      </div>
+      <div class="benefit">
+        <h4>Game balance tuning</h4>
+        <p>From play logs, extract "fun state combinations" → adjust the rules.</p>
+      </div>
+      <div class="benefit">
+        <h4>General constraint solving</h4>
+        <p>Any finite discrete domain. Scheduling, placement, combinatorial optimization.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 ===== Final form ===== -->
+  <section class="slide">
+    <h2><span class="num">10</span>The endpoint of ai-desk — dissolving the concept of "code"</h2>
+    <p class="lead">Ultimately, the step called "writing code" disappears.</p>
+    <div class="callout">
+      What remains is <strong>three things</strong>:<br>
+      · human <strong>intent + observation samples</strong><br>
+      · AI's <strong>law inference</strong><br>
+      · a fixed <strong>reducer execution substrate</strong>
+    </div>
+    <p>"Codebase" becomes "<strong>a set of constraint tables</strong>".<br>"Refactoring" becomes "<strong>add samples and re-infer</strong>".<br>"Bug fix" becomes "<strong>add the failing observation and reconstruct</strong>".</p>
+    <p class="muted" style="margin-top: 16px;">This is the final resolution of Bible §0.0 "complexity is the human's problem; concealment is the AI's problem."<br>Humans hold <strong>intent and observation</strong>, AI holds <strong>inference and construction</strong>, the machine holds <strong>pure execution</strong>. The roles separate completely.</p>
+  </section>
+
+  <!-- 12 ===== Conclusion ===== -->
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">Observation → Law → Execution</h2>
+    <p style="font-size: clamp(20px, 2.4vw, 32px); font-weight: 700; max-width: 900px; line-height: 1.4;">
+      Constraint Folding is not a "data-ification trick" —<br>
+      <strong style="color: var(--accent);">it is the substrate where AI discovers the law and the law itself runs</strong>.
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(16px, 2vw, 24px); color: var(--fg-dim); line-height: 1.6; max-width: 800px;">
+      Enumeration is the entrance, <strong>inference is the heart</strong>.<br>
+      On this substrate, development is no longer "writing" but "<strong>extracting</strong>".
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      Hiroyuki OKINOI · Aoyama Rito
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="constraint-folding.en.pdf" download>PDF</a>
+<div id="hint">← → / Space to advance · F for fullscreen · <a href="constraint-folding.en.pdf" download style="color: var(--accent); font-weight: 700;">PDF</a></div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 12</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

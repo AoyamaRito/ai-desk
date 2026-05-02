@@ -159,7 +159,7 @@ node eyes-e2e.js --test                             # 22/22 PASS
 | `constraint-janken.js` | Minimal proof of constraint folding (start here) |
 | `AI_NATIVE_MASTER_BIBLE.md` | Full design canon — all six pillars |
 | `AI_UNDERSTANDING_MANIFESTO.md` | AI cognition properties (±300-line spotlight, etc.) |
-| `PROMPT_constraint_folding.md` | Constraint folding decision criteria and measurement evidence |
+| `CONSTRAINT_FOLDING_MASTER.md` | Constraint folding decision criteria, measurement evidence, and the mining-paradigm PoC |
 
 ---
 

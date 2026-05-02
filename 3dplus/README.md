@@ -277,8 +277,7 @@ scene.objects[0].transform.quaternion = _math.quatSlerp(qStart, qEnd, t);
 
 - [`AI_NATIVE_MASTER_BIBLE.md`](../AI_NATIVE_MASTER_BIBLE.md) §4 / §7 — 思想の出典
 - [`AI_UNDERSTANDING_MANIFESTO.md`](../AI_UNDERSTANDING_MANIFESTO.md) — なぜ展開された算数がAIには「優しい」のか
-- [`PROMPT_constraint_folding.md`](../PROMPT_constraint_folding.md) — 別射程（L3）の制約畳み込み
-- [`DISCUSSION_constraint_library.md`](../DISCUSSION_constraint_library.md) — 鉱脈採掘パラダイム
+- [`CONSTRAINT_FOLDING_MASTER.md`](../CONSTRAINT_FOLDING_MASTER.md) — 別射程（L3）の制約畳み込み（鉱脈採掘パラダイム含む）
 
 ---
 

@@ -184,7 +184,7 @@ node eyes-e2e.js --test                             # 22/22 PASS
 | `constraint-janken.js` | 制約畳み込みの最小実証（まずここ） |
 | `AI_NATIVE_MASTER_BIBLE.md` | 設計の全根拠・6つの柱 |
 | `AI_UNDERSTANDING_MANIFESTO.md` | AIの認知特性（±300行スポットライト等） |
-| `PROMPT_constraint_folding.md` | 制約畳み込みの適用判定と測定エビデンス |
+| `CONSTRAINT_FOLDING_MASTER.md` | 制約畳み込みの適用判定と測定エビデンス（鉱脈採掘 PoC を含む） |
 
 ---
 

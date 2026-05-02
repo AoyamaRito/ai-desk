@@ -99,5 +99,5 @@ function resolveCharacterState(current, input, physics_env) {
 
 ---
 **参考資料:**
-- `/Users/AoyamaRito/PJs/ai-desk/PROMPT_constraint_folding.md` (理論編)
+- `/Users/AoyamaRito/PJs/ai-desk/CONSTRAINT_FOLDING_MASTER.md` (理論編)
 - `constraint-janken.js` (最小実装例)

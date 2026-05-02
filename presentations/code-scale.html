@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why code scales — 行数が増えても破綻しない設計</title>
+<style>
+:root {
+  --fg: #111111;
+  --fg-dim: #5a5a5a;
+  --bg: #ffffff;
+  --bg-soft: #f6f6f8;
+  --border: #1a1a1a;
+  --border-soft: #d8d8de;
+  --accent: #6b3aff;
+  --accent-soft: #f0eaff;
+  --pink: #ff1d6d;
+  --green: #00a86b;
+  --amber: #f59e0b;
+  --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg);
+  border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(42px, 7vw, 110px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.0; color: var(--accent); margin-bottom: 24px; max-width: 18ch;
+}
+.title-slide .tagline { font-size: clamp(18px, 2.4vw, 28px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 30ch; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(28px, 4vw, 50px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+.split .col ul { margin-left: 0; list-style: none; padding: 0; }
+.split .col li { padding: 6px 0 6px 28px; position: relative; }
+.split .col.problem li::before { content: "✗"; position: absolute; left: 4px; color: var(--pink); font-weight: 800; }
+.split .col.solution li::before { content: "✓"; position: absolute; left: 4px; color: var(--green); font-weight: 800; }
+
+.principles {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px;
+}
+.principle {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 16px 18px;
+}
+.principle h4 {
+  font-size: clamp(15px, 1.7vw, 19px); font-weight: 800; margin-bottom: 6px; color: var(--accent);
+}
+.principle p { font-size: clamp(13px, 1.4vw, 16px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(24px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics, .principles { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- 1 ===== Title ===== -->
+  <section class="slide title-slide active">
+    <h1>「行数が増えると AI 開発は死ぬ」への反論</h1>
+    <p class="tagline">設計でどう潰しているか</p>
+    <p class="sub">ai-desk 方法論 — 沖井広行 · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <!-- 2 ===== The critique ===== -->
+  <section class="slide">
+    <h2><span class="num">1</span>よくある批判</h2>
+    <div class="callout">
+      AI に適当に書かせる開発は、初期は速い。<br>
+      だが規模が大きくなると <strong>コンテキストを失って AI が壊し始める</strong>。<br>
+      5万行を超えたあたりで詰む。
+    </div>
+    <p class="muted">この批判は <strong>普通の書き方をしていれば正しい</strong>。<br>では「普通の書き方」をしないと何が起きるか。</p>
+  </section>
+
+  <!-- 3 ===== Why normal codebases die ===== -->
+  <section class="slide">
+    <h2><span class="num">2</span>普通のコードが規模で死ぬ仕組み</h2>
+    <div class="split">
+      <div class="col problem">
+        <h3>規模が増えると</h3>
+        <ul>
+          <li>関数が他の関数を呼ぶ → 連鎖的に context が必要</li>
+          <li>ファイル間で依存 → 編集前に複数ファイル読む必要</li>
+          <li>共有ヘルパー (DRY) → 1 箇所の変更が広域に波及</li>
+          <li>抽象化・カプセル化 → 隠蔽された情報が AI から見えない</li>
+          <li>暗黙の前提 → 知らないと壊す</li>
+        </ul>
+      </div>
+      <div class="col problem">
+        <h3>結果</h3>
+        <ul>
+          <li>AI のスポットライト (~±300 行) を超える</li>
+          <li>コンテキスト窓を食い尽くす</li>
+          <li>影響範囲が読み切れず壊す</li>
+          <li>テスト落ちる、修正が連鎖、雪だるま式に詰む</li>
+          <li>「AI には限界がある」と結論付けられる</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ===== ai-desk's axiom ===== -->
+  <section class="slide">
+    <h2><span class="num">3</span>原因の原因</h2>
+    <p class="lead">AI が壊れるのは <strong>AI の限界ではなく、設計が AI 向けじゃないから</strong>。</p>
+    <p>普通の設計原則 (DRY / 抽象化 / カプセル化) は、人間がコードを <strong>読みやすくする</strong> ために作られた。AI はそれと逆の最適化を必要とする:</p>
+    <ul>
+      <li><strong>ローカリティの極大化</strong> — 1 箇所だけ読めば全部わかる</li>
+      <li><strong>共有禁止</strong> — 編集の影響範囲が固定</li>
+      <li><strong>明示性</strong> — 隠蔽せず展開して書く</li>
+      <li><strong>1 ファイル完結</strong> — ファイル間ジャンプを避ける</li>
+    </ul>
+    <p class="muted">これが Bible §0.0「認知非対称性」。同じコードが、人間には読みにくく、AI には読みやすい。<br><strong>普通の書き方こそが AI を殺している</strong>。</p>
+  </section>
+
+  <!-- 5 ===== Defense 1: Heavy Function ===== -->
+  <section class="slide">
+    <h2><span class="num">4</span>設計戦略 1 — Heavy Function</h2>
+    <p class="lead">1 つの関数で完結させる。AI が「その関数だけ読めば全部わかる」状態を作る。</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>関数を切り刻まない</h4>
+        <p>機能ごとに大きな関数を作る。データ加工・条件分岐・副作用トリガーを 1 つのスコープに inline する。</p>
+      </div>
+      <div class="principle">
+        <h4>長さを恐れない</h4>
+        <p>200-500 行の関数は問題ない。AI のスポットライトに収まれば良い。短く分割するほど他関数への依存ジャンプが増える。</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">普通の感覚と真逆。だが <strong>1 関数完結 = 編集の影響範囲が関数内に閉じる</strong>。スケールしても他関数を壊さない。</p>
+  </section>
+
+  <!-- 6 ===== Defense 2: No Shared Helpers ===== -->
+  <section class="slide">
+    <h2><span class="num">5</span>設計戦略 2 — 共有ヘルパー禁止</h2>
+    <p class="lead">複数の関数から呼ばれる「共通ヘルパー」は作らない。重複を恐れない。</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>DRY (普通の常識)</h3>
+        <ul>
+          <li>同じコードは関数化して再利用</li>
+          <li>「美しい設計」と評価される</li>
+          <li>しかし: 1 箇所変更で全呼び出し元に影響</li>
+          <li>blast radius = O(callers)</li>
+          <li>規模が大きいほど破壊力増</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk: 共有禁止</h3>
+        <ul>
+          <li>似たコードは <strong>各関数内に複製</strong></li>
+          <li>「重複は悪ではない、隠れた依存が悪」</li>
+          <li>1 箇所変更しても他は無傷</li>
+          <li>blast radius = O(1)</li>
+          <li>規模が大きくなっても被害が広がらない</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 ===== Defense 3: Emblem boundaries ===== -->
+  <section class="slide">
+    <h2><span class="num">6</span>設計戦略 3 — Emblem 境界 + 局所読み込み</h2>
+    <p class="lead">巨大ファイルを「物理分割せず仮想分割」して AI に局所読み込みさせる。</p>
+    <ul>
+      <li><code>// [ai_s_emblem:#layer Name]</code> でセクション宣言</li>
+      <li><code>node ai-desk.js file.js skeleton</code> → 全 emblem の目次表示 (数十行)</li>
+      <li><code>node ai-desk.js file.js focus EmblemName</code> → 該当 emblem だけ抽出</li>
+      <li><code>node ai-desk.js file.js apply patch.js</code> → 原子的適用 (pre-flight 検証 + tag immutability)</li>
+    </ul>
+    <div class="callout">
+      ファイルが <strong>10 万行</strong> でも、AI が読むのは該当 emblem の <strong>数百行</strong> だけ。<br>
+      コンテキスト消費は <strong>ファイルサイズに依存しない</strong>。
+    </div>
+  </section>
+
+  <!-- 8 ===== Defense 4: 4-Layer + REAL/SHADOW ===== -->
+  <section class="slide">
+    <h2><span class="num">7</span>設計戦略 4 — 4 層 + REAL/SHADOW</h2>
+    <p class="lead">データの流れと状態の責任を構造的に分離する。</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>4 層一方向フロー</h4>
+        <p>L1 物理 → L2 意図 → L3 ロジック → L4 描画。データの流れが固定 → どこを編集すれば何に影響するかが構造的に決まる。</p>
+      </div>
+      <div class="principle">
+        <h4>REAL は 1 つだけ書き換え可</h4>
+        <p>L3 だけが <code>REAL_state</code> を更新できる。他層は read only。状態漏れバグが <strong>原理的に発生しない</strong>。</p>
+      </div>
+      <div class="principle">
+        <h4>SHADOW は使い捨て</h4>
+        <p>派生値は変数に保存しない。生成して即捨てる。「同期漏れ」バグが消える。</p>
+      </div>
+      <div class="principle">
+        <h4>Bridge で層境界を明示</h4>
+        <p>層を跨ぐ呼び出しは <code>// [ai_s_bridge:L3toL4]</code> でタグ付け。AI が「ここは認知ジャンプ点」と分かる。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 ===== Defense 5: Constraint Folding ===== -->
+  <section class="slide">
+    <h2><span class="num">8</span>設計戦略 5 — Constraint Folding</h2>
+    <p class="lead">if/else ネストを「全可能世界 → filter」に置き換える。</p>
+    <ul>
+      <li><strong>普通の書き方:</strong> 条件分岐ツリーを書く → 規模で組合せ爆発、テスト漏れ、AI が分岐迷子</li>
+      <li><strong>ai-desk:</strong> 全可能世界を <strong>データ構造として列挙</strong> → 制約で filter → 残った世界が答え</li>
+      <li>分岐ツリーが消える = AI の認知分裂が消える</li>
+      <li>逆引きが可能 (出力 → 入力)、テストも全網羅できる</li>
+    </ul>
+    <p class="muted" style="margin-top: 18px;">最小実証: <code>constraint-janken.js</code> — 3 人ジャンケン 27 世界、if 文ゼロ。<br>実用例: <code>fighter-cancel.test.js</code> — 1920 世界全網羅、1 ファイル。</p>
+  </section>
+
+  <!-- 10 ===== Defense 6: Twin + Event Sourcing ===== -->
+  <section class="slide">
+    <h2><span class="num">9</span>設計戦略 6 — Twin + Event Sourcing</h2>
+    <p class="lead">改修可能性と検証可能性を構造で保証する。</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>Twin (検証双子)</h4>
+        <p>GPU 実装と並走する CPU 純粋関数で計算を検算。バグが出ても「描画のバグか論理のバグか」を断定できる。</p>
+      </div>
+      <div class="principle">
+        <h4>Event Sourcing</h4>
+        <p>状態を上書き保存せず、Command の履歴を JSON で追記。各イベントは前ハッシュを含む直列ハッシュ。改ざん検知が数学的に保証される。</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">→ 過去のどの時点でも再現可能、改修時に「なぜこの状態になったか」が完全に追える。<br>規模が大きくなっても <strong>履歴を遡って原因特定できる</strong>。</p>
+  </section>
+
+  <!-- 11 ===== Numbers ===== -->
+  <section class="slide">
+    <h2><span class="num">10</span>設計が保証する数値</h2>
+    <div class="metrics">
+      <div class="metric"><div class="num">±300 行</div><div class="lab">AI が一度に読む量<br>(emblem 単位、ファイルサイズ非依存)</div></div>
+      <div class="metric"><div class="num">O(1)</div><div class="lab">編集の blast radius<br>(共有ヘルパー禁止)</div></div>
+      <div class="metric"><div class="num">O(変更単位)</div><div class="lab">検証範囲<br>(Twin / 網羅 per goal)</div></div>
+    </div>
+    <p class="lead" style="margin-top: 26px;">これらは <strong>規模 (ファイル数 / 行数) に依存しない</strong>。<br>10 万行になっても、各数値は変わらない。</p>
+    <p class="muted">普通の codebase だと、これらは全部規模に比例して増える。<strong>ai-desk は設計でそれを切断している</strong>。</p>
+  </section>
+
+  <!-- 12 ===== Conclusion ===== -->
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">設計で潰した</h2>
+    <p style="font-size: clamp(18px, 2.2vw, 30px); font-weight: 600; max-width: 900px; line-height: 1.5;">
+      「AI 開発は規模で死ぬ」は、<br>
+      <strong style="color: var(--accent);">普通の書き方をした場合の話</strong>。<br>
+      設計を AI 向けに作り直せば、<strong style="color: var(--accent);">死ぬ理由がなくなる</strong>。
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(14px, 1.5vw, 18px); color: var(--fg-dim); line-height: 1.6; max-width: 720px;">
+      Heavy Function · 共有禁止 · Emblem 局所読込 · 4 層 + REAL/SHADOW ·<br>
+      Constraint Folding · Twin + Event Sourcing<br>
+      ── これらが揃うと、<strong>規模はもう破綻原因ではない</strong>。
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      沖井広行 · 蒼山りと
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="code-scale.pdf" download>PDF</a>
+<div id="hint">← → / Space で進む · F でフルスクリーン · <a href="code-scale.pdf" download style="color: var(--accent); font-weight: 700;">PDF</a></div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 12</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

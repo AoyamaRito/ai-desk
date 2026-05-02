@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space Race — ai-desk demo</title>
+<style>
+:root { --fg: #1a0f24; --accent: #00c4cc; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html.embed body > header { display: none; }
+html, body { height: 100%; }
+body {
+  background: #050010;
+  color: #e6e6f0;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+header {
+  padding: 14px 20px;
+  border-bottom: 3px solid var(--fg);
+  background: #ffffff;
+  color: var(--fg);
+}
+header h1 { font-size: 18px; font-weight: 800; }
+header p { font-size: 13px; color: #555; margin-top: 2px; }
+main {
+  flex: 1 1 auto;
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+}
+canvas { display: block; width: 100%; height: 100%; }
+.hud {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: rgba(0,0,0,0.55);
+  border: 2px solid var(--accent);
+  padding: 8px 14px;
+  font-weight: 800;
+  font-size: 13px;
+  color: #e6e6f0;
+  pointer-events: none;
+  letter-spacing: 0.04em;
+}
+.hud .num { color: var(--accent); font-size: 22px; vertical-align: -2px; margin-left: 4px; }
+.help {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: rgba(0,0,0,0.55);
+  border: 2px solid #6b3aff;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: #c4abf5;
+  pointer-events: none;
+  line-height: 1.5;
+  text-align: right;
+}
+.win {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%) scale(0.6);
+  background: var(--accent);
+  color: #000;
+  padding: 16px 28px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  pointer-events: none;
+}
+.win.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+</style>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <h1>Space Race</h1>
+  <p>ドラッグ (or 矢印キー) で進行方向を変えながらリングをくぐる。レーダーは左下、次のリングはピンクで表示。</p>
+</header>
+
+<main>
+  <canvas id="c"></canvas>
+  <div class="hud">通過: <span class="num" id="num">0</span></div>
+  <div class="help">drag / arrow keys: 旋回<br>auto-thrust forward</div>
+  <div class="win" id="win">RING PASSED!</div>
+</main>
+
+<script>
+// ============================================================
+// Space Race — vanilla canvas 3D race demo (no deps)
+//   - Camera moves forward at fixed velocity along its facing direction
+//   - Drag (or arrow keys) rotates yaw / pitch
+//   - 600 stars are scattered in a bubble around the camera and recycled
+//   - 6 rings are placed ahead; passing one spawns the next
+//   - Radar (bottom-left) shows top-down map of nearby rings + heading
+// ============================================================
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const numEl = document.getElementById('num');
+const winEl = document.getElementById('win');
+let W = 0, H = 0, FOCAL = 600;
+
+// camera
+const cam = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+const SPEED = 240; // units/sec forward
+
+// world
+const STAR_COUNT = 600;
+const STAR_RANGE = 3000;
+let stars = [];
+let rings = [];
+let passed = 0;
+
+// input
+const keys = {};
+let dragging = false;
+let dragLast = { x: 0, y: 0 };
+
+// resize
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  W = r.width; H = r.height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  FOCAL = Math.min(W, H) * 0.85;
+}
+window.addEventListener('resize', resize);
+
+// init
+function initStars() {
+  stars = [];
+  for (let i = 0; i < STAR_COUNT; i++) {
+    stars.push({
+      x: cam.x + (Math.random() - 0.5) * STAR_RANGE * 2,
+      y: cam.y + (Math.random() - 0.5) * STAR_RANGE * 2,
+      z: cam.z + (Math.random() - 0.5) * STAR_RANGE * 2,
+      bright: 0.3 + Math.random() * 0.7,
+      tint: Math.random() < 0.15 ? '#ffcc00' : (Math.random() < 0.2 ? '#6b3aff' : '#ffffff'),
+    });
+  }
+}
+function spawnRing(distance) {
+  // place ahead of camera at ~distance, with a random offset perpendicular
+  const fwd = forward();
+  const right = rightVec();
+  const up = upVec();
+  const offX = (Math.random() - 0.5) * 600;
+  const offY = (Math.random() - 0.5) * 400;
+  return {
+    x: cam.x + fwd[0] * distance + right[0] * offX + up[0] * offY,
+    y: cam.y + fwd[1] * distance + right[1] * offX + up[1] * offY,
+    z: cam.z + fwd[2] * distance + right[2] * offX + up[2] * offY,
+    radius: 90,
+    age: 0,
+  };
+}
+function initRings() {
+  rings = [];
+  for (let i = 0; i < 4; i++) rings.push(spawnRing(600 + i * 700));
+}
+
+// vector helpers (inline, ai-desk style)
+function forward() {
+  return [
+    Math.sin(cam.yaw) * Math.cos(cam.pitch),
+    -Math.sin(cam.pitch),
+    Math.cos(cam.yaw) * Math.cos(cam.pitch),
+  ];
+}
+function rightVec() {
+  return [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
+}
+function upVec() {
+  const f = forward(), r = rightVec();
+  return [
+    r[1] * f[2] - r[2] * f[1],
+    r[2] * f[0] - r[0] * f[2],
+    r[0] * f[1] - r[1] * f[0],
+  ];
+}
+function dot(a, b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+function project(wx, wy, wz) {
+  const r = rightVec(), u = upVec(), f = forward();
+  const dx = wx - cam.x, dy = wy - cam.y, dz = wz - cam.z;
+  const lz = dx*f[0] + dy*f[1] + dz*f[2];
+  if (lz < 0.5) return null;
+  const lx = dx*r[0] + dy*r[1] + dz*r[2];
+  const ly = dx*u[0] + dy*u[1] + dz*u[2];
+  return {
+    x: (lx / lz) * FOCAL + W / 2,
+    y: -(ly / lz) * FOCAL + H / 2,
+    z: lz,
+  };
+}
+
+// ring pass detection: ring is a sphere of radius `radius` perpendicular
+// to the camera's path. Approximation: when ring's local z drops below a
+// small threshold (camera passed it), check if perpendicular distance was
+// within radius at closest approach.
+function checkRingPass(ring) {
+  const f = forward();
+  const dx = ring.x - cam.x, dy = ring.y - cam.y, dz = ring.z - cam.z;
+  const lz = dx*f[0] + dy*f[1] + dz*f[2];
+  if (ring._lastZ === undefined) { ring._lastZ = lz; return false; }
+  const passed = ring._lastZ > 0 && lz <= 0;
+  if (passed) {
+    // perpendicular distance at the moment ring's z plane is crossed
+    const r = rightVec(), u = upVec();
+    const lx = dx*r[0] + dy*r[1] + dz*r[2];
+    const ly = dx*u[0] + dy*u[1] + dz*u[2];
+    const perp = Math.hypot(lx, ly);
+    ring._lastZ = lz;
+    return perp < ring.radius;
+  }
+  ring._lastZ = lz;
+  return false;
+}
+
+// star recycle: keep stars within bubble around camera
+function recycleStar(s) {
+  const dx = s.x - cam.x, dy = s.y - cam.y, dz = s.z - cam.z;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist > STAR_RANGE) {
+    // place ahead of camera randomly
+    const f = forward();
+    const r = rightVec();
+    const u = upVec();
+    const ahead = STAR_RANGE * (0.3 + Math.random() * 0.7);
+    const offR = (Math.random() - 0.5) * STAR_RANGE * 1.4;
+    const offU = (Math.random() - 0.5) * STAR_RANGE * 1.4;
+    s.x = cam.x + f[0] * ahead + r[0] * offR + u[0] * offU;
+    s.y = cam.y + f[1] * ahead + r[1] * offR + u[1] * offU;
+    s.z = cam.z + f[2] * ahead + r[2] * offR + u[2] * offU;
+  }
+}
+
+// draw ring as projected circle: sample N points around ring perimeter
+// (in ring's local plane perpendicular to camera path, approx) and project
+function drawRing(ring, isNext) {
+  const f = forward();
+  // ring axis = forward (rings always face the player path approx)
+  const axis = [-f[0], -f[1], -f[2]]; // from ring toward camera
+  // build two basis vectors perpendicular to axis (use right and up)
+  const rb = rightVec();
+  const ub = upVec();
+  const N = 36;
+  const pts = [];
+  let visible = false;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const wx = ring.x + Math.cos(a) * ring.radius * rb[0] + Math.sin(a) * ring.radius * ub[0];
+    const wy = ring.y + Math.cos(a) * ring.radius * rb[1] + Math.sin(a) * ring.radius * ub[1];
+    const wz = ring.z + Math.cos(a) * ring.radius * rb[2] + Math.sin(a) * ring.radius * ub[2];
+    const p = project(wx, wy, wz);
+    pts.push(p);
+    if (p) visible = true;
+  }
+  if (!visible) return;
+  // distance fade
+  const center = project(ring.x, ring.y, ring.z);
+  const z = center ? center.z : 1000;
+  const alpha = Math.max(0.15, Math.min(1, 1 - z / 3500));
+  ctx.lineWidth = isNext ? 4 : 2;
+  ctx.strokeStyle = isNext ? `rgba(255, 29, 109, ${alpha})` : `rgba(0, 196, 204, ${alpha * 0.7})`;
+  ctx.shadowColor = isNext ? '#ff1d6d' : '#00c4cc';
+  ctx.shadowBlur = isNext ? 18 : 10;
+  ctx.beginPath();
+  let started = false;
+  for (const p of pts) {
+    if (!p) { started = false; continue; }
+    if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+    else ctx.lineTo(p.x, p.y);
+  }
+  if (pts[0]) ctx.lineTo(pts[0].x, pts[0].y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// radar (bottom-left)
+function drawRadar() {
+  const size = Math.min(160, W * 0.22);
+  const cx = 16 + size / 2, cy = H - 16 - size / 2;
+  // bg
+  ctx.fillStyle = 'rgba(0, 20, 30, 0.78)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#00c4cc';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // crosshair + range rings
+  ctx.strokeStyle = 'rgba(0, 196, 204, 0.3)';
+  ctx.lineWidth = 1;
+  for (let r = size / 6; r < size / 2; r += size / 6) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  // player triangle (always pointing up = forward)
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 6);
+  ctx.lineTo(cx - 5, cy + 5);
+  ctx.lineTo(cx + 5, cy + 5);
+  ctx.closePath(); ctx.fill();
+  // rings: project to 2D using camera's right/forward axes (top-down)
+  const RANGE = 2400;
+  const f = forward();
+  const r = rightVec();
+  rings.forEach((ring, i) => {
+    const dx = ring.x - cam.x, dy = ring.y - cam.y, dz = ring.z - cam.z;
+    const localR = dx*r[0] + dy*r[1] + dz*r[2];
+    const localF = dx*f[0] + dy*f[1] + dz*f[2];
+    const dist = Math.hypot(localR, localF);
+    if (dist > RANGE) return;
+    const px = cx + (localR / RANGE) * (size / 2);
+    const py = cy - (localF / RANGE) * (size / 2);
+    ctx.fillStyle = i === 0 ? '#ff1d6d' : '#00c4cc';
+    ctx.beginPath();
+    ctx.arc(px, py, i === 0 ? 5 : 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// flash on ring pass
+let flash = 0;
+
+// loop
+let lastTime = performance.now();
+function step(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+
+  // input → camera rotation
+  const yawSpeed = 1.4, pitchSpeed = 1.0;
+  if (keys['ArrowLeft']  || keys['a']) cam.yaw -= yawSpeed * dt;
+  if (keys['ArrowRight'] || keys['d']) cam.yaw += yawSpeed * dt;
+  if (keys['ArrowUp']    || keys['w']) cam.pitch -= pitchSpeed * dt;
+  if (keys['ArrowDown']  || keys['s']) cam.pitch += pitchSpeed * dt;
+  cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch));
+
+  // forward thrust
+  const f = forward();
+  cam.x += f[0] * SPEED * dt;
+  cam.y += f[1] * SPEED * dt;
+  cam.z += f[2] * SPEED * dt;
+
+  // ring collision (only check next ring)
+  if (rings.length > 0 && checkRingPass(rings[0])) {
+    rings.shift();
+    rings.push(spawnRing(2400));
+    passed++;
+    numEl.textContent = passed;
+    flash = 1;
+    winEl.classList.add('show');
+    setTimeout(() => winEl.classList.remove('show'), 600);
+  }
+
+  // recycle stars
+  for (const s of stars) recycleStar(s);
+
+  // ---- draw
+  // motion-blurry trail
+  ctx.fillStyle = 'rgba(5, 0, 16, 0.35)';
+  ctx.fillRect(0, 0, W, H);
+
+  // stars
+  for (const s of stars) {
+    const p = project(s.x, s.y, s.z);
+    if (!p) continue;
+    const sz = Math.max(0.4, (1.6 - p.z / 2500) * s.bright * 1.4);
+    ctx.fillStyle = s.tint;
+    ctx.globalAlpha = Math.min(1, s.bright * (1 - p.z / 3500));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // rings (back-to-front so closer overlays farther)
+  const sortedRings = [...rings].map((r, i) => ({ r, i }));
+  sortedRings.sort((a, b) => {
+    const az = (a.r.x - cam.x) * f[0] + (a.r.y - cam.y) * f[1] + (a.r.z - cam.z) * f[2];
+    const bz = (b.r.x - cam.x) * f[0] + (b.r.y - cam.y) * f[1] + (b.r.z - cam.z) * f[2];
+    return bz - az;
+  });
+  for (const { r, i } of sortedRings) drawRing(r, i === 0);
+
+  // pass flash
+  if (flash > 0) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${flash * 0.4})`;
+    ctx.fillRect(0, 0, W, H);
+    flash *= 0.85;
+  }
+
+  // radar overlay
+  drawRadar();
+
+  requestAnimationFrame(step);
+}
+
+// drag rotation
+function pointerXY(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+canvas.addEventListener('pointerdown', e => {
+  dragging = true;
+  const p = pointerXY(e);
+  dragLast = p;
+  canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const p = pointerXY(e);
+  const dx = p.x - dragLast.x;
+  const dy = p.y - dragLast.y;
+  cam.yaw   += dx * 0.005;
+  cam.pitch += dy * 0.005;
+  cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch));
+  dragLast = p;
+});
+canvas.addEventListener('pointerup',   () => { dragging = false; });
+canvas.addEventListener('pointerleave',() => { dragging = false; });
+
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+resize();
+initStars();
+initRings();
+requestAnimationFrame(step);
+</script>
+</body>
+</html>

@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ai-desk — AIにプログラムを書かせるための土台</title>
-<meta name="description" content="人間がやるのはやりたいことを自然言語でAIに伝えることだけ。コードの読み書き・修正・テストはAIが担当する開発体系。">
-<meta property="og:title" content="ai-desk — AIにプログラムを書かせるための土台">
-<meta property="og:description" content="人間がやるのはやりたいことを自然言語でAIに伝えることだけ。">
+<title>ai-desk — A foundation for letting AI write your programs</title>
+<meta name="description" content="All you do is tell the AI what you want, in plain language. The AI handles reading, writing, fixing, and testing the code.">
+<meta property="og:title" content="ai-desk — A foundation for letting AI write your programs">
+<meta property="og:description" content="All you do is tell the AI what you want, in plain language.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://aoyamarito.github.io/ai-desk/">
-<meta property="og:image" content="https://aoyamarito.github.io/ai-desk/og.png">
+<meta property="og:url" content="https://aoyamarito.github.io/ai-desk/en/">
+<meta property="og:image" content="https://aoyamarito.github.io/ai-desk/en/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://aoyamarito.github.io/ai-desk/og.png">
+<meta name="twitter:image" content="https://aoyamarito.github.io/ai-desk/en/og.png">
 <style>
 :root {
   --bg: #ffffff;
@@ -286,97 +286,97 @@ footer a:hover { color: var(--fg); }
 <body>
 
 <header class="hero">
-  <p class="lang-switch"><strong>日本語</strong> · <a href="en/">English</a></p>
+  <p class="lang-switch"><a href="../">日本語</a> · <strong>English</strong></p>
   <h1>ai-desk</h1>
-  <p class="tagline">AIにプログラムを書かせるための土台</p>
+  <p class="tagline">A foundation for letting AI write your programs</p>
   <p class="sub">
-    人間がやるのは「やりたいこと」を自然言語でAIに伝えることだけ。<br>
-    コードの読み書き・修正・テストはAIが担当する開発体系。
+    All you do is tell the AI what you want, in plain language.<br>
+    The AI handles reading, writing, fixing, and testing the code.
   </p>
   <div class="cta">
-    <a class="btn btn-primary" href="#demos">デモを触る</a>
-    <a class="btn btn-secondary" href="https://github.com/AoyamaRito/ai-desk">GitHubを見る</a>
+    <a class="btn btn-primary" href="#demos">Try the demos</a>
+    <a class="btn btn-secondary" href="https://github.com/AoyamaRito/ai-desk">View on GitHub</a>
   </div>
 </header>
 
 <aside class="strip">
   <p>
-    <span class="strip-label">姉妹サイト</span>
-    <a href="https://sorisuto.com">株式会社ソリスト合唱団 — ボードゲーム制作</a>
+    <span class="strip-label">Sister site</span>
+    <a href="https://sorisuto.com">Solist Choir Inc. — Board game studio</a>
   </p>
 </aside>
 
 <section class="block">
-  <h2>どんな人に向いているか</h2>
+  <h2>Who is this for</h2>
   <p class="lead">
-    AIに任せて何かを作りたいけれど、毎回コードがバラバラになって続かない。
-    そんな状況を構造側から解決します。
+    If you want AI to build things for you but the code keeps falling apart between sessions —
+    this addresses the problem from the structural side, not by hoping the model gets smarter.
   </p>
   <p>
-    複雑な状態の組み合わせバグを構造的に潰す仕組みが入っているので、
-    AIが書いたコードが「途中まで動いて崩壊する」状況になりにくくなっています。
-    ゲームのルール・業務ロジック・アプリのUI──「条件分岐が多い」ものに特に効きます。
+    A built-in mechanism crushes the combinatorial state-bugs that usually make AI-written code
+    "work halfway, then collapse." It's especially effective for things with lots of branching
+    logic: game rules, business rules, app UI state.
   </p>
 </section>
 
 <section class="block">
-  <h2>使い方</h2>
-  <p class="lead">人間が叩くコマンドはほぼありません。AIに喋るだけです。</p>
+  <h2>How to use it</h2>
+  <p class="lead">No commands to type. Just ask the AI in plain language.</p>
 
-  <div class="prompt-label">何かを作りたいとき</div>
-  <div class="prompt">AI_ONBOARDING.md を読んでから、
-じゃんけんゲームをブラウザで動くように作ってください。</div>
+  <div class="prompt-label">When you want to build something</div>
+  <div class="prompt">Read AI_ONBOARDING.md first, then build a
+rock-paper-scissors game that runs in the browser.</div>
 
-  <div class="prompt-label">バグを直したいとき</div>
-  <div class="prompt">AI_ONBOARDING.md を読んでから、
-ai-eyes を起動して、[バグの現象] を直してください。</div>
+  <div class="prompt-label">When you want to fix a bug</div>
+  <div class="prompt">Read AI_ONBOARDING.md first, then start
+ai-eyes and fix [the symptom you're seeing].</div>
 
-  <div class="prompt-label">既存ファイルに手を入れたいとき</div>
-  <div class="prompt">AI_ONBOARDING.md を読んでから、
-app.js の [機能名] を [変更内容] してください。</div>
+  <div class="prompt-label">When you want to edit an existing file</div>
+  <div class="prompt">Read AI_ONBOARDING.md first, then change
+[feature] in app.js to do [new behavior].</div>
 </section>
 
 <section class="block" id="demos">
-  <h2>触れるデモ</h2>
-  <p class="lead">このページ上でそのまま遊べます。別タブを開きたい場合は各タイトルからどうぞ。</p>
+  <h2>Playable demos</h2>
+  <p class="lead">Play them right on this page. Click a title to open in a new tab.</p>
 
   <div class="demo-block">
-    <h3 class="demo-title"><a href="demos/burst.html">Constraint Burst</a></h3>
-    <p class="demo-desc">クリックで色が伝播する。全部ひとつの色になったら勝ち。指でも遊べる。</p>
-    <div class="demo-frame"><iframe src="demos/burst.html?embed=1" loading="lazy" title="Constraint Burst"></iframe></div>
+    <h3 class="demo-title"><a href="../demos/burst.html">Constraint Burst</a></h3>
+    <p class="demo-desc">Click to paint colors that spread. When every ball is one color, you win. Touch friendly.</p>
+    <div class="demo-frame"><iframe src="../demos/burst.html?embed=1" loading="lazy" title="Constraint Burst"></iframe></div>
   </div>
 
   <div class="demo-block">
-    <h3 class="demo-title"><a href="demos/swarm.html">Color Swarm</a></h3>
-    <p class="demo-desc">カーソルで粒子を引き寄せたり弾いたり。指でも遊べる。</p>
-    <div class="demo-frame"><iframe src="demos/swarm.html?embed=1" loading="lazy" title="Color Swarm"></iframe></div>
+    <h3 class="demo-title"><a href="../demos/swarm.html">Color Swarm</a></h3>
+    <p class="demo-desc">Drag the cursor to attract or repel particles. Touch friendly.</p>
+    <div class="demo-frame"><iframe src="../demos/swarm.html?embed=1" loading="lazy" title="Color Swarm"></iframe></div>
   </div>
 
   <div class="demo-block">
-    <h3 class="demo-title"><a href="demos/space-race.html">Space Race</a></h3>
-    <p class="demo-desc">宇宙空間を猛スピードで進みながらリングをくぐる。ドラッグ or 矢印キーで操舵、左下レーダーで次のリングを確認。</p>
-    <div class="demo-frame tall"><iframe src="demos/space-race.html?embed=1" loading="lazy" title="Space Race"></iframe></div>
+    <h3 class="demo-title"><a href="../demos/space-race.html">Space Race</a></h3>
+    <p class="demo-desc">Hurtle through space and fly through rings. Drag or use arrow keys to steer; the radar at the bottom-left shows the next ring.</p>
+    <div class="demo-frame tall"><iframe src="../demos/space-race.html?embed=1" loading="lazy" title="Space Race"></iframe></div>
   </div>
 </section>
 
 <section class="block">
-  <h2>もっと知りたい</h2>
+  <h2>Learn more</h2>
   <div class="docs-links">
-    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/README.md">
-      <span class="name">README</span>
-      <span class="desc">クイックスタート (一般ユーザ向け)</span>
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/README.en.md">
+      <span class="name">README (English)</span>
+      <span class="desc">Project overview and quickstart</span>
     </a>
     <a href="https://github.com/AoyamaRito/ai-desk/blob/main/README.ai.md">
       <span class="name">README.ai</span>
-      <span class="desc">設計思想・アーキテクチャ・哲学 (AI / アーキテクト向け)</span>
+      <span class="desc">Design philosophy, architecture, philosophy (Japanese)</span>
     </a>
     <a href="https://github.com/AoyamaRito/ai-desk/blob/main/AI_NATIVE_MASTER_BIBLE.md">
       <span class="name">Bible</span>
-      <span class="desc">全体の正典。設計の根拠がすべてここに</span>
+      <span class="desc">The canonical document. All design rationale lives here</span>
     </a>
-    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/AI_ONBOARDING.md">
-      <span class="name">AI Onboarding</span>
-      <span class="desc">AI が作業を始めるときに読むファイル</span>
+    <a href="https://github.com/AoyamaRito/ai-desk/blob/main/AI_ONBOARDING.en.md">
+      <span class="name">AI Onboarding (English)</span>
+      <span class="desc">What the AI reads before starting work</span>
     </a>
   </div>
 </section>
@@ -387,7 +387,7 @@ app.js の [機能名] を [変更内容] してください。</div>
     <a href="https://github.com/AoyamaRito/ai-desk/blob/main/LICENSE">MIT License</a>
   </p>
   <p>
-    沖井広行 / <a href="https://github.com/AoyamaRito">AoyamaRito</a> (蒼山りと)
+    Hiroyuki OKINOI / <a href="https://github.com/AoyamaRito">AoyamaRito</a> (Aoyama Rito)
   </p>
 </footer>
 

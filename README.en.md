@@ -40,6 +40,13 @@ Read AI_ONBOARDING.en.md, then fix [bug symptom].
 ai-eyes.js is already running at localhost:3000.
 ```
 
+## Branch Strategy
+
+- **`main`** — The primary development branch. Latest commits go here. Default branch.
+- **`stable`** — Pinned stable version. Advances only when manually fast-forwarded from main (not synced per commit). Use this if you need a reliable citation or external integration point (e.g., `ai-desk@stable`).
+
+---
+
 ### Glossary
 
 | Term | One-liner |
@@ -274,11 +281,11 @@ For `fighter-cancel` specifically: 1920 worlds traversed, zero contradictions, 1
 - **[`ai-desk.js`](ai-desk.js) (hands)** — A CLI that provides locality for the single intent of "what part of the code do I need to look at right now, and for what purpose?" Rather than making AI read entire files repeatedly, it `focus`-extracts only the range needed for the current intent, in Emblem units, and `apply`s patches locally. Satisfies Bible §0.1 (locality maximization) and Single-Purpose Binding simultaneously.
 
 ```bash
-node ai-desk.js path/to/file.js skeleton                # structure overview (table of contents only)
-node ai-desk.js path/to/file.js focus EmblemName        # local read for a single intent
-node ai-desk.js path/to/file.js apply patch.js          # partial apply (zero side effects on other emblems)
-node ai-desk.js path/to/file.js check                   # tag vocabulary + direction validation
-node ai-desk.js path/to/file.js coverage                # bridge coverage report
+node ai-desk.js path/to/file.js skeleton                     # structure overview (with line numbers)
+node ai-desk.js path/to/file.js focus EmblemName             # local read for a single intent
+node ai-desk.js path/to/file.js apply patch.js [--dry-run]   # atomic apply (pre-flight verify -> write all on success / do nothing on any failure)
+node ai-desk.js path/to/file.js check                        # tag vocabulary + direction validation
+node ai-desk.js path/to/file.js coverage                     # bridge coverage report
 ```
 
 - **[`ai-eyes.js`](ai-eyes.js) (eyes)** — Zero-dependency local server that collects browser errors automatically, saves snapshots, and accepts remote control commands. AI observes the page state without routing through a human.
@@ -339,7 +346,9 @@ See `PROMPT_constraint_folding.md` §1 for full details. Summary:
 
 ```
 ai-desk/
-├── README.md / README.en.md
+├── README.md                      # Quick start for general users
+├── README.ai.md                   # This file (details for AI / Architects)
+├── README.en.md                   # English README
 ├── CLAUDE.md / GEMINI.md           # auto-loaded by AI CLI → redirects to AI_ONBOARDING
 ├── AI_ONBOARDING.md                # AI work guide (Japanese)
 ├── AI_ONBOARDING.en.md             # AI work guide (English)

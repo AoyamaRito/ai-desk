@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "target": "AI_NATIVE_MASTER_BIBLE.md",
+      "source": "./DOCS_REAL.js",
+      "header": "# {{META.title}}\n\n{{META.subtitle}}\n\n---\n",
+      "sections": [
+        "SECTION_0_0",
+        "SECTION_0_1",
+        "SECTION_0_15",
+        "SECTION_0_2",
+        "SECTION_0_21",
+        "SECTION_0_3",
+        "SECTION_1_0",
+        "SECTION_1_5",
+        "SECTION_2_0",
+        "SECTION_3_0",
+        "SECTION_4_0",
+        "SECTION_4_5",
+        "SECTION_5_0",
+        "SECTION_6_0",
+        "SECTION_7_0"
+      ],
+      "footer": "\n---\n**Version**: {{META.version}}\n**Date**: {{META.date}}\n**Author**: {{META.author}}\n"
+    }
+  ]
+}

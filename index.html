@@ -397,28 +397,34 @@ app.js の [機能名] を [変更内容] してください。</div>
 </section>
 
 <section class="block setup">
-  <h2>本物の gemini-cli を WezTerm で使う</h2>
+  <h2>Windows で gemini-cli + WezTerm をセットアップ</h2>
   <p class="lead">
-    上のデモはあくまで雛形。手元の Mac / Linux で本格的に AI に作業を頼むなら、
-    ターミナル <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">WezTerm</a> +
-    <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener">gemini-cli</a> が一番早い。
+    Windows 10/11 を想定した手順。コマンドはすべて <strong>PowerShell</strong> で実行 (スタートメニュー → "PowerShell")。
+    Mac/Linux の場合は <code>winget</code> を <code>brew</code> / パッケージマネージャに、PowerShell の env 設定を <code>~/.zshrc</code> 等の <code>export</code> に置き換えるだけ。
   </p>
 
   <div class="step-label">1. WezTerm をインストール</div>
-  <div class="step-cmd">brew install --cask wezterm</div>
-  <div class="step-note">公式サイト <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">wezfurlong.org/wezterm</a> からも DL 可。</div>
+  <div class="step-cmd">winget install wez.wezterm</div>
+  <div class="step-note">winget が無ければ <a href="https://wezfurlong.org/wezterm/install/windows.html" target="_blank" rel="noopener">公式インストーラ</a> から。</div>
 
-  <div class="step-label">2. gemini-cli をインストール</div>
+  <div class="step-label">2. Node.js (v18+) をインストール</div>
+  <div class="step-cmd">winget install OpenJS.NodeJS.LTS</div>
+  <div class="step-note">既に入っていれば <code>node -v</code> で確認。v18 未満なら更新を。</div>
+
+  <div class="step-label">3. gemini-cli をインストール</div>
   <div class="step-cmd">npm install -g @google/gemini-cli</div>
-  <div class="step-note">Node.js (v18+) が前提。未導入なら <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a> から。</div>
+  <div class="step-note">完了後 <code>gemini --version</code> が通れば OK。</div>
 
-  <div class="step-label">3. API キーを取得して環境変数に設定</div>
-  <div class="step-cmd">export GEMINI_API_KEY=&lt;your-key&gt;</div>
-  <div class="step-note">キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> から無料取得。<code>~/.zshrc</code> に書いておくと毎回設定不要。</div>
+  <div class="step-label">4. API キーを取得して環境変数に設定 (永続化)</div>
+  <div class="step-cmd">[System.Environment]::SetEnvironmentVariable('GEMINI_API_KEY', '&lt;your-key&gt;', 'User')</div>
+  <div class="step-note">
+    キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> から無料取得。
+    上記コマンドはユーザ環境変数に永続保存 (再起動後も有効)。設定後は WezTerm を <strong>開き直す</strong>。
+  </div>
 
-  <div class="step-label">4. WezTerm を開いて起動</div>
+  <div class="step-label">5. WezTerm を開いて起動</div>
   <div class="step-cmd">gemini</div>
-  <div class="step-note">あとは AI に自然言語で頼むだけ。<code>AI_ONBOARDING.md を読んでから [作りたいもの] を作って</code></div>
+  <div class="step-note">あとは AI に自然言語で頼むだけ:<br><code>AI_ONBOARDING.md を読んでから [作りたいもの] を作って</code></div>
 </section>
 
 <section class="block tech-note">

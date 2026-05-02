@@ -397,28 +397,34 @@ ai-eyes and fix [the symptom you're seeing].</div>
 </section>
 
 <section class="block setup">
-  <h2>Use the real gemini-cli with WezTerm</h2>
+  <h2>Set up gemini-cli + WezTerm on Windows</h2>
   <p class="lead">
-    The inline demos above are templates. To actually delegate work to AI on your own machine,
-    the fastest path is <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">WezTerm</a> +
-    <a href="https://github.com/google-gemini/gemini-cli" target="_blank" rel="noopener">gemini-cli</a>.
+    Windows 10/11 instructions. All commands run in <strong>PowerShell</strong> (Start menu → "PowerShell").
+    On Mac/Linux, swap <code>winget</code> for <code>brew</code> / your package manager and the PowerShell env line for <code>export</code> in <code>~/.zshrc</code>.
   </p>
 
   <div class="step-label">1. Install WezTerm</div>
-  <div class="step-cmd">brew install --cask wezterm</div>
-  <div class="step-note">Or download from <a href="https://wezfurlong.org/wezterm/" target="_blank" rel="noopener">wezfurlong.org/wezterm</a>.</div>
+  <div class="step-cmd">winget install wez.wezterm</div>
+  <div class="step-note">No winget? Use the <a href="https://wezfurlong.org/wezterm/install/windows.html" target="_blank" rel="noopener">official installer</a>.</div>
 
-  <div class="step-label">2. Install gemini-cli</div>
+  <div class="step-label">2. Install Node.js (v18+)</div>
+  <div class="step-cmd">winget install OpenJS.NodeJS.LTS</div>
+  <div class="step-note">If already installed, check with <code>node -v</code>. Update if older than v18.</div>
+
+  <div class="step-label">3. Install gemini-cli</div>
   <div class="step-cmd">npm install -g @google/gemini-cli</div>
-  <div class="step-note">Requires Node.js v18+. Get it from <a href="https://nodejs.org/" target="_blank" rel="noopener">nodejs.org</a>.</div>
+  <div class="step-note">Verify with <code>gemini --version</code>.</div>
 
-  <div class="step-label">3. Get an API key and set it as an env var</div>
-  <div class="step-cmd">export GEMINI_API_KEY=&lt;your-key&gt;</div>
-  <div class="step-note">Free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Add to <code>~/.zshrc</code> so you don't have to set it every shell.</div>
+  <div class="step-label">4. Get an API key and persist it as a user env var</div>
+  <div class="step-cmd">[System.Environment]::SetEnvironmentVariable('GEMINI_API_KEY', '&lt;your-key&gt;', 'User')</div>
+  <div class="step-note">
+    Free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+    The command above stores it in the user environment (survives reboots). <strong>Reopen WezTerm</strong> after setting.
+  </div>
 
-  <div class="step-label">4. Open WezTerm and start it</div>
+  <div class="step-label">5. Open WezTerm and start it</div>
   <div class="step-cmd">gemini</div>
-  <div class="step-note">Then just talk to the AI in plain language: <code>Read AI_ONBOARDING.md first, then build [what you want]</code></div>
+  <div class="step-note">Then just talk to the AI in plain language:<br><code>Read AI_ONBOARDING.md first, then build [what you want]</code></div>
 </section>
 
 <section class="block tech-note">

@@ -396,3 +396,6 @@ MIT — use, modify, and redistribute freely. Credit is appreciated.
 AoyamaRito (2026). ai-desk: AI-Native Software Methodology.
 https://github.com/AoyamaRito/ai-desk
 ```
+
+---
+**Author**: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)

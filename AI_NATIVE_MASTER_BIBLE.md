@@ -327,5 +327,5 @@ Twin は **Zero-Dep / Zero-Side-Effect**:
 ---
 **Version**: 3.5 (Final Architecture Edition)
 **Date**: 2026-05-01
-**Author**: Hiroyuki OKINOI, Claude, Gemini CLI
+**Author**: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)
 

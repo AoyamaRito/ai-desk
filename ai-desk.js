@@ -9,6 +9,24 @@
 
 const fs = require('fs');
 
+const path = require('path');
+let CONFIG = {
+  emblemMarker: 'ai_s_emblem',
+  bridgeMarker: 'ai_s_bridge',
+  customTags: []
+};
+try {
+  const configPath = path.join(process.cwd(), 'ai-desk.config.json');
+  if (fs.existsSync(configPath)) {
+    const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    CONFIG = { ...CONFIG, ...userConfig };
+  }
+} catch (e) { /* fallback to defaults */ }
+
+const EMB_MARK = CONFIG.emblemMarker;
+const BRD_MARK = CONFIG.bridgeMarker;
+
+
 // [ai_s_emblem:#low#config Help]
 const HELP_TEXT = `ai-desk (Emblem Edition) - Robust Workspace Manager
 
@@ -26,14 +44,14 @@ Modes:
   miner <data.json>  [AI-Only] Extract logic (laws) from data and synthesize code.
 
 Format (emblem):
-  // [ai_s_emblem:#importance#layer#tag <name>]
+  // [${EMB_MARK}:#importance#layer#tag <name>]
   // ... code ...
-  // [/ai_s_emblem: <name>]
+  // [/${EMB_MARK}: <name>]
 
 Format (bridge — explicit layer crossing):
-  // [ai_s_bridge:LXtoLY <name>]
+  // [${BRD_MARK}:LXtoLY <name>]
   // ... code ...
-  // [/ai_s_bridge: <name>]
+  // [/${BRD_MARK}: <name>]
 
 Layer tags for emblems:
   #L1 / #physical    Physical I/O, DOM, events
@@ -89,8 +107,8 @@ switch (mode) {
 function runSkeleton(filePath) {
   const code = fs.readFileSync(filePath, 'utf8');
   // Inline parsers (Bible §0.1.2 — 共有禁止: regexは各モードに複製).
-  const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
-  const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+  const EMBLEM_RE = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
+  const BRIDGE_RE = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
 
   const items = [];
   let m;
@@ -100,7 +118,7 @@ function runSkeleton(filePath) {
   // 推測でフォールバックさせない: タグ無しは「(untagged)」として末尾に分離する。
   while ((m = EMBLEM_RE.exec(code)) !== null) {
     const [, meta, name, content] = m;
-    if (content.includes('// [ai_s_emblem:') || content.includes('// [ai_s_bridge:')) {
+    if (content.includes(`// [${EMB_MARK}:`) || content.includes(`// [${BRD_MARK}:`)) {
       console.warn(`Warning: Potential nested tag detected inside emblem '${name}'. Tags should be flat.`);
     }
     const trimmed = content.trim();
@@ -120,7 +138,7 @@ function runSkeleton(filePath) {
   // 不明な方向はOutOfLayersの直前 (150) に置く。強制はしない。
   while ((m = BRIDGE_RE.exec(code)) !== null) {
     const [, direction, name, content] = m;
-    if (content.includes('// [ai_s_emblem:') || content.includes('// [ai_s_bridge:')) {
+    if (content.includes(`// [${EMB_MARK}:`) || content.includes(`// [${BRD_MARK}:`)) {
       console.warn(`Warning: Potential nested tag detected inside bridge '${name}'. Tags should be flat.`);
     }
     const trimmed = content.trim();
@@ -156,13 +174,13 @@ function runSkeleton(filePath) {
       prevLabel = item.label;
     }
     if (item.kind === 'emblem') {
-      console.log(`// [ai_s_emblem:${item.meta} ${item.name}]`);
+      console.log(`// [${EMB_MARK}:${item.meta} ${item.name}]`);
       console.log(`  /* [Emblem: ${item.name} (${item.lines} lines hidden)] */`);
-      console.log(`// [/ai_s_emblem: ${item.name}]`);
+      console.log(`// [/${EMB_MARK}: ${item.name}]`);
     } else {
-      console.log(`// [ai_s_bridge:${item.meta} ${item.name}]`);
+      console.log(`// [${BRD_MARK}:${item.meta} ${item.name}]`);
       console.log(`  /* [Bridge: ${item.name} ${item.meta} (${item.lines} lines hidden)] */`);
-      console.log(`// [/ai_s_bridge: ${item.name}]`);
+      console.log(`// [/${BRD_MARK}: ${item.name}]`);
     }
     console.log('');
   }
@@ -177,7 +195,7 @@ function runFocus(filePath, targetName) {
   }
   const code = fs.readFileSync(filePath, 'utf8');
   // Emblem を先に走査（既存互換）。
-  const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
+  const EMBLEM_RE = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
   let m;
   while ((m = EMBLEM_RE.exec(code)) !== null) {
     if (m[2] === targetName) {
@@ -187,7 +205,7 @@ function runFocus(filePath, targetName) {
     }
   }
   // Bridge も独立 regex で走査（§0.1.2 共有禁止）。
-  const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+  const BRIDGE_RE = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
   while ((m = BRIDGE_RE.exec(code)) !== null) {
     if (m[2] === targetName) {
       console.log(m[0]);
@@ -208,6 +226,7 @@ function runCheck(filePath) {
   let warnings = 0;
 
   const KNOWN_TAGS = new Set([
+    ...CONFIG.customTags,
     '#high', '#mid', '#low',
     '#L1', '#L2', '#L3', '#L4',
     '#physical', '#intent', '#logic', '#draw',
@@ -215,13 +234,13 @@ function runCheck(filePath) {
   ]);
 
   // Emblem 検査（既存ロジックそのまま）。
-  const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
+  const EMBLEM_RE = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
   let parsedEmblems = 0;
   const emblemNames = new Set();
   let m;
   while ((m = EMBLEM_RE.exec(code)) !== null) {
     const name = m[2];
-    if (m[3].includes('// [ai_s_emblem:') || m[3].includes('// [ai_s_bridge:')) {
+    if (m[3].includes(`// [${EMB_MARK}:`) || m[3].includes(`// [${BRD_MARK}:`)) {
       console.warn(`Warning: Potential nested tag detected inside emblem '${name}'. Tags should be flat.`);
     }
     if (emblemNames.has(name)) {
@@ -237,8 +256,8 @@ function runCheck(filePath) {
     }
     parsedEmblems++;
   }
-  const emblemStarts = (code.match(/\/\/ \[ai_s_emblem:/g) || []).length;
-  const emblemEnds   = (code.match(/\/\/ \[\/ai_s_emblem:/g) || []).length;
+  const emblemStarts = (code.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
+  const emblemEnds   = (code.match(new RegExp(`\\/\\/ \\[\\/${EMB_MARK}:`, 'g')) || []).length;
   if (emblemStarts !== emblemEnds) {
     console.error(`Error: Emblem tag count mismatch! Start: ${emblemStarts}, End: ${emblemEnds}`);
     errors++;
@@ -250,13 +269,13 @@ function runCheck(filePath) {
 
   // Bridge 検査（独立 regex / 独立カウンタ §0.1.2 共有禁止）。
   // 方向は原則強制しないが、非標準パターンは警告する（typo検知）。
-  const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+  const BRIDGE_RE = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
   const CANONICAL_DIR_RE = /^L[1-4]to(L[1-4]|Persistent|Network|Verify)$/;
   let parsedBridges = 0;
   const bridgeNames = new Set();
   while ((m = BRIDGE_RE.exec(code)) !== null) {
     const dir = m[1], name = m[2];
-    if (m[3].includes('// [ai_s_emblem:') || m[3].includes('// [ai_s_bridge:')) {
+    if (m[3].includes(`// [${EMB_MARK}:`) || m[3].includes(`// [${BRD_MARK}:`)) {
       console.warn(`Warning: Potential nested tag detected inside bridge '${name}'. Tags should be flat.`);
     }
     if (bridgeNames.has(name)) {
@@ -270,8 +289,8 @@ function runCheck(filePath) {
     bridgeNames.add(name);
     parsedBridges++;
   }
-  const bridgeStarts = (code.match(/\/\/ \[ai_s_bridge:/g) || []).length;
-  const bridgeEnds   = (code.match(/\/\/ \[\/ai_s_bridge:/g) || []).length;
+  const bridgeStarts = (code.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
+  const bridgeEnds   = (code.match(new RegExp(`\\/\\/ \\[\\/${BRD_MARK}:`, 'g')) || []).length;
   if (bridgeStarts !== bridgeEnds) {
     console.error(`Error: Bridge tag count mismatch! Start: ${bridgeStarts}, End: ${bridgeEnds}`);
     errors++;
@@ -295,8 +314,8 @@ function runCheck(filePath) {
 // [ai_s_emblem:#high#logic Run-Coverage]
 function runCoverage(filePath) {
   const code = fs.readFileSync(filePath, 'utf8');
-  const EMBLEM_RE = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
-  const BRIDGE_RE = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+  const EMBLEM_RE = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
+  const BRIDGE_RE = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
 
   const layerCounts = { L1: 0, L2: 0, L3: 0, L4: 0, Verify: 0 };
   let m;
@@ -376,7 +395,7 @@ function runApply(filePath, patchPath) {
   // パッチ側の Emblem を一括収集（独立 regex、§0.1.2 共有禁止）。
   const patchEmblems = [];
   {
-    const re = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
+    const re = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
     let m;
     while ((m = re.exec(patchCode)) !== null) {
       patchEmblems.push({ meta: m[1], name: m[2], content: m[3] });
@@ -385,25 +404,25 @@ function runApply(filePath, patchPath) {
   // パッチ側の Bridge も独立 regex で収集（§0.1.2 共有禁止）。
   const patchBridges = [];
   {
-    const re = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+    const re = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
     let m;
     while ((m = re.exec(patchCode)) !== null) {
       patchBridges.push({ direction: m[1], name: m[2], content: m[3] });
     }
   }
   if (patchEmblems.length === 0 && patchBridges.length === 0) {
-    console.error('Error: No valid ai_s_emblem or ai_s_bridge blocks found in patch.');
+    console.error('Error: No valid ${EMB_MARK} or ${BRD_MARK} blocks found in patch.');
     process.exit(1);
   }
 
   // 適用前のタグ数を記録（破壊検知のため）。Emblem / Bridge 別カウント。
-  const baseEmblemStarts = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;
-  const baseBridgeStarts = (newCode.match(/\/\/ \[ai_s_bridge:/g) || []).length;
+  const baseEmblemStarts = (newCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
+  const baseBridgeStarts = (newCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
   let appliedCount = 0;
 
   // Emblem パッチ適用
   for (const pEmb of patchEmblems) {
-    const re = /\/\/ \[ai_s_emblem:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_emblem: \2\]/g;
+    const re = new RegExp(`\\/\\/ \\[${EMB_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${EMB_MARK}: \\2\\]`, 'g');
     const matches = [];
     let m;
     while ((m = re.exec(newCode)) !== null) {
@@ -414,7 +433,7 @@ function runApply(filePath, patchPath) {
     if (matches.length === 1) {
       const t = matches[0];
       // Tag Immutability: ヘッダ・フッタはターゲット側を保持し、中身だけ差し替える。
-      const safeReplacement = `// [ai_s_emblem:${t.meta} ${t.name}]\n${pEmb.content.trim()}\n// [/ai_s_emblem: ${t.name}]`;
+      const safeReplacement = `// [${EMB_MARK}:${t.meta} ${t.name}]\n${pEmb.content.trim()}\n// [/${EMB_MARK}: ${t.name}]`;
       newCode = newCode.slice(0, t.start) + safeReplacement + newCode.slice(t.end);
       appliedCount++;
       console.log(`Applied patch for emblem: ${pEmb.name}`);
@@ -427,7 +446,7 @@ function runApply(filePath, patchPath) {
 
   // Bridge パッチ適用（独立ロジック §0.1.2 共有禁止）
   for (const pBr of patchBridges) {
-    const re = /\/\/ \[ai_s_bridge:([^\]\s]*) ([\w\-]+)\]([\s\S]*?)\/\/ \[\/ai_s_bridge: \2\]/g;
+    const re = new RegExp(`\\/\\/ \\[${BRD_MARK}:([^\\]\\s]*) ([\\w\\-]+)\\]([\\s\\S]*?)\\/\\/ \\[\\/${BRD_MARK}: \\2\\]`, 'g');
     const matches = [];
     let m;
     while ((m = re.exec(newCode)) !== null) {
@@ -437,7 +456,7 @@ function runApply(filePath, patchPath) {
     }
     if (matches.length === 1) {
       const t = matches[0];
-      const safeReplacement = `// [ai_s_bridge:${t.direction} ${t.name}]\n${pBr.content.trim()}\n// [/ai_s_bridge: ${t.name}]`;
+      const safeReplacement = `// [${BRD_MARK}:${t.direction} ${t.name}]\n${pBr.content.trim()}\n// [/${BRD_MARK}: ${t.name}]`;
       newCode = newCode.slice(0, t.start) + safeReplacement + newCode.slice(t.end);
       appliedCount++;
       console.log(`Applied patch for bridge: ${pBr.name}`);
@@ -455,10 +474,10 @@ function runApply(filePath, patchPath) {
 
   // Destruction Fence: Emblem / Bridge どちらも対称性と件数不変を検査。
   {
-    const postEmblemStarts = (newCode.match(/\/\/ \[ai_s_emblem:/g) || []).length;
-    const postEmblemEnds   = (newCode.match(/\/\/ \[\/ai_s_emblem:/g) || []).length;
-    const postBridgeStarts = (newCode.match(/\/\/ \[ai_s_bridge:/g) || []).length;
-    const postBridgeEnds   = (newCode.match(/\/\/ \[\/ai_s_bridge:/g) || []).length;
+    const postEmblemStarts = (newCode.match(new RegExp(`\\/\\/ \\[${EMB_MARK}:`, 'g')) || []).length;
+    const postEmblemEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${EMB_MARK}:`, 'g')) || []).length;
+    const postBridgeStarts = (newCode.match(new RegExp(`\\/\\/ \\[${BRD_MARK}:`, 'g')) || []).length;
+    const postBridgeEnds   = (newCode.match(new RegExp(`\\/\\/ \\[\\/${BRD_MARK}:`, 'g')) || []).length;
     if (postEmblemStarts !== postEmblemEnds) {
       console.error(`\n[FATAL] Apply cancelled! Emblem tag corrupted (starts: ${postEmblemStarts}, ends: ${postEmblemEnds}).`);
       process.exit(1);

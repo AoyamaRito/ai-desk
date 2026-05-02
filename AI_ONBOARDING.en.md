@@ -55,6 +55,20 @@ const shadow_hp = REAL_state.hp / 100;
 
 ---
 
+## Starting a New Implementation (Scaffolding)
+
+When creating a new app or feature from scratch, start by copying the `template/` directory.
+
+```bash
+cp -r template my-new-app   # copy the template
+cd my-new-app               # move to the directory
+node ../ai-eyes.js          # start ai-eyes to view in browser (localhost:3000/my-new-app/)
+```
+
+`template/app.js` provides a minimal 4-layer structure (Physical, Intent, Logic, Draw). The basic workflow is to add your logic while maintaining this architectural integrity.
+
+---
+
 ## Tool Usage
 
 ### ai-desk (code editing workflow)
@@ -68,7 +82,7 @@ node ai-desk.js <file> apply patch.js    # 5. apply patch (with destruction fenc
 ```
 
 When making changes, write to a patch.js and apply it — safer than editing directly.
-`apply` validates that the emblem count is unchanged and cancels automatically if destruction is detected.
+`apply` enforces **Tag Immutability**, validating that the emblem count and tag structure are unchanged, and cancels automatically if destruction is detected.
 
 ### ai-eyes + eyes-e2e (observation / debugging)
 
@@ -77,8 +91,13 @@ node ai-eyes.js                          # start server (localhost:3000)
 node eyes-e2e.js "debug goal"            # compress current state to one text blob
 ```
 
-`eyes-e2e.js` returns exit 1 on errors, exit 0 on clean.
-Autonomous debug loop: run `eyes-e2e.js` → check errors → fix → repeat.
+`ai-eyes` serves a **Dynamic client.js** (`localhost:3000/client.js`). Including this in your HTML enables remote control and observation by AI.
+Furthermore, the **/structure** endpoint allows sending internal structures (3D coordinates, physics data) for logic validation without a browser (**Structural Projection**).
+
+### run.js (Orchestrator Pattern)
+
+For complex validation or automated debugging, create and use a `run.js` (**Orchestrator**) that unifies server startup, browser interaction, and validation script execution. This allows AI to complete the entire process with a single command.
+
 
 ---
 
@@ -165,16 +184,19 @@ Tell the human in one sentence: what you found and how you fixed it.
 
 ## After reading this file
 
-Present the following to the human operator:
+Tell the human operator: "I have read the guide and understood the AI-Native design rules (Constraint Folding, 4-Layer Architecture, and tool usage)."
 
-**What this repo can do:**
+**NOTE:**
+Tools like `skeleton` for structure overview, `focus` for local reads, and `ai-eyes` for debugging are **for YOU (the AI) to use autonomously**. Do not present them as a menu to the human.
 
-1. **Structure overview** — list the layer structure of a file with `skeleton`
-2. **Local read** — extract a single Emblem with `focus`
-3. **Add feature** — implement new logic with the constraint folding pattern
-4. **Fix bug** — autonomous debug loop with `ai-eyes` + `eyes-e2e`
-5. **Integrity check** — validate tags and bridges with `check` / `coverage`
-6. **Apply patch** — write changes safely with `apply`
-7. **Run tests** — check current state by running the existing test suite
+Instead, ask the human for their goal using plain, everyday language:
 
-Then ask: "Which would you like to do?"
+- "Shall we build something new from scratch?"
+- "Would you like to add new features or change existing ones?"
+- "Are there any issues or broken parts we need to fix?"
+- "Should I play through the app in slow motion to check for any glitches?"
+
+Once the human gives a directive, use `ai-desk` and `ai-eyes` autonomously to complete the task.
+
+---
+**Author**: 沖井広行 (Hiroyuki OKINOI) / Pen name: 蒼山りと (Aoyama Rito)

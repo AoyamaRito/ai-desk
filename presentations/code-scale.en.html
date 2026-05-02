@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why code scales — design that survives growth</title>
+<style>
+:root {
+  --fg: #111111; --fg-dim: #5a5a5a; --bg: #ffffff; --bg-soft: #f6f6f8;
+  --border: #1a1a1a; --border-soft: #d8d8de;
+  --accent: #6b3aff; --accent-soft: #f0eaff;
+  --pink: #ff1d6d; --green: #00a86b; --amber: #f59e0b; --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg); border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(42px, 7vw, 110px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.0; color: var(--accent); margin-bottom: 24px; max-width: 18ch;
+}
+.title-slide .tagline { font-size: clamp(18px, 2.4vw, 28px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 30ch; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(28px, 4vw, 50px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+.split .col ul { margin-left: 0; list-style: none; padding: 0; }
+.split .col li { padding: 6px 0 6px 28px; position: relative; }
+.split .col.problem li::before { content: "✗"; position: absolute; left: 4px; color: var(--pink); font-weight: 800; }
+.split .col.solution li::before { content: "✓"; position: absolute; left: 4px; color: var(--green); font-weight: 800; }
+
+.principles { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+.principle {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 16px 18px;
+}
+.principle h4 {
+  font-size: clamp(15px, 1.7vw, 19px); font-weight: 800; margin-bottom: 6px; color: var(--accent);
+}
+.principle p { font-size: clamp(13px, 1.4vw, 16px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(24px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics, .principles { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <section class="slide title-slide active">
+    <h1>"AI dev dies at scale" — answered</h1>
+    <p class="tagline">How design crushes the failure mode.</p>
+    <p class="sub">ai-desk methodology — Hiroyuki OKINOI · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">1</span>The standard critique</h2>
+    <div class="callout">
+      Letting AI loose on a codebase is fast at first.<br>
+      But once it grows, <strong>AI loses context and starts breaking things</strong>.<br>
+      Past 50,000 lines, you're stuck.
+    </div>
+    <p class="muted">This critique <strong>is correct under conventional design</strong>.<br>What happens when conventional design is rejected?</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">2</span>How conventional code dies at scale</h2>
+    <div class="split">
+      <div class="col problem">
+        <h3>As size grows</h3>
+        <ul>
+          <li>Functions call other functions → context chains</li>
+          <li>Files depend on files → multi-file reads to edit safely</li>
+          <li>Shared helpers (DRY) → one change ripples everywhere</li>
+          <li>Abstraction / encapsulation → hidden info AI can't see</li>
+          <li>Implicit assumptions → break silently</li>
+        </ul>
+      </div>
+      <div class="col problem">
+        <h3>Result</h3>
+        <ul>
+          <li>Exceeds AI's spotlight (~±300 lines)</li>
+          <li>Eats the context window</li>
+          <li>Blast radius unreadable, AI breaks things</li>
+          <li>Tests fail, fixes cascade, snowball stalls</li>
+          <li>Conclusion drawn: "AI has limits"</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">3</span>Cause behind the cause</h2>
+    <p class="lead">AI breaks because <strong>the design wasn't built for AI</strong>, not because of inherent AI limits.</p>
+    <p>Conventional design principles (DRY / abstraction / encapsulation) optimise for <strong>humans reading code</strong>. AI needs the opposite optimisation:</p>
+    <ul>
+      <li><strong>Maximise locality</strong> — read one place, see everything</li>
+      <li><strong>Forbid sharing</strong> — bound the blast radius of any edit</li>
+      <li><strong>Be explicit</strong> — expand inline rather than hide</li>
+      <li><strong>One-file completeness</strong> — avoid file-jump cost</li>
+    </ul>
+    <p class="muted">This is Bible §0.0 "Cognitive Asymmetry". The same code is hard for AI and easy for humans, vice versa.<br><strong>Conventional best practice is what kills AI.</strong></p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">4</span>Strategy 1 — Heavy Function</h2>
+    <p class="lead">Complete inside one function. AI reads that one function and knows everything.</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>Don't chop functions</h4>
+        <p>Build large feature-scoped functions. Inline data transforms, branches, and side-effect triggers into one scope.</p>
+      </div>
+      <div class="principle">
+        <h4>Don't fear length</h4>
+        <p>200-500 line functions are fine. They just need to fit AI's spotlight. Splitting smaller increases inter-function dependency jumps.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">Counter-intuitive. But <strong>1 function = edit blast radius bounded inside it</strong>. Other functions stay safe at scale.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">5</span>Strategy 2 — Forbid shared helpers</h2>
+    <p class="lead">No "common helpers" called from multiple functions. Don't fear duplication.</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>DRY (conventional)</h3>
+        <ul>
+          <li>Extract identical code, reuse</li>
+          <li>Praised as "good design"</li>
+          <li>But: 1 change ripples to all callers</li>
+          <li>Blast radius = O(callers)</li>
+          <li>Larger scale, worse damage</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk: no sharing</h3>
+        <ul>
+          <li>Similar code is <strong>duplicated into each function</strong></li>
+          <li>"Duplication isn't evil — hidden dependency is"</li>
+          <li>1 change leaves others untouched</li>
+          <li>Blast radius = O(1)</li>
+          <li>Damage doesn't grow with size</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">6</span>Strategy 3 — Emblem boundaries + local read</h2>
+    <p class="lead">Don't physically split a giant file. Virtually partition it and let AI read locally.</p>
+    <ul>
+      <li>Declare sections with <code>// [ai_s_emblem:#layer Name]</code></li>
+      <li><code>node ai-desk.js file.js skeleton</code> → list all emblems (dozens of lines)</li>
+      <li><code>node ai-desk.js file.js focus EmblemName</code> → extract just that emblem</li>
+      <li><code>node ai-desk.js file.js apply patch.js</code> → atomic apply (pre-flight verify + tag immutability check)</li>
+    </ul>
+    <div class="callout">
+      Even in a <strong>100,000-line</strong> file, AI reads only the few hundred lines of the relevant emblem.<br>
+      <strong>Context consumption doesn't depend on file size.</strong>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">7</span>Strategy 4 — 4-Layer + REAL/SHADOW</h2>
+    <p class="lead">Structurally separate data flow and state ownership.</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>4-layer one-way flow</h4>
+        <p>L1 Physical → L2 Intent → L3 Logic → L4 Draw. Direction is fixed → editing X structurally determines what changes.</p>
+      </div>
+      <div class="principle">
+        <h4>REAL — only one mutator</h4>
+        <p>Only L3 may update <code>REAL_state</code>. Other layers are read-only. State-leak bugs become <strong>structurally impossible</strong>.</p>
+      </div>
+      <div class="principle">
+        <h4>SHADOW is disposable</h4>
+        <p>Derived values aren't stored. Compute, use, throw away. "Sync miss" bugs vanish.</p>
+      </div>
+      <div class="principle">
+        <h4>Bridges expose layer crossings</h4>
+        <p>Cross-layer calls tagged <code>// [ai_s_bridge:L3toL4]</code>. AI sees "this is a cognitive jump point".</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">8</span>Strategy 5 — Constraint Folding</h2>
+    <p class="lead">Replace nested if/else with "enumerate all worlds → filter".</p>
+    <ul>
+      <li><strong>Conventional:</strong> branch trees → combinatorial explosion at scale, missed test cases, AI lost in branches</li>
+      <li><strong>ai-desk:</strong> enumerate all possible worlds as a <strong>data structure</strong> → filter by constraints → surviving worlds = answer</li>
+      <li>No branch tree = no AI cognitive split</li>
+      <li>Reverse lookup possible (output → input), exhaustive testing trivial</li>
+    </ul>
+    <p class="muted" style="margin-top: 18px;">Minimal proof: <code>constraint-janken.js</code> — 3-player rock-paper-scissors, 27 worlds, zero if statements.<br>Real example: <code>fighter-cancel.test.js</code> — 1920 worlds exhaustive, single file.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">9</span>Strategy 6 — Twin + Event Sourcing</h2>
+    <p class="lead">Guarantee maintainability and verifiability structurally.</p>
+    <div class="principles">
+      <div class="principle">
+        <h4>Twin (verification twin)</h4>
+        <p>A pure CPU function runs alongside the GPU implementation, recomputing the same input. When a bug appears, you can definitively say "this is a logic bug, not a rendering bug".</p>
+      </div>
+      <div class="principle">
+        <h4>Event Sourcing</h4>
+        <p>Don't overwrite state. Append the Command history as a JSON array. Each event includes the previous hash → tampering is mathematically detectable.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">→ Reproduce any past state, completely audit "why did the state become this".<br>Even at scale, <strong>you can trace back to the cause</strong>.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">10</span>Numbers the design guarantees</h2>
+    <div class="metrics">
+      <div class="metric"><div class="num">±300 lines</div><div class="lab">AI's read window<br>(per emblem, file-size independent)</div></div>
+      <div class="metric"><div class="num">O(1)</div><div class="lab">Edit blast radius<br>(no shared helpers)</div></div>
+      <div class="metric"><div class="num">O(change)</div><div class="lab">Verification scope<br>(Twin / per-goal exhaustive)</div></div>
+    </div>
+    <p class="lead" style="margin-top: 26px;">All of these are <strong>independent of total size (file count / line count)</strong>.<br>At 100,000 lines, the numbers don't change.</p>
+    <p class="muted">In conventional codebases, all of these grow with size. <strong>ai-desk severs that relationship by design.</strong></p>
+  </section>
+
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">Crushed by design</h2>
+    <p style="font-size: clamp(18px, 2.2vw, 30px); font-weight: 600; max-width: 900px; line-height: 1.5;">
+      "AI dev dies at scale" applies <br>
+      <strong style="color: var(--accent);">only when you keep writing the conventional way.</strong><br>
+      Redesigned for AI, <strong style="color: var(--accent);">there is no remaining cause to die</strong>.
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(14px, 1.5vw, 18px); color: var(--fg-dim); line-height: 1.6; max-width: 720px;">
+      Heavy Function · No shared helpers · Emblem local read · 4-Layer + REAL/SHADOW ·<br>
+      Constraint Folding · Twin + Event Sourcing<br>
+      ── once these line up, <strong>scale is no longer a failure mode</strong>.
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      Hiroyuki OKINOI · Aoyama Rito
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="code-scale.en.pdf" download>PDF</a>
+<div id="hint">← → / Space to advance · F for fullscreen · <a href="code-scale.en.pdf" download style="color: var(--accent); font-weight: 700;">PDF</a></div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 12</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Why ai-desk scales — the case for not reading code</title>
+<style>
+:root {
+  --fg: #111111;
+  --fg-dim: #5a5a5a;
+  --bg: #ffffff;
+  --bg-soft: #f6f6f8;
+  --border: #1a1a1a;
+  --border-soft: #d8d8de;
+  --accent: #6b3aff;
+  --accent-soft: #f0eaff;
+  --pink: #ff1d6d;
+  --green: #00a86b;
+  --amber: #f59e0b;
+  --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg); border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(48px, 8vw, 120px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 0.95; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
+}
+.title-slide .tagline { font-size: clamp(18px, 2.4vw, 28px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 30ch; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(30px, 4.2vw, 52px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; color: var(--fg); }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; color: var(--fg); margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul, .slide ol { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+.split .col ul { margin-left: 0; list-style: none; padding: 0; }
+.split .col li { padding: 6px 0 6px 28px; position: relative; }
+.split .col.problem li::before { content: "✗"; position: absolute; left: 4px; color: var(--pink); font-weight: 800; }
+.split .col.solution li::before { content: "✓"; position: absolute; left: 4px; color: var(--green); font-weight: 800; }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(26px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+.flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0; }
+.flow .stage {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 12px;
+  text-align: center; min-height: 110px; display: flex; flex-direction: column; justify-content: center;
+}
+.flow .stage .who { font-size: clamp(11px, 1.1vw, 13px); color: var(--accent); font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.flow .stage .what { font-size: clamp(13px, 1.4vw, 17px); font-weight: 700; line-height: 1.3; }
+.flow .stage.human { background: var(--accent-soft); border-color: var(--accent); }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.objection { border: 2px solid var(--border); padding: 16px 20px; margin: 16px 0; }
+.objection .q { font-size: clamp(15px, 1.7vw, 21px); font-weight: 800; color: var(--pink); margin-bottom: 8px; }
+.objection .q::before { content: "Q. "; }
+.objection .a { font-size: clamp(14px, 1.5vw, 18px); color: var(--fg); line-height: 1.6; }
+.objection .a::before { content: "A. "; font-weight: 800; color: var(--green); }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics, .flow { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <section class="slide title-slide active">
+    <h1>Not reading code scales</h1>
+    <p class="tagline">When "humans review the PR" hits its ceiling in the AI era — what comes next.</p>
+    <p class="sub">ai-desk methodology — Hiroyuki OKINOI · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">1</span>The common doubt</h2>
+    <div class="callout">
+      Can a human really read AI-parallel-generated code?<br>
+      The volume is unmanageable.<br>
+      But if reviews are fully automated, do you still know what's being built?
+    </div>
+    <p class="muted">The doubt is correct — <strong>under the assumption that "humans must read the code"</strong>, AI parallel development does not scale.</p>
+    <p>So what happens if we drop that assumption?</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">2</span>The volume wall</h2>
+    <p class="lead">The gap between AI generation rate and human reading rate widens every year.</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">~50</div><div class="lab">Lines a human can<br>seriously read per day</div></div>
+      <div class="metric"><div class="num">~50,000</div><div class="lab">Lines AI generates<br>per day</div></div>
+      <div class="metric"><div class="num">×1,000</div><div class="lab">Speed gap<br>(growing, not closing)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">The moment "carefully review every PR" stays mandatory, total throughput is <strong>rate-limited by human reading capacity</strong>. Adding more reviewers just means multiple humans reading the same PR.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">3</span>The quality wall — review doesn't catch everything</h2>
+    <p class="lead">Even reviewed-by-humans code ships vulnerabilities.</p>
+    <ul>
+      <li><strong>Heartbleed (2014)</strong> — OpenSSL, reviewed by experts worldwide, dormant 2 years</li>
+      <li><strong>Log4Shell (2021)</strong> — 8 years dormant, passed Apache Foundation review</li>
+      <li><strong>XZ utils backdoor (2024)</strong> — multi-year planned attack, reached most Linux distros</li>
+    </ul>
+    <p>"Humans review" is <strong>neither necessary nor sufficient</strong>. The basis for confidence is weaker than it feels.</p>
+    <p class="muted" style="margin-top: 18px;">Review is "better than nothing" but not "review = safe". Whether AI or human writes, review alone guarantees little.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">4</span>Re-split the human / machine roles</h2>
+    <div class="split">
+      <div class="col problem">
+        <h3>Old division</h3>
+        <ul>
+          <li>Human: writes code</li>
+          <li>Human: reads code (review)</li>
+          <li>Human: writes tests</li>
+          <li>Human: chases bugs</li>
+          <li>Machine: builds &amp; runs</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk division</h3>
+        <ul>
+          <li>Human: <strong>declares intent</strong></li>
+          <li>Human: <strong>verifies the result</strong> (behaviour / acceptance)</li>
+          <li>Machine (AI): writes / reads / fixes</li>
+          <li>Machine: generates exhaustive E2E</li>
+          <li>Machine: records logs / screenshots / video</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 18px;">What humans give up: chasing lines of code. What humans keep: <strong>"what to build" and "is it working"</strong>.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">5</span>The new pipeline</h2>
+    <div class="flow">
+      <div class="stage human"><div class="who">human</div><div class="what">declare intent<br>"what to build"</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">generate code<br>+ self test</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">mass-generate E2E<br>exhaustive run</div></div>
+      <div class="stage"><div class="who">AI</div><div class="what">screenshots + video<br>history record</div></div>
+      <div class="stage human"><div class="who">human</div><div class="what">accept<br>"works ✓"</div></div>
+    </div>
+    <p class="lead" style="margin-top: 14px;">The human touches <strong>only at the start and the end</strong>. The 3 middle stages are entirely machine.</p>
+    <p class="muted">Tools shipped in ai-desk:<br>
+      <code>ai-desk.js</code> (code editing) · <code>ai-eyes.js</code> (screen observation / input injection / video record) · <code>eyes-e2e.js</code> (state → text).
+    </p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">6</span>Why this scales</h2>
+    <p class="lead">Human load becomes <strong>O(intent count)</strong>, no longer dependent on code volume.</p>
+    <div class="split">
+      <div class="col problem">
+        <h3>Old (PR review)</h3>
+        <ul>
+          <li>Human load = O(lines of code)</li>
+          <li>1 feature added = hundreds of lines to read</li>
+          <li>10× features = 10× review hours</li>
+          <li>Parallel dev makes it worse</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk</h3>
+        <ul>
+          <li>Human load = O(intent count)</li>
+          <li>1 feature = 1 intent declaration + 1 acceptance check</li>
+          <li>10× features = 10× intents (read volume unchanged)</li>
+          <li>Parallel dev: machine side scales, human side stays linear</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">This is the structure that makes "single-developer full-time parallel execution" work.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">7</span>Objection 1 — "What about future maintenance?"</h2>
+    <div class="objection">
+      <p class="q">Code written without reading — surely you can't fix it 6 months later?</p>
+      <p class="a">The fixer is also AI. As long as the original intent and the E2E tests are preserved, AI can re-read and patch.<br>
+      ai-desk's tool for this is <strong>Emblem-scoped editing (skeleton / focus / apply)</strong>.
+      <strong>Even in a 100k-line file, AI only reads the relevant emblem to make the change.</strong></p>
+    </div>
+    <p class="muted">Premise: AI doesn't go away. With multi-vendor competition + local models maturing, this is structurally guaranteed rather than wishful.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">8</span>Objection 2 — "What about onboarding new members?"</h2>
+    <div class="objection">
+      <p class="q">A new member who can't read code can't join the project, right?</p>
+      <p class="a">The handoff material = <strong>intent declarations + working E2E tests + screenshots + video</strong>.<br>
+      The new member reads "what does this service do", not "how is it implemented", and asks AI for changes.<br>
+      Compared with "read the code and infer the spec", <strong>seeing intent and observed behaviour directly is faster onboarding</strong>.</p>
+    </div>
+    <p class="muted">Claim: if it works for an individual, it works for a team — same method, same primitives.</p>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">9</span>Objection 3 — "I can't trust it without reading"</h2>
+    <div class="objection">
+      <p class="q">Without reading, you'll never notice when AI does something weird.</p>
+      <p class="a">"Reading" is <strong>subjective inspection</strong>. Sometimes it catches things, sometimes it doesn't (Heartbleed: 2 years dormant).<br>
+      ai-desk relies on <strong>objective inspection</strong>:<br>
+      ・<strong>Exhaustive E2E</strong> (try all 1920 worlds)<br>
+      ・<strong>Twin (double-entry math)</strong> verification (re-compute GPU output with a pure CPU function)<br>
+      ・<strong>Event sourcing + hash chain</strong> (mathematical tamper detection)<br>
+      These are <strong>stronger guarantees than "a human read it"</strong>.</p>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2><span class="num">10</span>Real example — fighter-cancel.test.js</h2>
+    <p class="lead">Action-game cancel/combo logic, exhaustively tested across <strong>1920 worlds</strong>.</p>
+    <div class="metrics">
+      <div class="metric"><div class="num">1920</div><div class="lab">Worlds covered<br>(all possible state combinations)</div></div>
+      <div class="metric"><div class="num">19/19</div><div class="lab">Test cases<br>all green</div></div>
+      <div class="metric"><div class="num">1</div><div class="lab">File<br>(everything in one)</div></div>
+    </div>
+    <p class="muted" style="margin-top: 22px;">What the human reviews = "all 1920 worlds passed". The contents of individual worlds are not read.<br><strong>"Mechanically tried everything" is a stronger guarantee than "a human read part of it".</strong></p>
+  </section>
+
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(36px, 5.6vw, 72px); margin-bottom: 28px;">Paradigm shift</h2>
+    <p style="font-size: clamp(18px, 2.2vw, 30px); font-weight: 600; max-width: 800px; line-height: 1.5;">
+      Don't give up on "reading the code".<br>
+      <strong style="color: var(--accent);">Replace it with what machines can guarantee.</strong>
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(14px, 1.6vw, 19px); color: var(--fg-dim); line-height: 1.6; max-width: 700px;">
+      This isn't a "technique improvement", it's a <strong>role-split redesign</strong>.<br>
+      In an era where AI writes the code, <strong>narrow the human's responsibility to intent and verification</strong>.<br>
+      The moment that happens, however much code grows, the human's load only grows with intent count.
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      Hiroyuki OKINOI · Aoyama Rito
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="scale.en.pdf" download>PDF</a>
+<div id="hint">← → / Space to advance · F for fullscreen · <a href="scale.en.pdf" download style="color: var(--accent); font-weight: 700;">PDF</a></div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 12</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

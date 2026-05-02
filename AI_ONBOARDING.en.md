@@ -4,7 +4,12 @@
 
 ai-desk is a **mechanism for running AI under the conceptual framework called *ai-desk***, so that anyone can develop software using AI. This is an architecture — a separate concept from the software engineering of the pre-AI era. Debate framed in pre-AI terms is not invited from the outset. ai-desk is a **thought-construct that solves the problem of AI being constrained by human software engineering and failing to perform at its true capability**.
 
-**The intended audience of this documentation is LLM/AI only, not human engineers.**
+## Audience Roles
+
+- **End users**: Focus on building what you want to build, in natural language. Architectural debate is not required of you.
+- **Architects**: Discussion about how AI can produce structures *not* bound by human intuitions is welcome. Discussion that imports pre-AI-era software engineering is out of scope.
+
+**The documentation itself is for LLM/AI only, not for human engineers.**
 Human-era "readability" (abstraction, modularization, encapsulation) hides information from AI. This repo optimizes for the opposite: exposed, explicit, and integrated complexity. If a human finds it hard to read, that is by design, not a defect.
 
 Every AI working in this repo should read this file first.

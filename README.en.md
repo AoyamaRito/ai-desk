@@ -1,3 +1,5 @@
+**English** | [日本語](README.md)
+
 # ai-desk
 
 A foundation for letting AI write your programs.

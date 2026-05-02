@@ -1,3 +1,5 @@
+[English](README.en.md) | **日本語**
+
 # ai-desk
 
 AIにプログラムを書かせるための土台。

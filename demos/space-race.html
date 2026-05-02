@@ -155,26 +155,39 @@ function initStars() {
 // pick a vivid hue for each ring so the tunnel rainbows ahead
 const RING_HUES = [350, 200, 50, 280, 130, 25, 310, 170];
 let ringSeq = 0;
-function spawnRing(distance) {
-  // place ahead of camera at ~distance, with a random offset perpendicular
+
+// Chain new rings off the last ring (or camera) with a *small* perpendicular
+// offset so consecutive rings form a smooth flying path that's always
+// reachable from the previous one. spacing/offset stay in proportion so
+// turning isn't required to pass each one — just gentle steering.
+function spawnRing(spacing, baseRing) {
   const fwd = forward();
   const right = rightVec();
   const up = upVec();
-  const offX = (Math.random() - 0.5) * 700;
-  const offY = (Math.random() - 0.5) * 450;
+  const bx = baseRing ? baseRing.x : cam.x;
+  const by = baseRing ? baseRing.y : cam.y;
+  const bz = baseRing ? baseRing.z : cam.z;
+  // tight cone — ±35% of spacing in either perpendicular axis
+  const offX = (Math.random() - 0.5) * spacing * 0.7;
+  const offY = (Math.random() - 0.5) * spacing * 0.5;
   const hue = RING_HUES[ringSeq++ % RING_HUES.length];
   return {
-    x: cam.x + fwd[0] * distance + right[0] * offX + up[0] * offY,
-    y: cam.y + fwd[1] * distance + right[1] * offX + up[1] * offY,
-    z: cam.z + fwd[2] * distance + right[2] * offX + up[2] * offY,
-    radius: 90,
+    x: bx + fwd[0] * spacing + right[0] * offX + up[0] * offY,
+    y: by + fwd[1] * spacing + right[1] * offX + up[1] * offY,
+    z: bz + fwd[2] * spacing + right[2] * offX + up[2] * offY,
+    radius: 95,
     hue,
     pulse: Math.random() * Math.PI * 2,
   };
 }
 function initRings() {
   rings = [];
-  for (let i = 0; i < RING_COUNT; i++) rings.push(spawnRing(500 + i * 550));
+  let prev = null;
+  for (let i = 0; i < RING_COUNT; i++) {
+    const r = spawnRing(i === 0 ? 380 : 360, prev);
+    rings.push(r);
+    prev = r;
+  }
 }
 
 // vector helpers (inline, ai-desk style)
@@ -503,9 +516,10 @@ function step(now) {
   if (rings.length > 0 && checkRingPass(rings[0])) {
     const passedRing = rings.shift();
     spawnRingBurst(passedRing.x, passedRing.y, passedRing.z);
-    // queue next ring at the back of the lineup
-    const lastZ = rings.length ? rings[rings.length - 1] : null;
-    rings.push(spawnRing(2600));
+    // chain next ring off the last one in queue so the rainbow tunnel
+    // continues smoothly without huge gaps or off-screen jumps
+    const tail = rings.length ? rings[rings.length - 1] : null;
+    rings.push(spawnRing(360, tail));
     passed++;
     numEl.textContent = passed;
     // speed up — diminishing returns, capped

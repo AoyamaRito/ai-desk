@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanban — ai-desk demo (vanilla, single file)</title>
+<style>
+:root {
+  --fg: #1a0f24; --fg-dim: #5a4d6a; --bg: #f3eef9; --board-bg: #f8f6fb;
+  --col-bg: #ffffff; --card-bg: #fefdff; --border: #1a0f24; --accent: #6b3aff;
+  --pink: #ff1d6d; --teal: #00c4cc; --yellow: #ffcc00; --green: #00d97e;
+  --shadow: rgba(26, 15, 36, 0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html.embed body > header { display: none; }
+html, body { height: 100%; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", system-ui, sans-serif; overflow: hidden; }
+button, input, textarea { font: inherit; color: inherit; background: transparent; border: 0; outline: none; }
+header {
+  height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--border); background: #fff; font-size: 13px; flex-shrink: 0;
+}
+header .title { font-weight: 800; }
+header .pill { font-size: 11px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 99px; color: var(--fg-dim); letter-spacing: 0.04em; }
+header .grow { flex: 1 1 auto; }
+header .icon-btn { padding: 6px 12px; border: 2px solid var(--border); cursor: pointer; font-size: 12px; font-weight: 700; }
+header .icon-btn:hover { background: var(--fg); color: #fff; }
+header .hint { color: var(--fg-dim); font-size: 11px; }
+
+#board {
+  height: calc(100% - 44px); padding: 16px; display: flex; gap: 14px;
+  overflow-x: auto; align-items: flex-start; user-select: none;
+}
+html.embed #board { height: 100%; }
+
+.col {
+  width: 280px; flex-shrink: 0; background: var(--col-bg); border: 2px solid var(--border);
+  display: flex; flex-direction: column; max-height: 100%;
+}
+.col.dragging { opacity: 0.4; }
+.col.drop-target { box-shadow: 0 0 0 3px var(--pink); }
+.col-head {
+  padding: 10px 12px; display: flex; align-items: center; gap: 8px; cursor: grab;
+  border-bottom: 2px solid var(--border); background: var(--bg); font-weight: 800;
+}
+.col-head .col-title {
+  flex: 1 1 auto; font-size: 14px; padding: 2px 4px; border-radius: 2px;
+}
+.col-head .col-title:focus { background: #fff; outline: 1px solid var(--accent); }
+.col-head .count { font-size: 11px; color: var(--fg-dim); padding: 2px 6px; background: #fff; border: 1px solid var(--border); }
+.col-head .x { cursor: pointer; padding: 0 4px; color: var(--fg-dim); font-weight: 800; }
+.col-head .x:hover { color: var(--pink); }
+
+.cards {
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; flex: 1 1 auto; min-height: 60px;
+}
+
+.card {
+  padding: 8px 10px; background: var(--card-bg); border: 2px solid var(--border);
+  font-size: 13px; line-height: 1.4; cursor: grab; position: relative;
+  box-shadow: 2px 2px 0 var(--shadow); word-break: break-word;
+}
+.card:hover { background: #fff; }
+.card .x {
+  position: absolute; top: 2px; right: 4px; font-size: 16px; color: var(--fg-dim);
+  cursor: pointer; font-weight: 800; padding: 0 4px; opacity: 0;
+}
+.card:hover .x { opacity: 1; }
+.card .x:hover { color: var(--pink); }
+.card.dragging { opacity: 0.3; }
+.card.editing { background: #fff8d8; cursor: text; }
+.card textarea {
+  width: 100%; min-height: 40px; resize: none; font: inherit; line-height: 1.4;
+}
+
+.add-card {
+  padding: 8px 10px; cursor: pointer; color: var(--fg-dim); font-size: 12px;
+  border-top: 1px dashed var(--border); text-align: center; font-weight: 700;
+}
+.add-card:hover { background: var(--bg); color: var(--fg); }
+
+.add-col {
+  width: 280px; flex-shrink: 0; padding: 16px; background: transparent;
+  border: 2px dashed var(--fg-dim); color: var(--fg-dim); cursor: pointer;
+  text-align: center; font-weight: 700; font-size: 13px; align-self: stretch;
+  display: flex; align-items: center; justify-content: center;
+}
+.add-col:hover { border-color: var(--fg); color: var(--fg); background: #fff; }
+
+/* drag ghost (floats with the cursor) */
+#ghost {
+  position: fixed; pointer-events: none; z-index: 1000;
+  padding: 8px 10px; background: #fff; border: 2px solid var(--accent);
+  font-size: 13px; line-height: 1.4; box-shadow: 4px 4px 0 var(--shadow);
+  width: 260px; transform: rotate(-2deg);
+}
+#ghost.col-ghost { padding: 10px 12px; background: var(--bg); width: 280px; }
+
+/* drop indicator */
+.drop-indicator {
+  height: 3px; background: var(--pink); margin: 4px 0; border-radius: 2px;
+}
+
+.toast {
+  position: absolute; bottom: 14px; right: 14px; padding: 8px 14px;
+  background: var(--fg); color: #fff; border-radius: 4px; font-size: 12px;
+  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <span class="title">Kanban</span>
+  <span class="pill">vanilla · 1 file · zero deps</span>
+  <span class="grow"></span>
+  <span class="hint">drag cards/columns · click card to edit · ⌘Z / Ctrl+Z = undo · auto-save</span>
+  <button class="icon-btn" id="btn-undo" title="undo">undo</button>
+  <button class="icon-btn" id="btn-clear" title="reset to seed">reset</button>
+</header>
+
+<div id="board"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// Kanban — vanilla 1-file demo for ai-desk
+//
+// Multi-column board with cards, drag-and-drop (cards between
+// columns, columns reorderable), inline edit, delete, undo,
+// localStorage persistence. No drag-and-drop library required.
+//
+// Layers (Bible §2):
+//   L1 Physical : DOM, mouse, keyboard, localStorage
+//   L2 Intent   : events → Command
+//                   (AddCard / EditCard / MoveCard / DeleteCard
+//                    / AddColumn / MoveColumn / RenameColumn /
+//                    DeleteColumn / Undo / Reset / Load)
+//   L3 Logic    : pure reducer (state, command) => newState,
+//                 undo stack, persistence trigger
+//   L4 Draw     : render columns + cards from state every dispatch
+//
+// DnD is implemented manually (mousedown / mousemove / mouseup +
+// floating ghost) rather than HTML5 native drag-and-drop because
+// it's more reliable cross-browser and gives us a smoother ghost.
+// ============================================================
+
+const STORAGE_KEY = 'ai-desk:kanban:v1';
+
+let nextId = 1;
+function uid() { return 'k' + (nextId++); }
+
+const REAL_state = {
+  columns: [],   // [{ id, title, cards: [{id, text}] }]
+  history: [],   // past states (JSON snapshots) for undo, capped
+  drag: null,    // { kind: 'card' | 'col', id, ghost: HTMLElement, fromCol?, fromIdx? }
+};
+
+// ----- L3 reducer ------------------------------------------
+function snapshot() {
+  // structuredClone keeps card / column ids stable
+  return structuredClone({ columns: REAL_state.columns });
+}
+function pushHistory() {
+  REAL_state.history.push(snapshot());
+  if (REAL_state.history.length > 50) REAL_state.history.shift();
+}
+
+function dispatch(cmd) {
+  if (cmd.type !== 'UNDO' && cmd.type !== 'LOAD' && cmd.type !== 'NOOP_RENDER') pushHistory();
+  switch (cmd.type) {
+    case 'ADD_CARD': {
+      const col = REAL_state.columns.find(c => c.id === cmd.colId); if (!col) break;
+      col.cards.push({ id: uid(), text: cmd.text || '' });
+      break;
+    }
+    case 'EDIT_CARD': {
+      for (const col of REAL_state.columns) {
+        const card = col.cards.find(c => c.id === cmd.cardId);
+        if (card) { card.text = cmd.text; break; }
+      }
+      break;
+    }
+    case 'DELETE_CARD': {
+      for (const col of REAL_state.columns) {
+        const i = col.cards.findIndex(c => c.id === cmd.cardId);
+        if (i >= 0) { col.cards.splice(i, 1); break; }
+      }
+      break;
+    }
+    case 'MOVE_CARD': {
+      // pull card out of its source column, insert at target.col[idx]
+      let card = null;
+      for (const col of REAL_state.columns) {
+        const i = col.cards.findIndex(c => c.id === cmd.cardId);
+        if (i >= 0) { card = col.cards.splice(i, 1)[0]; break; }
+      }
+      if (!card) break;
+      const target = REAL_state.columns.find(c => c.id === cmd.toColId);
+      if (!target) break;
+      const idx = Math.max(0, Math.min(target.cards.length, cmd.toIdx));
+      target.cards.splice(idx, 0, card);
+      break;
+    }
+    case 'ADD_COLUMN':
+      REAL_state.columns.push({ id: uid(), title: cmd.title || 'New Column', cards: [] });
+      break;
+    case 'RENAME_COLUMN': {
+      const col = REAL_state.columns.find(c => c.id === cmd.colId); if (!col) break;
+      col.title = cmd.title;
+      break;
+    }
+    case 'DELETE_COLUMN':
+      REAL_state.columns = REAL_state.columns.filter(c => c.id !== cmd.colId);
+      break;
+    case 'MOVE_COLUMN': {
+      const i = REAL_state.columns.findIndex(c => c.id === cmd.colId);
+      if (i < 0) break;
+      const [col] = REAL_state.columns.splice(i, 1);
+      const j = Math.max(0, Math.min(REAL_state.columns.length, cmd.toIdx));
+      REAL_state.columns.splice(j, 0, col);
+      break;
+    }
+    case 'UNDO': {
+      const prev = REAL_state.history.pop();
+      if (!prev) { toast('nothing to undo'); break; }
+      REAL_state.columns = prev.columns;
+      break;
+    }
+    case 'RESET':
+      REAL_state.columns = seedColumns();
+      REAL_state.history = [];
+      break;
+    case 'LOAD':
+      REAL_state.columns = cmd.columns;
+      break;
+  }
+  if (cmd.type !== 'LOAD' && cmd.type !== 'NOOP_RENDER') bridgeLogic2Persistent();
+  render();
+}
+
+// ----- Bridge: L3 → Persistent (Bible §5) ------------------
+function bridgeLogic2Persistent() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ columns: REAL_state.columns, nextId }));
+}
+function loadPersistent() {
+  const s = localStorage.getItem(STORAGE_KEY);
+  if (!s) return false;
+  try {
+    const data = JSON.parse(s);
+    if (Array.isArray(data.columns)) {
+      if (data.nextId) nextId = data.nextId;
+      dispatch({ type: 'LOAD', columns: data.columns });
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// ----- L4 render -------------------------------------------
+const board = document.getElementById('board');
+
+function render() {
+  board.innerHTML = '';
+  for (const col of REAL_state.columns) board.appendChild(renderColumn(col));
+  // add-column button at the end
+  const add = document.createElement('div');
+  add.className = 'add-col';
+  add.textContent = '+ add column';
+  add.addEventListener('click', () => dispatch({ type: 'ADD_COLUMN', title: 'New Column' }));
+  board.appendChild(add);
+}
+
+function renderColumn(col) {
+  const el = document.createElement('div');
+  el.className = 'col';
+  el.dataset.colId = col.id;
+
+  const head = document.createElement('div');
+  head.className = 'col-head';
+  head.addEventListener('mousedown', e => beginColDrag(e, col, el));
+
+  const title = document.createElement('span');
+  title.className = 'col-title';
+  title.textContent = col.title;
+  title.contentEditable = 'true';
+  title.spellcheck = false;
+  title.addEventListener('mousedown', e => e.stopPropagation()); // don't trigger col drag
+  title.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); title.blur(); } });
+  title.addEventListener('blur', () => {
+    const newTitle = title.textContent.trim() || col.title;
+    if (newTitle !== col.title) dispatch({ type: 'RENAME_COLUMN', colId: col.id, title: newTitle });
+  });
+  head.appendChild(title);
+
+  const count = document.createElement('span');
+  count.className = 'count';
+  count.textContent = col.cards.length;
+  head.appendChild(count);
+
+  const xCol = document.createElement('span');
+  xCol.className = 'x';
+  xCol.textContent = '×';
+  xCol.title = 'delete column';
+  xCol.addEventListener('mousedown', e => e.stopPropagation());
+  xCol.addEventListener('click', () => {
+    if (col.cards.length > 0 && !confirm(`Delete "${col.title}" with ${col.cards.length} cards?`)) return;
+    dispatch({ type: 'DELETE_COLUMN', colId: col.id });
+  });
+  head.appendChild(xCol);
+
+  el.appendChild(head);
+
+  const cardsEl = document.createElement('div');
+  cardsEl.className = 'cards';
+  cardsEl.dataset.colId = col.id;
+  for (const card of col.cards) cardsEl.appendChild(renderCard(card, col));
+  el.appendChild(cardsEl);
+
+  const addBtn = document.createElement('div');
+  addBtn.className = 'add-card';
+  addBtn.textContent = '+ add card';
+  addBtn.addEventListener('click', () => {
+    dispatch({ type: 'ADD_CARD', colId: col.id, text: 'New card' });
+    // start editing the freshly-added card
+    setTimeout(() => {
+      const newCard = REAL_state.columns.find(c => c.id === col.id).cards.slice(-1)[0];
+      if (newCard) startEdit(newCard.id);
+    }, 0);
+  });
+  el.appendChild(addBtn);
+
+  return el;
+}
+
+function renderCard(card, col) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.cardId = card.id;
+  el.dataset.colId = col.id;
+  el.textContent = card.text || '(empty)';
+  el.addEventListener('mousedown', e => beginCardDrag(e, card, col, el));
+  el.addEventListener('click', e => { if (!justDragged) startEdit(card.id); });
+  const x = document.createElement('span');
+  x.className = 'x';
+  x.textContent = '×';
+  x.addEventListener('mousedown', e => e.stopPropagation());
+  x.addEventListener('click', e => { e.stopPropagation(); dispatch({ type: 'DELETE_CARD', cardId: card.id }); });
+  el.appendChild(x);
+  return el;
+}
+
+// ----- inline edit -----------------------------------------
+function startEdit(cardId) {
+  // find the card el in DOM
+  const el = board.querySelector(`.card[data-card-id="${cardId}"]`);
+  if (!el || el.classList.contains('editing')) return;
+  const card = currentCard(cardId);
+  if (!card) return;
+  el.classList.add('editing');
+  el.textContent = '';
+  const ta = document.createElement('textarea');
+  ta.value = card.text;
+  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ta.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); el.classList.remove('editing'); render(); }
+  });
+  ta.addEventListener('blur', () => {
+    const text = ta.value.trim();
+    el.classList.remove('editing');
+    if (text === '') dispatch({ type: 'DELETE_CARD', cardId });
+    else if (text !== card.text) dispatch({ type: 'EDIT_CARD', cardId, text });
+    else render();
+  });
+  el.appendChild(ta);
+  ta.focus();
+  ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
+}
+function currentCard(cardId) {
+  for (const col of REAL_state.columns) for (const c of col.cards) if (c.id === cardId) return c;
+  return null;
+}
+
+// ----- drag & drop -----------------------------------------
+let justDragged = false;
+function beginCardDrag(e, card, col, el) {
+  if (e.button !== 0 || el.classList.contains('editing')) return;
+  e.preventDefault();
+  const ghost = document.createElement('div');
+  ghost.id = 'ghost';
+  ghost.textContent = card.text || '(empty)';
+  document.body.appendChild(ghost);
+  positionGhost(ghost, e.clientX, e.clientY);
+  el.classList.add('dragging');
+  REAL_state.drag = { kind: 'card', cardId: card.id, fromColId: col.id, ghost, el };
+  document.addEventListener('mousemove', onCardDrag);
+  document.addEventListener('mouseup', endCardDrag);
+}
+function onCardDrag(e) {
+  const d = REAL_state.drag; if (!d || d.kind !== 'card') return;
+  positionGhost(d.ghost, e.clientX, e.clientY);
+  // clear previous indicator
+  document.querySelectorAll('.drop-indicator').forEach(x => x.remove());
+  document.querySelectorAll('.col.drop-target').forEach(x => x.classList.remove('drop-target'));
+  const target = findCardDropTarget(e.clientX, e.clientY);
+  if (target) {
+    const colEl = board.querySelector(`.col[data-col-id="${target.colId}"]`);
+    if (colEl) colEl.classList.add('drop-target');
+    insertDropIndicator(target.colId, target.idx);
+  }
+}
+function endCardDrag(e) {
+  const d = REAL_state.drag; if (!d || d.kind !== 'card') return;
+  document.removeEventListener('mousemove', onCardDrag);
+  document.removeEventListener('mouseup', endCardDrag);
+  d.ghost.remove();
+  d.el.classList.remove('dragging');
+  document.querySelectorAll('.drop-indicator').forEach(x => x.remove());
+  document.querySelectorAll('.col.drop-target').forEach(x => x.classList.remove('drop-target'));
+  const target = findCardDropTarget(e.clientX, e.clientY);
+  if (target) {
+    dispatch({ type: 'MOVE_CARD', cardId: d.cardId, toColId: target.colId, toIdx: target.idx });
+    justDragged = true; setTimeout(() => { justDragged = false; }, 200);
+  }
+  REAL_state.drag = null;
+}
+function findCardDropTarget(x, y) {
+  // find which column we're over
+  const cols = [...board.querySelectorAll('.col')];
+  for (const colEl of cols) {
+    const r = colEl.getBoundingClientRect();
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+      const colId = colEl.dataset.colId;
+      const cardsEl = colEl.querySelector('.cards');
+      const cardEls = [...cardsEl.querySelectorAll('.card')].filter(c => !c.classList.contains('dragging'));
+      // find insertion index by midpoint of each card
+      let idx = cardEls.length;
+      for (let i = 0; i < cardEls.length; i++) {
+        const cr = cardEls[i].getBoundingClientRect();
+        if (y < cr.top + cr.height / 2) { idx = i; break; }
+      }
+      return { colId, idx };
+    }
+  }
+  return null;
+}
+function insertDropIndicator(colId, idx) {
+  const cardsEl = board.querySelector(`.col[data-col-id="${colId}"] .cards`);
+  if (!cardsEl) return;
+  const ind = document.createElement('div');
+  ind.className = 'drop-indicator';
+  const cards = [...cardsEl.querySelectorAll('.card')].filter(c => !c.classList.contains('dragging'));
+  if (idx >= cards.length) cardsEl.appendChild(ind);
+  else cardsEl.insertBefore(ind, cards[idx]);
+}
+
+function beginColDrag(e, col, el) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const ghost = document.createElement('div');
+  ghost.id = 'ghost';
+  ghost.classList.add('col-ghost');
+  ghost.textContent = col.title;
+  document.body.appendChild(ghost);
+  positionGhost(ghost, e.clientX, e.clientY);
+  el.classList.add('dragging');
+  REAL_state.drag = { kind: 'col', colId: col.id, ghost, el };
+  document.addEventListener('mousemove', onColDrag);
+  document.addEventListener('mouseup', endColDrag);
+}
+function onColDrag(e) {
+  const d = REAL_state.drag; if (!d || d.kind !== 'col') return;
+  positionGhost(d.ghost, e.clientX, e.clientY);
+}
+function endColDrag(e) {
+  const d = REAL_state.drag; if (!d || d.kind !== 'col') return;
+  document.removeEventListener('mousemove', onColDrag);
+  document.removeEventListener('mouseup', endColDrag);
+  d.ghost.remove();
+  d.el.classList.remove('dragging');
+  // find target index by x position relative to other columns
+  const cols = [...board.querySelectorAll('.col')];
+  let toIdx = cols.length;
+  for (let i = 0; i < cols.length; i++) {
+    const r = cols[i].getBoundingClientRect();
+    if (e.clientX < r.left + r.width / 2) { toIdx = i; break; }
+  }
+  // adjust index if dragging right (the column itself is removed from the list)
+  const fromIdx = REAL_state.columns.findIndex(c => c.id === d.colId);
+  if (fromIdx >= 0 && fromIdx < toIdx) toIdx -= 1;
+  if (toIdx !== fromIdx) dispatch({ type: 'MOVE_COLUMN', colId: d.colId, toIdx });
+  REAL_state.drag = null;
+}
+function positionGhost(g, x, y) {
+  g.style.left = (x - 130) + 'px';
+  g.style.top  = (y - 18)  + 'px';
+}
+
+// ----- toolbar buttons -------------------------------------
+document.getElementById('btn-undo').addEventListener('click', () => dispatch({ type: 'UNDO' }));
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (confirm('Reset board to seed?')) dispatch({ type: 'RESET' });
+});
+
+// keyboard
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true') return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+    e.preventDefault();
+    dispatch({ type: 'UNDO' });
+  }
+});
+
+// ----- toast -----------------------------------------------
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1200);
+}
+
+// ----- seed ------------------------------------------------
+function seedColumns() {
+  return [
+    { id: uid(), title: 'To Do', cards: [
+      { id: uid(), text: 'Buy coffee beans' },
+      { id: uid(), text: 'Reply to email from 阪下さん' },
+      { id: uid(), text: 'Plan demo schedule' },
+    ] },
+    { id: uid(), title: 'Doing', cards: [
+      { id: uid(), text: 'Write Kanban demo (this!)\nVanilla, no DnD library.' },
+      { id: uid(), text: 'Test on mobile' },
+    ] },
+    { id: uid(), title: 'Done', cards: [
+      { id: uid(), text: '✓ Constraint Burst' },
+      { id: uid(), text: '✓ Mini Spreadsheet' },
+      { id: uid(), text: '✓ Node Graph' },
+    ] },
+  ];
+}
+
+// ----- init ------------------------------------------------
+if (!loadPersistent()) {
+  REAL_state.columns = seedColumns();
+}
+render();
+</script>
+</body>
+</html>

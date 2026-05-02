@@ -330,6 +330,47 @@ function drawRadar() {
 // flash on ring pass
 let flash = 0;
 
+// 3D particle pool (used for ring-pass burst + engine plume)
+const particles = [];
+function spawnRingBurst(x, y, z) {
+  const COLORS = ['#ff1d6d', '#ffcc00', '#00c4cc', '#a78bfa', '#ffffff'];
+  for (let i = 0; i < 120; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const sp = 60 + Math.random() * 220;
+    particles.push({
+      x, y, z,
+      vx: Math.sin(phi) * Math.cos(theta) * sp,
+      vy: Math.sin(phi) * Math.sin(theta) * sp,
+      vz: Math.cos(phi) * sp * 0.5, // bias outward laterally
+      life: 1,
+      decay: 0.4 + Math.random() * 0.4,
+      r: 1.5 + Math.random() * 2.5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    });
+  }
+}
+function spawnEnginePlume() {
+  const r = rightVec(), u = upVec(), f = forward();
+  // emit from ship rear position (camera-local 0,-6,18)
+  const ex = cam.x + r[0] * 0 + u[0] * (-6) + f[0] * 18;
+  const ey = cam.y + r[1] * 0 + u[1] * (-6) + f[1] * 18;
+  const ez = cam.z + r[2] * 0 + u[2] * (-6) + f[2] * 18;
+  for (let i = 0; i < 3; i++) {
+    const jitter = 0.6;
+    particles.push({
+      x: ex, y: ey, z: ez,
+      vx: -f[0] * (50 + Math.random() * 80) + (Math.random() - 0.5) * 30,
+      vy: -f[1] * (50 + Math.random() * 80) + (Math.random() - 0.5) * 30,
+      vz: -f[2] * (50 + Math.random() * 80) + (Math.random() - 0.5) * 30,
+      life: 0.9,
+      decay: 1.4,
+      r: 2 + Math.random() * 3,
+      color: Math.random() < 0.4 ? '#ffcc00' : (Math.random() < 0.5 ? '#ff8d3a' : '#ffffff'),
+    });
+  }
+}
+
 // ---- player ship: triangular pyramid (tetrahedron) anchored in camera-local
 // space, slightly in front and below center so it doesn't block sight.
 // Coordinates are (right, up, forward).
@@ -421,13 +462,30 @@ function step(now) {
 
   // ring collision (only check next ring)
   if (rings.length > 0 && checkRingPass(rings[0])) {
-    rings.shift();
+    const passedRing = rings.shift();
+    spawnRingBurst(passedRing.x, passedRing.y, passedRing.z);
     rings.push(spawnRing(2400));
     passed++;
     numEl.textContent = passed;
     flash = 1;
     winEl.classList.add('show');
     setTimeout(() => winEl.classList.remove('show'), 600);
+  }
+
+  // continuous engine plume
+  spawnEnginePlume();
+
+  // update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.z += p.vz * dt;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+    p.vz *= 0.96;
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
   }
 
   // recycle stars
@@ -460,7 +518,25 @@ function step(now) {
   });
   for (const { r, i } of sortedRings) drawRing(r, i === 0);
 
-  // player ship (drawn after rings so always visible)
+  // 3D particles (drawn after rings, before ship)
+  // sort approximately back-to-front by local z so glow blends sanely
+  for (const p of particles) {
+    const proj = project(p.x, p.y, p.z);
+    if (!proj) continue;
+    const a = Math.max(0, Math.min(1, p.life));
+    const sz = Math.max(0.5, p.r * (1.4 - proj.z / 3000));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, sz, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // player ship (drawn after rings/particles so always visible)
   drawShip();
 
   // pass flash

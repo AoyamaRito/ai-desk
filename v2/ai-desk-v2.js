@@ -255,38 +255,132 @@ export class Graph {
   byType(type)       { return this.all().filter(b => b.type === type); }
 
   // ============================================================
-  // lint — グラフ整合性の検査
+  // lint — グラフ整合性の検査(漏れ検出強化版)
   // ============================================================
-  // broken-ref : target が存在しない ref
-  // orphan     : 誰からも参照されない非 module Block
-  // circular   : forward の循環
-  lint() {
+  //
+  // ルール一覧(opts でカテゴリごとに無効化可能):
+  //   - broken      : target が存在しない ref
+  //   - orphan      : 誰からも参照されない非 module Block
+  //   - circular    : forward の循環
+  //   - brace       : content の `{` `}` 数が合わない
+  //   - calls       : content に他関数呼び出しがあるが calls ref がない
+  //   - tags        : type と tags が整合してない
+  //   - empty       : content も refs も children も空
+  //   - hash        : version の hash チェーン破損
+  //
+  // 例: g.lint({ orphan: false }) で orphan 検出を切る
+  lint(opts = {}) {
+    const enable = key => opts[key] !== false;
     const issues = [];
     const ids = new Set(this.blocks.keys());
 
-    // broken refs
-    for (const b of this.blocks.values()) {
-      for (const r of b.refs) {
-        // 'import' で相対パス未解決のものは除外、それ以外は全部チェック
-        if (r.kind === 'import' && r.target.startsWith('.')) continue;
-        if (!ids.has(r.target)) {
-          issues.push({ kind: 'broken-ref', from: b.id, ref: r });
+    // 1. broken refs
+    // import 系は外部モジュールを除外:
+    //   - 相対パス(./...) は resolveImports で解決される予定なのでスキップ
+    //   - 'node:fs' のような node 標準
+    //   - 'react'のような npm モジュール(/ で始まらず . 以外)
+    // → 検査対象は内部 Block 同士の参照のみ
+    if (enable('broken')) {
+      for (const b of this.blocks.values()) {
+        for (const r of b.refs) {
+          if (r.kind === 'import') {
+            const isExternal =
+              !r.target.startsWith('.') &&  // 相対パスじゃない
+              !r.target.startsWith('/');     // 絶対パスじゃない(=外部 or built-in)
+            if (isExternal || r.target.startsWith('.')) continue;
+          }
+          if (!ids.has(r.target)) {
+            issues.push({ kind: 'broken-ref', from: b.id, ref: r });
+          }
         }
       }
     }
 
-    // orphans(module 以外で誰にも参照されてない)
-    for (const b of this.blocks.values()) {
-      if (b.type === 'module') continue;
-      if (this.backward(b.id).length === 0) {
-        issues.push({ kind: 'orphan', id: b.id, type: b.type });
+    // 2. orphans
+    if (enable('orphan')) {
+      for (const b of this.blocks.values()) {
+        if (b.type === 'module') continue;
+        if (this.backward(b.id).length === 0) {
+          issues.push({ kind: 'orphan', id: b.id, type: b.type });
+        }
       }
     }
 
-    // circular refs(forward DFS)
-    for (const b of this.blocks.values()) {
-      const cycle = this._findCycle(b.id);
-      if (cycle) issues.push({ kind: 'circular', cycle });
+    // 3. circular
+    if (enable('circular')) {
+      for (const b of this.blocks.values()) {
+        const cycle = this._findCycle(b.id);
+        if (cycle) issues.push({ kind: 'circular', cycle });
+      }
+    }
+
+    // 4. brace mismatch — content の構文整合
+    if (enable('brace')) {
+      for (const b of this.blocks.values()) {
+        if (!b.content) continue;
+        const r = checkBraces(b.content);
+        if (r) issues.push({ kind: 'brace-mismatch', id: b.id, ...r });
+      }
+    }
+
+    // 5. calls leak — 同モジュール内で名前が出てるのに calls ref が無い
+    if (enable('calls')) {
+      const moduleNameMap = new Map(); // moduleId -> Map<name, blockId>
+      for (const b of this.blocks.values()) {
+        if (!b.meta?.name) continue;
+        if (b.type !== 'function' && b.type !== 'class') continue;
+        const moduleId = b.id.split(':').slice(0, -2).join(':');
+        if (!moduleNameMap.has(moduleId)) moduleNameMap.set(moduleId, new Map());
+        moduleNameMap.get(moduleId).set(b.meta.name, b.id);
+      }
+      for (const b of this.blocks.values()) {
+        if (!b.content || !b.meta?.name) continue;
+        const moduleId = b.id.split(':').slice(0, -2).join(':');
+        const peers = moduleNameMap.get(moduleId);
+        if (!peers) continue;
+        const declared = new Set(
+          b.refs.filter(r => r.kind === 'calls').map(r => r.target)
+        );
+        for (const [name, id] of peers) {
+          if (id === b.id) continue;
+          const re = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+          if (re.test(b.content) && !declared.has(id)) {
+            issues.push({ kind: 'calls-leak', from: b.id, missing: id, name });
+          }
+        }
+      }
+    }
+
+    // 6. tag mismatch — type と tags の整合
+    if (enable('tags')) {
+      for (const b of this.blocks.values()) {
+        if (b.type === 'function' && !b.tags.includes('function')) {
+          issues.push({ kind: 'tag-mismatch', id: b.id, expected: 'function', actual: b.tags });
+        }
+        if (b.type === 'class' && !b.tags.includes('class')) {
+          issues.push({ kind: 'tag-mismatch', id: b.id, expected: 'class', actual: b.tags });
+        }
+      }
+    }
+
+    // 7. empty block
+    if (enable('empty')) {
+      for (const b of this.blocks.values()) {
+        if (b.type === 'module') continue;
+        if (!b.content && b.refs.length === 0 && b.children.length === 0) {
+          issues.push({ kind: 'empty-block', id: b.id });
+        }
+      }
+    }
+
+    // 8. hash チェーン破損
+    if (enable('hash')) {
+      for (const b of this.blocks.values()) {
+        const r = b.verify();
+        if (!r.ok) {
+          issues.push({ kind: 'hash-broken', id: b.id, reason: r.reason, brokenAt: r.brokenAt });
+        }
+      }
     }
 
     return issues;
@@ -573,6 +667,44 @@ function findFunctionBody(source, declStart) {
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// content 中の brace 整合性をチェック
+// 文字列リテラル(`'"`)とコメント(// /**/)の中の `{` `}` は無視。
+// 戻り値: 不整合があれば { error, ... }、整合してれば null
+export function checkBraces(content) {
+  let depth = 0;
+  let inString = null; // null | "'" | '"' | '`'
+  let escape = false;
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (inString) {
+      if (c === inString) inString = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { inString = c; continue; }
+    // 行コメント
+    if (c === '/' && content[i + 1] === '/') {
+      const nl = content.indexOf('\n', i);
+      i = nl < 0 ? content.length : nl;
+      continue;
+    }
+    // ブロックコメント
+    if (c === '/' && content[i + 1] === '*') {
+      const end = content.indexOf('*/', i + 2);
+      i = end < 0 ? content.length : end + 1;
+      continue;
+    }
+    if (c === '{') depth++;
+    if (c === '}') {
+      depth--;
+      if (depth < 0) return { error: 'extra-closing-brace', at: i };
+    }
+  }
+  if (depth !== 0) return { error: 'unbalanced-braces', remaining: depth };
+  return null;
 }
 
 // ============================================================
@@ -1260,14 +1392,30 @@ function runCommand(cmd, args) {
       break;
     }
     case 'lint': {
-      // node ai-desk-v2.js lint <file>
-      if (!args[0]) return console.error('usage: lint <file>');
+      // node ai-desk-v2.js lint <file> [--only=K1,K2] [--summary]
+      if (!args[0]) return console.error('usage: lint <file> [--only=K1,K2] [--summary]');
+      const opts = {};
+      let summary = false;
+      let onlyKinds = null;
+      for (const a of args.slice(1)) {
+        if (a === '--summary') summary = true;
+        const m = a.match(/^--only=(.+)$/);
+        if (m) onlyKinds = new Set(m[1].split(','));
+      }
       const g = loadProject([args[0]]);
-      const issues = g.lint();
-      if (issues.length === 0) {
+      let issues = g.lint(opts);
+      if (onlyKinds) issues = issues.filter(i => onlyKinds.has(i.kind.replace(/-.*/, '')));
+      if (summary) {
+        const counts = {};
+        for (const i of issues) counts[i.kind] = (counts[i.kind] || 0) + 1;
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        if (sorted.length === 0) console.log('OK — no issues');
+        else for (const [k, c] of sorted) console.log(`  ${k.padEnd(15)} ${c}`);
+        console.log(`total: ${issues.length}`);
+      } else if (issues.length === 0) {
         console.log('OK — no issues found');
       } else {
-        for (const i of issues) console.log(`  ${i.kind.padEnd(12)} ${JSON.stringify(i)}`);
+        for (const i of issues) console.log(`  ${i.kind.padEnd(15)} ${JSON.stringify(i)}`);
         console.log(`${issues.length} issues found`);
       }
       break;

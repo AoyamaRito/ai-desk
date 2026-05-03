@@ -795,11 +795,72 @@ group('Graph lint', () => {
   test('健全な graph では issue なし', () => {
     const m = new Block({ id: 'm', type: 'module' });
     const a = new Block({ id: 'a', type: 'function' });
-    a.commit({ content: 'a' });
+    a.commit({ content: 'function a(){}', tags: ['function'] });
     m.commit({ content: null, refs: [{ kind: 'contains', target: 'a' }] });
     const g = new Graph([m, a]);
     const issues = g.lint();
     assert.equal(issues.length, 0);
+  });
+
+  test('brace-mismatch を検出', () => {
+    const a = new Block({ id: 'a', type: 'function' });
+    a.commit({ content: 'function a(){ return; ', tags: ['function'] });  // 閉じカッコなし
+    const g = new Graph([a]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(issues.some(i => i.kind === 'brace-mismatch'));
+  });
+
+  test('brace 検査が文字列リテラル中の {} を無視', () => {
+    const a = new Block({ id: 'm:fn:a', type: 'function', meta: { name: 'a' } });
+    a.commit({ content: 'function a(){ return "{ unclosed string"; }', tags: ['function'] });
+    const g = new Graph([a]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(!issues.some(i => i.kind === 'brace-mismatch'));
+  });
+
+  test('calls-leak を検出', () => {
+    const a = new Block({ id: 'm:fn:a', type: 'function', meta: { name: 'a' } });
+    a.commit({ content: 'function a(){ return 1; }', tags: ['function'] });
+    const b = new Block({ id: 'm:fn:b', type: 'function', meta: { name: 'b' } });
+    // content には a() がある、refs には calls エッジがない
+    b.commit({ content: 'function b(){ return a() + 1; }', tags: ['function'], refs: [] });
+    const g = new Graph([a, b]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(issues.some(i => i.kind === 'calls-leak' && i.from === 'm:fn:b' && i.missing === 'm:fn:a'));
+  });
+
+  test('tag-mismatch を検出(function なのに tag なし)', () => {
+    const a = new Block({ id: 'a', type: 'function', meta: { name: 'a' } });
+    a.commit({ content: 'function a(){}', tags: [] });
+    const g = new Graph([a]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(issues.some(i => i.kind === 'tag-mismatch' && i.expected === 'function'));
+  });
+
+  test('empty-block を検出', () => {
+    const a = new Block({ id: 'a', type: 'function' });
+    a.commit({ content: null, refs: [], children: [], tags: ['function'] });
+    const g = new Graph([a]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(issues.some(i => i.kind === 'empty-block'));
+  });
+
+  test('hash-broken を検出', () => {
+    const a = new Block({ id: 'a', type: 'function' });
+    a.commit({ content: 'function a(){}', tags: ['function'] });
+    a.versions[0].content = 'tampered';  // 改ざん
+    const g = new Graph([a]);
+    const issues = g.lint({ orphan: false });
+    assert.ok(issues.some(i => i.kind === 'hash-broken'));
+  });
+
+  test('opts でカテゴリを無効化できる', () => {
+    const a = new Block({ id: 'a', type: 'function', meta: { name: 'a' } });
+    a.commit({ content: 'function a(){}', tags: [] }); // tag-mismatch + orphan
+    const g = new Graph([a]);
+    const all = g.lint();
+    const noOrphan = g.lint({ orphan: false });
+    assert.ok(all.length > noOrphan.length);
   });
 });
 

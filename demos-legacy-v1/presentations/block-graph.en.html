@@ -367,9 +367,62 @@ a { color: var(--accent); }
     <p class="lead" style="margin-top: 20px; text-align: center;">When these three click together,<br>the result is: <strong>large AI edits stop collapsing</strong>.</p>
   </section>
 
-  <!-- 11 ===== git positioning ===== -->
+  <!-- 11 ===== Tags & priority ===== -->
   <section class="slide">
-    <h2><span class="num">10</span>Not a replacement for git — it sits on top</h2>
+    <h2><span class="num">10</span>Tags &amp; priorities — the AI narrows what it has to read</h2>
+    <p class="lead">Every Block carries <strong>tags</strong> (e.g. <code>#high</code> <code>#logic</code> <code>#io</code>) and a <strong>priority</strong>.<br>The AI <strong>searches</strong> and reads only the slice it actually needs.</p>
+    <div class="bigvis" style="margin-top: 16px;">
+      <div>
+        <div class="card-stack">
+          <div class="card dim">Block (#io)</div>
+          <div class="card">Block (#high #logic)</div>
+          <div class="card dim">Block (#test)</div>
+          <div class="card">Block (#high #logic)</div>
+          <div class="card dim">Block (#util)</div>
+          <div class="card dim">Block (#io)</div>
+        </div>
+        <div class="label-under">Lots of Blocks</div>
+      </div>
+      <div class="arrow">→ AI searches →</div>
+      <div>
+        <div class="card-stack">
+          <div class="card now">only #high #logic</div>
+        </div>
+        <div class="label-under">A focused subset<br>enters the AI's view</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">Even on a huge codebase, the AI's field of view is <strong>narrowed</strong>.<br>You no longer need to invoke "read everything and tell me" — the hallucination mode.</p>
+  </section>
+
+  <!-- 12 ===== SPEC tag ===== -->
+  <section class="slide">
+    <h2><span class="num">11</span>The SPEC tag — the spec lives inside the Block</h2>
+    <p class="lead">A version tagged <code>#SPEC</code> contains <strong>only the spec</strong>, no code.<br>The initial spec and every spec change stay in the Block's own history.</p>
+    <div class="bigvis" style="margin-top: 14px;">
+      <div class="card-stack">
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 320px;">
+          <strong>v0 [#SPEC]</strong> sort users by login time
+        </div>
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 320px;">
+          v1 (impl) function sort() { ... }
+        </div>
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 320px;">
+          <strong>v2 [#SPEC]</strong> sort by activity, descending
+        </div>
+        <div class="card now" style="text-align: left; padding: 8px 14px; min-width: 320px;">
+          v3 (impl) function sort() { ... } new
+        </div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 16px;">
+      "What was this function <strong>supposed to do</strong>?" → just read the Block's history.<br>
+      <strong>Spec, implementation, and the trail of changes</strong> all live in one place. External docs going stale stops being a problem.
+    </div>
+  </section>
+
+  <!-- 13 ===== git positioning ===== -->
+  <section class="slide">
+    <h2><span class="num">12</span>Not a replacement for git — it sits on top</h2>
     <div class="split">
       <div class="col problem">
         <h3>git's job</h3>
@@ -393,7 +446,7 @@ a { color: var(--accent); }
 
   <!-- 12 ===== Evidence ===== -->
   <section class="slide">
-    <h2><span class="num">11</span>It works — this isn't a manifesto</h2>
+    <h2><span class="num">13</span>It works — this isn't a manifesto</h2>
     <div class="metrics">
       <div class="metric"><div class="num">105</div><div class="lab">tests passing<br>(end-to-end)</div></div>
       <div class="metric"><div class="num">4</div><div class="lab">single-HTML demos<br>(card game / spreadsheet / node graph / kanban)</div></div>
@@ -425,7 +478,7 @@ a { color: var(--accent); }
 <div id="hint">← → / Space to advance · F for fullscreen</div>
 <div id="nav">
   <button id="nav-prev">← prev</button>
-  <span class="pos" id="nav-pos">1 / 13</span>
+  <span class="pos" id="nav-pos">1 / 15</span>
   <button id="nav-next">next →</button>
 </div>
 

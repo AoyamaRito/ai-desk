@@ -367,9 +367,62 @@ a { color: var(--accent); }
     <p class="lead" style="margin-top: 20px; text-align: center;">この 3 つが組み合わさると<br>「<strong>AI に大きな修正を任せても崩壊しない</strong>」という挙動になる。</p>
   </section>
 
-  <!-- 10 ===== git positioning ===== -->
+  <!-- 10 ===== Tags & priority ===== -->
   <section class="slide">
-    <h2><span class="num">10</span>git の代わりじゃない。git の上に乗る</h2>
+    <h2><span class="num">10</span>タグと優先順位 — AI が「読むべきところ」を絞れる</h2>
+    <p class="lead">各 Block に <strong>タグ</strong>(例: <code>#high</code> <code>#logic</code> <code>#io</code>)と <strong>優先順位</strong>がつく。<br>AI は「<strong>その中から検索</strong>して必要な分だけ読む」。</p>
+    <div class="bigvis" style="margin-top: 16px;">
+      <div>
+        <div class="card-stack">
+          <div class="card dim">Block (#io)</div>
+          <div class="card">Block (#high #logic)</div>
+          <div class="card dim">Block (#test)</div>
+          <div class="card">Block (#high #logic)</div>
+          <div class="card dim">Block (#util)</div>
+          <div class="card dim">Block (#io)</div>
+        </div>
+        <div class="label-under">大量の Block</div>
+      </div>
+      <div class="arrow">→ AI が検索 →</div>
+      <div>
+        <div class="card-stack">
+          <div class="card now">#high #logic だけ</div>
+        </div>
+        <div class="label-under">必要な範囲だけが<br>視野に入る</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">巨大なコードベースでも、AI の視野は <strong>絞れる</strong>。<br>「全部読んで把握して」の幻覚モードを <strong>呼び出さなくて済む</strong>。</p>
+  </section>
+
+  <!-- 11 ===== SPEC tag ===== -->
+  <section class="slide">
+    <h2><span class="num">11</span>SPEC タグ — 仕様書が Block の中に住む</h2>
+    <p class="lead">特殊タグ <code>#SPEC</code> がついた version は、<strong>仕様だけ</strong>を書いた一枚のページ。<br>初期仕様も、変更履歴も、Block の歴史にそのまま残る。</p>
+    <div class="bigvis" style="margin-top: 14px;">
+      <div class="card-stack">
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 280px;">
+          <strong>v0 [#SPEC]</strong> users をログイン時刻で並べる
+        </div>
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 280px;">
+          v1 (impl) function sort() { ... }
+        </div>
+        <div class="card dim" style="text-align: left; padding: 8px 14px; min-width: 280px;">
+          <strong>v2 [#SPEC]</strong> 並びをアクティビティ降順に変更
+        </div>
+        <div class="card now" style="text-align: left; padding: 8px 14px; min-width: 280px;">
+          v3 (impl) function sort() { ... } 新版
+        </div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 16px;">
+      「この関数は<strong>何をするはずだった</strong>のか?」 → Block の歴史を見ればわかる。<br>
+      <strong>仕様 と 実装 と 変更経緯</strong>が同じ場所にある。外部ドキュメントが陳腐化する問題が消える。
+    </div>
+  </section>
+
+  <!-- 12 ===== git positioning ===== -->
+  <section class="slide">
+    <h2><span class="num">12</span>git の代わりじゃない。git の上に乗る</h2>
     <div class="split">
       <div class="col problem">
         <h3>git の役割</h3>
@@ -393,7 +446,7 @@ a { color: var(--accent); }
 
   <!-- 11 ===== Evidence ===== -->
   <section class="slide">
-    <h2><span class="num">11</span>動いている — これは思想じゃなく実装</h2>
+    <h2><span class="num">13</span>動いている — これは思想じゃなく実装</h2>
     <div class="metrics">
       <div class="metric"><div class="num">105</div><div class="lab">テスト全パス</div></div>
       <div class="metric"><div class="num">4</div><div class="lab">単一HTMLで動くデモ<br>(ゲーム/表計算/ノードグラフ/カンバン)</div></div>
@@ -425,7 +478,7 @@ a { color: var(--accent); }
 <div id="hint">← → / Space で進む · F でフルスクリーン</div>
 <div id="nav">
   <button id="nav-prev">← prev</button>
-  <span class="pos" id="nav-pos">1 / 13</span>
+  <span class="pos" id="nav-pos">1 / 15</span>
   <button id="nav-next">next →</button>
 </div>
 

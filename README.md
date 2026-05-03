@@ -65,6 +65,13 @@ $ node v2/ai-desk.js virtual-apply graph.json 'my-app/render.js:fn:render' heavy
 - **循環参照を構造レベルで検出して拒否**
 - 詳細: [`v2/demos/block-spreadsheet/`](v2/demos/block-spreadsheet/)
 
+### 🔗 Node Graph — [触ってみる](https://aoyamarito.github.io/ai-desk/v2/demos/node-graph/)
+**ノード = Block**、**配線 = `Block.refs`** の visual dataflow editor(単一 HTML、~720 行)。
+- ノード移動・値編集・配線の全てが `Block.commit` → `versions` 履歴に積む
+- サイクル検出は `Graph.forwardClosure(toId)` が `fromId` を含むかで**構造的拒否**(専用 validator なし、Bible §4.1.1)
+- インスペクタで選択ノードの全 version 可視化
+- 詳細: [`v2/demos/node-graph/`](v2/demos/node-graph/)
+
 **これらの規模が 1 セッションで動く事自体が ai-desk の効果のデモ**になっている。
 
 ---

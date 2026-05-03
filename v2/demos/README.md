@@ -21,6 +21,22 @@ A clean re-implementation of the v1 spreadsheet using v2 primitives. Single HTML
 
 ---
 
+## [`node-graph/`](./node-graph/) — Node Graph
+
+A visual dataflow editor where **every node is a Block** and **every wire is a `Block.refs` entry**.
+
+**v2 concepts on display**:
+- **Block per node**: `Block { id, type:'node', meta:{nodeType}, versions:[] }`. Move / edit / wire = `commit()` on the same Block.
+- **Wires = Block.refs**: a wire is not a separate object — it's a `{kind:'input', target, fromOut, toIn}` ref stored in the **target** node's head version.
+- **Cycle detection via `Graph.forwardClosure`**: before adding wire A→B, compute `forwardClosure(B)`; reject if it contains A. **Structural rejection** — no separate validator (公理 A8 §4.1.1).
+- **Per-node history**: every move / edit / wire / unwire creates a new version. Inspector shows the full per-node history.
+
+Single HTML, ~720 lines. Pure 2D canvas. Zero deps.
+
+> ▶ **[Play (GitHub Pages)](https://aoyamarito.github.io/ai-desk/v2/demos/node-graph/)**
+
+---
+
 ## [`gravity-battle/`](./gravity-battle/) — Gravity Field Battle
 
 ブラウザで遊べる**カードゲーム**(単一 HTML、依存ゼロ、~1300 行)。

@@ -54,3 +54,8 @@ node ai-desk.js impact v1.json '../ai-desk.js:fn:runSkeleton'
 ### [`demos/block-spreadsheet/`](./demos/block-spreadsheet/) — Block Spreadsheet
 セル = Block で実装した表計算(refs で依存、versions で履歴、impact で再計算、cycle 検出)。
 🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/block-spreadsheet/)
+
+### [`demos/node-graph/`](./demos/node-graph/) — Node Graph
+ノード = Block、配線 = `Block.refs`。Const/Add/Mul/.../Output を繋いで dataflow。サイクル検出は `Graph.forwardClosure` で構造的拒否(専用 validator なし、A8 §4.1.1)。
+🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/node-graph/)
+

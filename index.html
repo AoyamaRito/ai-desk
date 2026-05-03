@@ -402,6 +402,18 @@ app.js の [機能名] を [変更内容] してください。</div>
     <div class="demo-frame tall"><iframe src="v2/demos/block-spreadsheet/?embed=1" loading="lazy" title="Block Spreadsheet"></iframe></div>
   </div>
 
+  <div class="demo-block" style="border: 3px solid #9334e6; background: linear-gradient(135deg, #f3e8fd, #e0c3fc); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #6a1b9a;">
+      🔗 <a href="v2/demos/node-graph/" style="color: #6a1b9a; font-weight: 900;">Node Graph</a>
+      <span style="font-size: 13px; background: #9334e6; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>ノード = Block</strong>、<strong>配線 = <code>Block.refs</code></strong>。Const/Add/Sub/Mul/Div/Output を繋いで dataflow を組む。
+      サイクル検出は <code>Graph.forwardClosure</code> で構造レベル拒否(専用 validator なし、A8 の構造的 enforcement)。各ノードの編集履歴(move / edit / wire / unwire)が <code>Block.versions</code> に append-only。
+    </p>
+    <div class="demo-frame tall"><iframe src="v2/demos/node-graph/?embed=1" loading="lazy" title="Node Graph"></iframe></div>
+  </div>
+
   <p style="background: #f0f4ff; border-left: 6px solid #4dabf7; padding: 12px 18px; margin: 24px 0 16px 0; font-size: 14px;">
     <strong>↓ 以下は v1 時代のデモ集</strong>(<code>demos-legacy-v1/</code> に隔離済み)。
     新規コードは <a href="https://github.com/AoyamaRito/ai-desk/tree/main/v2"><code>v2/</code></a> を参照してください。

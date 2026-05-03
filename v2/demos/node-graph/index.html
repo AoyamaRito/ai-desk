@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Node Graph — ai-desk v2 demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    background: #f8f9fa;
+    color: #202124;
+    min-height: 100vh;
+    padding: 16px;
+    overflow: hidden;
+    font-size: 14px;
+    user-select: none;
+  }
+  #stage {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    gap: 8px;
+    height: calc(100vh - 32px);
+  }
+  .header-row {
+    display: flex; align-items: baseline; gap: 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #dadce0;
+  }
+  h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .subtitle { font-size: 12px; color: #5f6368; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 160px 1fr 260px;
+    gap: 8px;
+    overflow: hidden;
+  }
+
+  /* sidebar (palette) */
+  .palette {
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .palette h4 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #5f6368; font-weight: 600; margin-bottom: 4px;
+  }
+  .palette button {
+    padding: 8px 10px;
+    background: #fff;
+    color: #202124;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+  }
+  .palette button:hover { background: #f1f3f4; border-color: #1a73e8; color: #1a73e8; }
+  .palette .help {
+    margin-top: auto; font-size: 11px; color: #5f6368; line-height: 1.6;
+    border-top: 1px solid #e8eaed; padding-top: 10px;
+  }
+
+  /* viewport (canvas) */
+  .viewport {
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .viewport canvas { display: block; width: 100%; height: 100%; cursor: default; }
+
+  /* inspector */
+  .inspector {
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 12px;
+    overflow-y: auto;
+  }
+  .inspector h4 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #5f6368; font-weight: 600; margin-bottom: 6px;
+  }
+  .inspector .meta {
+    font-family: 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 12px; line-height: 1.6;
+    background: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 14px;
+    word-break: break-all;
+  }
+  .inspector .meta b { color: #1a73e8; }
+  .version-list {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #e8eaed;
+    border-radius: 4px;
+    background: #f8f9fa;
+  }
+  .version-entry {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e8eaed;
+    font-family: 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 11px;
+    color: #5f6368;
+  }
+  .version-entry:last-child { border-bottom: none; }
+  .version-entry.current {
+    background: #fff;
+    color: #202124;
+    font-weight: 500;
+    border-left: 3px solid #1a73e8;
+  }
+
+  /* controls */
+  #controls {
+    display: flex; gap: 8px;
+  }
+  #controls button {
+    padding: 6px 14px;
+    background: #fff;
+    color: #1a73e8;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  #controls button:hover { background: #f1f3f4; border-color: #1a73e8; }
+  #controls button.demo { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  #controls button.demo:hover { background: #1765cc; }
+  #controls button.danger { color: #d93025; }
+  #controls button.danger:hover { background: #fce8e6; border-color: #d93025; }
+
+  .help {
+    font-size: 12px; color: #5f6368;
+    padding: 4px 8px;
+  }
+  .help kbd {
+    background: #f1f3f4;
+    border: 1px solid #dadce0;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 11px;
+  }
+
+  /* edit dialog (simple inline) */
+  #edit-dialog {
+    position: absolute;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(26,115,232,0.18);
+    display: none;
+  }
+  #edit-dialog input {
+    width: 80px;
+    padding: 4px 6px;
+    border: 1px solid #dadce0;
+    border-radius: 3px;
+    font-family: 'SF Mono', Consolas, Menlo, monospace;
+    font-size: 13px;
+  }
+
+  /* compact */
+  body.compact { padding: 8px; font-size: 12px; }
+  body.compact #stage { gap: 6px; height: calc(100vh - 16px); }
+  body.compact .header-row { display: none; }
+  body.compact .help { display: none; }
+  body.compact .main { grid-template-columns: 110px 1fr 180px; gap: 6px; }
+  body.compact .palette { padding: 8px; }
+  body.compact .palette button { padding: 4px 6px; font-size: 11px; }
+  body.compact .palette h4 { font-size: 9px; }
+  body.compact .inspector { padding: 8px; }
+  body.compact .inspector h4 { font-size: 9px; }
+  body.compact .meta { font-size: 11px; padding: 4px 6px; }
+  body.compact .version-list { max-height: 130px; }
+  body.compact .version-entry { font-size: 10px; padding: 2px 5px; }
+  body.compact #controls button { padding: 3px 8px; font-size: 11px; }
+  @media (max-width: 720px) {
+    body.compact .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    body.compact .palette { flex-direction: row; flex-wrap: wrap; }
+    body.compact .palette .help { display: none; }
+    body.compact .inspector { max-height: 130px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="header-row">
+    <h1>Node Graph</h1>
+    <div class="subtitle">ai-desk v2 demo · each node = Block · wires = Block.refs · cycle detected via forwardClosure</div>
+  </div>
+
+  <div class="main">
+    <aside class="palette">
+      <h4>Add node</h4>
+      <button data-type="const">Const</button>
+      <button data-type="add">Add</button>
+      <button data-type="sub">Sub</button>
+      <button data-type="mul">Mul</button>
+      <button data-type="div">Div</button>
+      <button data-type="out">Output</button>
+      <div class="help">
+        Drag node body to move. Drag from output port (right) to input port (left) to wire.
+        Double-click a Const to edit. Click a wire to delete.
+      </div>
+    </aside>
+    <div class="viewport" id="viewport">
+      <canvas id="cv"></canvas>
+      <div id="edit-dialog"><input type="number" id="edit-input" step="any"></div>
+    </div>
+    <aside class="inspector">
+      <h4>Selected Block</h4>
+      <div class="meta" id="meta">— click a node —</div>
+      <h4>Block.versions</h4>
+      <div class="version-list" id="version-list"><div class="version-entry">—</div></div>
+    </aside>
+  </div>
+
+  <div id="controls">
+    <button class="demo" id="load-demo">Load sample</button>
+    <button class="danger" id="clear">Clear</button>
+    <button id="export">Export JSON</button>
+  </div>
+
+  <div class="help">
+    <kbd>Click</kbd> select · <kbd>Drag</kbd> move · <kbd>Drag port</kbd> wire · <kbd>Dbl-click Const</kbd> edit · <kbd>Click wire</kbd> delete · <kbd>Delete</kbd> remove selected
+  </div>
+</div>
+
+<script type="module">
+// ============================================================
+// Compact mode
+// ============================================================
+function applyCompact() {
+  const embed = new URLSearchParams(location.search).get('embed') === '1';
+  const narrow = window.innerWidth < 880;
+  document.body.classList.toggle('compact', embed || narrow);
+}
+applyCompact();
+window.addEventListener('resize', applyCompact);
+
+// ============================================================
+// ai-desk v2 portable subset (Block, Graph, Versions, forwardClosure)
+// ============================================================
+function hashVersion(v) {
+  const { hash, ...rest } = v;
+  const stable = JSON.stringify(rest, Object.keys(rest).sort());
+  let h = 0x811c9dc5;
+  for (let i = 0; i < stable.length; i++) {
+    h ^= stable.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+function makeVersion({ content, refs = [], children = [], tags = [], meta = {} }, prev = null) {
+  const v = { timestamp: Date.now(), prevHash: prev ? prev.hash : null, content, refs, children, tags, meta };
+  v.hash = hashVersion(v);
+  return v;
+}
+class Block {
+  constructor({ id, type, versions = [], meta = {} }) {
+    this.id = id; this.type = type; this.versions = versions; this.meta = meta;
+  }
+  commit(v = {}) {
+    const prev = this.head();
+    const nv = makeVersion(v, prev);
+    this.versions.push(nv);
+    return nv;
+  }
+  head() { return this.versions[this.versions.length - 1] || null; }
+  get content() { return this.head()?.content ?? null; }
+  get refs()    { return this.head()?.refs ?? []; }
+  rollback(idx) {
+    const target = this.versions[idx];
+    if (!target) return null;
+    return this.commit({ content: target.content, refs: target.refs, tags: target.tags, meta: { action: 'rollback', to: idx } });
+  }
+}
+class Graph {
+  constructor() { this.blocks = new Map(); }
+  add(b) { this.blocks.set(b.id, b); return this; }
+  remove(id) { this.blocks.delete(id); }
+  get(id) { return this.blocks.get(id); }
+  all() { return Array.from(this.blocks.values()); }
+  // Forward closure: all blocks reachable from id via refs (incl. self).
+  // Used here for cycle detection: "would adding A→B create a cycle?"
+  // Answer: yes iff B is in forwardClosure(A) before adding the edge.
+  forwardClosure(id) {
+    const seen = new Set();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      const b = this.get(cur);
+      if (!b) continue;
+      for (const r of b.refs) {
+        if (r.target) stack.push(r.target);
+      }
+    }
+    return seen;
+  }
+}
+
+// ============================================================
+// Node type definitions (function semantics)
+// ============================================================
+const TYPES = {
+  const: { label: 'Const',  inputs: 0, color: '#fbbc04', fn: (n) => Number(n.value ?? 0) },
+  add:   { label: 'Add',    inputs: 2, color: '#1a73e8', fn: (n, a, b) => a + b },
+  sub:   { label: 'Sub',    inputs: 2, color: '#ff8d3a', fn: (n, a, b) => a - b },
+  mul:   { label: 'Mul',    inputs: 2, color: '#34a853', fn: (n, a, b) => a * b },
+  div:   { label: 'Div',    inputs: 2, color: '#9334e6', fn: (n, a, b) => b === 0 ? NaN : a / b },
+  out:   { label: 'Output', inputs: 1, color: '#ea4335', fn: (n, a) => a },
+};
+
+// ============================================================
+// World state
+// ============================================================
+const NODE_W = 124, NODE_H = 56, PORT_R = 6, TITLE_H = 22;
+const graph = new Graph();
+let nextId = 1;
+let selectedId = null;
+let selectedWire = null;   // { fromId, fromOut, toId, toIn }
+let dragState = null;
+let pendingWire = null;    // { fromId, fromOut, mx, my }
+let toast = '';
+let toastUntil = 0;
+
+// ============================================================
+// Node ops (each node = Block; wires = refs of target node)
+// ============================================================
+function newNodeId() { return 'n' + (nextId++); }
+
+function addNode(type, x, y) {
+  const id = newNodeId();
+  const block = new Block({ id, type: 'node', meta: { nodeType: type } });
+  const initial = type === 'const' ? { x, y, value: 1 } : { x, y };
+  block.commit({ content: initial, refs: [], meta: { action: 'create', nodeType: type } });
+  graph.add(block);
+  return id;
+}
+
+function moveNode(id, x, y) {
+  const b = graph.get(id);
+  if (!b) return;
+  const cur = b.content;
+  if (cur.x === x && cur.y === y) return;
+  b.commit({ content: { ...cur, x, y }, refs: b.refs, meta: { action: 'move' } });
+}
+
+function setConstValue(id, value) {
+  const b = graph.get(id);
+  if (!b || b.meta.nodeType !== 'const') return;
+  const cur = b.content;
+  b.commit({ content: { ...cur, value }, refs: b.refs, meta: { action: 'edit-value' } });
+}
+
+function addWire(fromId, fromOut, toId, toIn) {
+  if (fromId === toId) { showToast('cannot wire node to itself'); return false; }
+  // Cycle check: forwardClosure(toId) must NOT contain fromId.
+  const closure = graph.forwardClosure(toId);
+  if (closure.has(fromId)) { showToast('cycle rejected (forwardClosure)'); return false; }
+  const target = graph.get(toId);
+  if (!target) return false;
+  // Replace existing ref at this input slot
+  const newRefs = target.refs.filter(r => !(r.kind === 'input' && r.toIn === toIn));
+  newRefs.push({ kind: 'input', target: fromId, fromOut, toIn });
+  target.commit({ content: target.content, refs: newRefs, meta: { action: 'wire' } });
+  return true;
+}
+
+function removeWire(toId, toIn) {
+  const target = graph.get(toId);
+  if (!target) return;
+  const newRefs = target.refs.filter(r => !(r.kind === 'input' && r.toIn === toIn));
+  target.commit({ content: target.content, refs: newRefs, meta: { action: 'unwire' } });
+}
+
+function deleteNode(id) {
+  graph.remove(id);
+  // also remove any wire pointing to this node from elsewhere
+  for (const b of graph.all()) {
+    const filtered = b.refs.filter(r => r.target !== id);
+    if (filtered.length !== b.refs.length) {
+      b.commit({ content: b.content, refs: filtered, meta: { action: 'cascade-unwire' } });
+    }
+  }
+  if (selectedId === id) selectedId = null;
+}
+
+// ============================================================
+// Evaluation (DAG walk; cycles short-circuit to NaN)
+// ============================================================
+function evaluateAll() {
+  const cache = new Map();
+  function eval_(id, outIdx, seen) {
+    const key = id + ':' + outIdx;
+    if (cache.has(key)) return cache.get(key);
+    if (seen.has(id)) return NaN;
+    const seen2 = new Set(seen); seen2.add(id);
+    const b = graph.get(id);
+    if (!b) return NaN;
+    const def = TYPES[b.meta.nodeType];
+    const ins = [];
+    for (let i = 0; i < def.inputs; i++) {
+      const w = b.refs.find(r => r.kind === 'input' && r.toIn === i);
+      ins.push(w ? eval_(w.target, w.fromOut, seen2) : 0);
+    }
+    const v = def.fn(b.content, ...ins);
+    cache.set(key, v);
+    return v;
+  }
+  const out = new Map();
+  for (const b of graph.all()) {
+    out.set(b.id, eval_(b.id, 0, new Set()));
+  }
+  return out;
+}
+
+// ============================================================
+// Geometry helpers
+// ============================================================
+function nodeRect(b) {
+  const { x, y } = b.content;
+  return { x, y, w: NODE_W, h: NODE_H };
+}
+function inputPortPos(b, idx) {
+  const r = nodeRect(b);
+  const def = TYPES[b.meta.nodeType];
+  const totalY = TITLE_H + (def.inputs ? (NODE_H - TITLE_H) / def.inputs * (idx + 0.5) : 0);
+  return { x: r.x, y: r.y + totalY };
+}
+function outputPortPos(b) {
+  const r = nodeRect(b);
+  return { x: r.x + r.w, y: r.y + (TITLE_H + NODE_H) / 2 };
+}
+function pointInNode(px, py, b) {
+  const r = nodeRect(b);
+  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+}
+function distToWire(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx*dx + dy*dy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * dx, cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+// ============================================================
+// Render
+// ============================================================
+const canvas = document.querySelector('#cv');
+const ctx = canvas.getContext('2d');
+let canvasW = 0, canvasH = 0;
+
+function fitCanvas() {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvasW = rect.width;
+  canvasH = rect.height;
+}
+
+function render() {
+  fitCanvas();
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // background dotted grid
+  ctx.fillStyle = '#dadce0';
+  for (let x = 0; x < canvasW; x += 24) {
+    for (let y = 0; y < canvasH; y += 24) {
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  const values = evaluateAll();
+
+  // wires
+  for (const b of graph.all()) {
+    for (const r of b.refs) {
+      if (r.kind !== 'input') continue;
+      const src = graph.get(r.target);
+      if (!src) continue;
+      const a = outputPortPos(src);
+      const tgt = inputPortPos(b, r.toIn);
+      const v = values.get(src.id);
+      const isCycle = !Number.isFinite(v);
+      ctx.strokeStyle = isCycle ? 'rgba(217,48,37,0.6)' : (TYPES[src.meta.nodeType].color + 'cc');
+      ctx.lineWidth = (selectedWire && selectedWire.toId === b.id && selectedWire.toIn === r.toIn) ? 3 : 2;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      const mid = (a.x + tgt.x) / 2;
+      ctx.bezierCurveTo(mid, a.y, mid, tgt.y, tgt.x, tgt.y);
+      ctx.stroke();
+    }
+  }
+
+  // dragging wire (preview)
+  if (pendingWire) {
+    const src = graph.get(pendingWire.fromId);
+    const a = outputPortPos(src);
+    ctx.strokeStyle = TYPES[src.meta.nodeType].color + 'aa';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    const mid = (a.x + pendingWire.mx) / 2;
+    ctx.bezierCurveTo(mid, a.y, mid, pendingWire.my, pendingWire.mx, pendingWire.my);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // nodes
+  for (const b of graph.all()) {
+    const def = TYPES[b.meta.nodeType];
+    const r = nodeRect(b);
+    const sel = b.id === selectedId;
+    // body
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = sel ? '#1a73e8' : '#5f6368';
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(r.x, r.y, r.w, r.h, 6);
+    else ctx.rect(r.x, r.y, r.w, r.h);
+    ctx.fill();
+    ctx.stroke();
+    // title bar
+    ctx.fillStyle = def.color;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(r.x, r.y, r.w, TITLE_H, [6, 6, 0, 0]);
+    else ctx.rect(r.x, r.y, r.w, TITLE_H);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '600 12px -apple-system, system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(def.label, r.x + 8, r.y + TITLE_H / 2);
+    // body content
+    ctx.fillStyle = '#202124';
+    ctx.font = '13px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    if (b.meta.nodeType === 'const') {
+      ctx.fillText(String(b.content.value), r.x + r.w - 10, r.y + TITLE_H + (NODE_H - TITLE_H) / 2);
+    } else {
+      const v = values.get(b.id);
+      const text = !Number.isFinite(v) ? '—' : (Number.isInteger(v) ? String(v) : v.toFixed(3));
+      ctx.fillText(text, r.x + r.w - 10, r.y + TITLE_H + (NODE_H - TITLE_H) / 2);
+    }
+    // input ports
+    for (let i = 0; i < def.inputs; i++) {
+      const p = inputPortPos(b, i);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.strokeStyle = '#5f6368';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    // output port
+    if (TYPES[b.meta.nodeType].label !== 'Output') {
+      const p = outputPortPos(b);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);
+      ctx.fillStyle = def.color;
+      ctx.fill();
+      ctx.strokeStyle = '#202124';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // toast
+  if (toastUntil > performance.now()) {
+    ctx.fillStyle = 'rgba(32,33,36,0.92)';
+    ctx.fillRect(canvasW / 2 - 110, canvasH - 36, 220, 24);
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(toast, canvasW / 2, canvasH - 24);
+    requestAnimationFrame(render);
+  }
+}
+
+function showToast(msg) {
+  toast = msg;
+  toastUntil = performance.now() + 1500;
+  render();
+}
+
+// ============================================================
+// Mouse handling
+// ============================================================
+function mouseToLocal(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+function findHitAt(x, y) {
+  // Check nodes (front to back: most recently added drawn last by Map order, so reverse)
+  const arr = graph.all();
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const b = arr[i];
+    const def = TYPES[b.meta.nodeType];
+    // output port
+    if (def.label !== 'Output') {
+      const p = outputPortPos(b);
+      if (Math.hypot(x - p.x, y - p.y) <= PORT_R + 3) return { kind: 'out-port', b, fromOut: 0 };
+    }
+    // input ports
+    for (let k = 0; k < def.inputs; k++) {
+      const p = inputPortPos(b, k);
+      if (Math.hypot(x - p.x, y - p.y) <= PORT_R + 3) return { kind: 'in-port', b, toIn: k };
+    }
+    // body
+    if (pointInNode(x, y, b)) return { kind: 'node', b };
+  }
+  // Check wires
+  for (const b of graph.all()) {
+    for (const r of b.refs) {
+      if (r.kind !== 'input') continue;
+      const src = graph.get(r.target);
+      if (!src) continue;
+      const a = outputPortPos(src);
+      const t = inputPortPos(b, r.toIn);
+      if (distToWire(x, y, a.x, a.y, t.x, t.y) < 6) return { kind: 'wire', toId: b.id, toIn: r.toIn, fromId: r.target, fromOut: r.fromOut };
+    }
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  hideEditDialog();
+  const { x, y } = mouseToLocal(e);
+  const hit = findHitAt(x, y);
+  if (!hit) {
+    selectedId = null;
+    selectedWire = null;
+    refreshAll();
+    return;
+  }
+  if (hit.kind === 'out-port') {
+    pendingWire = { fromId: hit.b.id, fromOut: hit.fromOut, mx: x, my: y };
+    render();
+  } else if (hit.kind === 'in-port') {
+    // No wire-from-input behavior; just select target node
+    selectedId = hit.b.id;
+    selectedWire = null;
+    refreshAll();
+  } else if (hit.kind === 'node') {
+    selectedId = hit.b.id;
+    selectedWire = null;
+    const r = nodeRect(hit.b);
+    dragState = { kind: 'node', id: hit.b.id, dx: x - r.x, dy: y - r.y };
+    refreshAll();
+  } else if (hit.kind === 'wire') {
+    selectedWire = { toId: hit.toId, toIn: hit.toIn, fromId: hit.fromId, fromOut: hit.fromOut };
+    selectedId = null;
+    refreshAll();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const { x, y } = mouseToLocal(e);
+  if (dragState && dragState.kind === 'node') {
+    moveNode(dragState.id, x - dragState.dx, y - dragState.dy);
+    refreshAll();
+  } else if (pendingWire) {
+    pendingWire.mx = x;
+    pendingWire.my = y;
+    render();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  const { x, y } = mouseToLocal(e);
+  if (pendingWire) {
+    const hit = findHitAt(x, y);
+    if (hit && hit.kind === 'in-port') {
+      addWire(pendingWire.fromId, pendingWire.fromOut, hit.b.id, hit.toIn);
+    }
+    pendingWire = null;
+    refreshAll();
+  }
+  dragState = null;
+});
+
+canvas.addEventListener('dblclick', e => {
+  const { x, y } = mouseToLocal(e);
+  const hit = findHitAt(x, y);
+  if (!hit || hit.kind !== 'node') return;
+  if (hit.b.meta.nodeType !== 'const') return;
+  showEditDialog(hit.b);
+});
+
+// click wire to delete
+canvas.addEventListener('click', e => {
+  if (!selectedWire) return;
+  // already selected on mousedown; second click could delete via Delete key
+});
+
+document.addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selectedWire) {
+      removeWire(selectedWire.toId, selectedWire.toIn);
+      selectedWire = null;
+      refreshAll();
+      e.preventDefault();
+    } else if (selectedId) {
+      deleteNode(selectedId);
+      refreshAll();
+      e.preventDefault();
+    }
+  }
+});
+
+// ============================================================
+// Edit dialog (Const value)
+// ============================================================
+const editDialog = document.querySelector('#edit-dialog');
+const editInput = document.querySelector('#edit-input');
+let editingId = null;
+
+function showEditDialog(b) {
+  editingId = b.id;
+  editInput.value = String(b.content.value ?? 0);
+  const r = nodeRect(b);
+  editDialog.style.left = (r.x + r.w / 2 - 50) + 'px';
+  editDialog.style.top = (r.y + 26) + 'px';
+  editDialog.style.display = 'block';
+  editInput.focus();
+  editInput.select();
+}
+function hideEditDialog() {
+  editDialog.style.display = 'none';
+  editingId = null;
+}
+editInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (editingId !== null) {
+      const v = Number(editInput.value);
+      if (Number.isFinite(v)) setConstValue(editingId, v);
+    }
+    hideEditDialog();
+    refreshAll();
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    hideEditDialog();
+    e.preventDefault();
+  }
+});
+editInput.addEventListener('blur', () => {
+  if (editingId !== null) {
+    const v = Number(editInput.value);
+    if (Number.isFinite(v)) setConstValue(editingId, v);
+  }
+  hideEditDialog();
+  refreshAll();
+});
+
+// ============================================================
+// Inspector panel
+// ============================================================
+function refreshInspector() {
+  const meta = document.querySelector('#meta');
+  const list = document.querySelector('#version-list');
+  if (selectedWire) {
+    meta.innerHTML = `
+      <b>wire</b><br>
+      from: <b>${selectedWire.fromId}</b>:out${selectedWire.fromOut}<br>
+      to: <b>${selectedWire.toId}</b>:in${selectedWire.toIn}<br>
+      <small>(stored as ref in target node's head version)</small>
+    `;
+    list.innerHTML = '<div class="version-entry">— wire = ref edge, see target node history —</div>';
+    return;
+  }
+  if (!selectedId) {
+    meta.innerHTML = '— click a node —';
+    list.innerHTML = '<div class="version-entry">—</div>';
+    return;
+  }
+  const b = graph.get(selectedId);
+  if (!b) { meta.innerHTML = '(removed)'; return; }
+  const def = TYPES[b.meta.nodeType];
+  const values = evaluateAll();
+  const v = values.get(b.id);
+  meta.innerHTML = `
+    id: <b>${b.id}</b><br>
+    type: node / <b>${def.label}</b><br>
+    pos: (${Math.round(b.content.x)}, ${Math.round(b.content.y)})<br>
+    ${b.meta.nodeType === 'const' ? `value: <b>${b.content.value}</b><br>` : ''}
+    inputs wired: <b>${b.refs.filter(r => r.kind === 'input').length}/${def.inputs}</b><br>
+    computed: <b>${Number.isFinite(v) ? v : '—'}</b><br>
+    versions: <b>${b.versions.length}</b>
+  `;
+  list.innerHTML = '';
+  b.versions.forEach((ver, idx) => {
+    const cur = idx === b.versions.length - 1;
+    const el = document.createElement('div');
+    el.className = 'version-entry' + (cur ? ' current' : '');
+    const t = new Date(ver.timestamp).toLocaleTimeString('en-US', { hour12: false });
+    const refsCount = (ver.refs || []).length;
+    el.innerHTML = `[${idx}] ${t} ${ver.meta?.action || ''} <span style="color:#9aa0a6">refs:${refsCount}</span>`;
+    list.appendChild(el);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
+function refreshAll() {
+  render();
+  refreshInspector();
+}
+
+// ============================================================
+// Sidebar buttons + controls
+// ============================================================
+document.querySelectorAll('.palette button[data-type]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    // place at viewport center (with small jitter)
+    const cx = canvasW / 2 + (Math.random() - 0.5) * 60;
+    const cy = canvasH / 2 + (Math.random() - 0.5) * 60;
+    addNode(type, Math.round(cx - NODE_W / 2), Math.round(cy - NODE_H / 2));
+    refreshAll();
+  });
+});
+
+// ============================================================
+// Demo: (3 + 4) * 2 = 14 → wired to Output
+// ============================================================
+function loadDemo() {
+  clearAll();
+  const cA = addNode('const', 60, 60);   setConstValue(cA, 3);
+  const cB = addNode('const', 60, 160);  setConstValue(cB, 4);
+  const cC = addNode('const', 60, 260);  setConstValue(cC, 2);
+  const ad = addNode('add',   240, 100);
+  const ml = addNode('mul',   420, 130);
+  const ot = addNode('out',   600, 130);
+  addWire(cA, 0, ad, 0);
+  addWire(cB, 0, ad, 1);
+  addWire(ad, 0, ml, 0);
+  addWire(cC, 0, ml, 1);
+  addWire(ml, 0, ot, 0);
+  refreshAll();
+}
+
+function clearAll() {
+  graph.blocks.clear();
+  selectedId = null;
+  selectedWire = null;
+  refreshAll();
+}
+
+document.querySelector('#load-demo').addEventListener('click', loadDemo);
+document.querySelector('#clear').addEventListener('click', clearAll);
+document.querySelector('#export').addEventListener('click', () => {
+  const blocks = graph.all().map(b => ({
+    id: b.id,
+    type: b.type,
+    nodeType: b.meta.nodeType,
+    versions: b.versions.length,
+    content: b.content,
+    refs: b.refs,
+  }));
+  const out = { blocks, exportedAt: Date.now() };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'node-graph-blocks.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+window.addEventListener('resize', () => render());
+
+loadDemo();
+</script>
+</body>
+</html>

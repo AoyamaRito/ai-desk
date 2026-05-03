@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ai-desk のコア発想 — コードを「歴史」として持つ</title>
+<style>
+:root {
+  --fg: #111111; --fg-dim: #5a5a5a; --bg: #ffffff; --bg-soft: #f6f6f8;
+  --border: #1a1a1a; --border-soft: #d8d8de;
+  --accent: #6b3aff; --accent-soft: #f0eaff;
+  --pink: #ff1d6d; --green: #00a86b; --amber: #f59e0b; --code-bg: #f3f3f5;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg-soft); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+a { color: var(--accent); }
+
+#deck { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 6vh 8vw;
+  background: var(--bg); border: 8px solid var(--border);
+  margin: 24px;
+  width: calc(100vw - 48px); height: calc(100vh - 48px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.title-slide { justify-content: center; align-items: center; text-align: center; }
+.title-slide h1 {
+  font-size: clamp(40px, 6.6vw, 100px); font-weight: 900; letter-spacing: -0.04em;
+  line-height: 1.0; color: var(--accent); margin-bottom: 24px; max-width: 16ch;
+}
+.title-slide .tagline { font-size: clamp(17px, 2.2vw, 26px); color: var(--fg); font-weight: 600; margin-bottom: 8px; max-width: 32ch; line-height: 1.4; }
+.title-slide .sub { font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim); }
+.title-slide .meta { position: absolute; bottom: 32px; right: 32px; font-size: 12px; color: var(--fg-dim); text-align: right; }
+
+.slide h2 {
+  font-size: clamp(28px, 4vw, 50px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; margin-bottom: 22px;
+}
+.slide h2 .num {
+  display: inline-block; background: var(--accent); color: #fff;
+  width: 1.3em; height: 1.3em; line-height: 1.3em; text-align: center;
+  font-size: 0.55em; vertical-align: 0.4em; margin-right: 16px; font-weight: 800;
+}
+.slide p { font-size: clamp(15px, 1.7vw, 21px); line-height: 1.6; margin-bottom: 14px; }
+.slide p.lead { font-size: clamp(19px, 2.2vw, 28px); font-weight: 600; margin-bottom: 22px; }
+.slide p.muted { color: var(--fg-dim); }
+.slide ul { margin: 10px 0 18px 24px; }
+.slide li { font-size: clamp(14px, 1.6vw, 19px); line-height: 1.6; margin-bottom: 8px; }
+.slide li strong { color: var(--accent); }
+.slide code { background: var(--code-bg); padding: 2px 6px; font-family: "SF Mono", Menlo, monospace; font-size: 0.92em; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-top: 12px; }
+.split .col h3 { font-size: clamp(15px, 1.8vw, 21px); font-weight: 800; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.split .col.problem h3 { color: var(--pink); }
+.split .col.solution h3 { color: var(--green); }
+
+.callout {
+  background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 18px 22px;
+  margin: 18px 0; font-size: clamp(15px, 1.7vw, 21px); font-weight: 600; line-height: 1.55;
+}
+.callout strong { color: var(--accent); }
+
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+.metric { background: var(--accent-soft); border-left: 6px solid var(--accent); padding: 16px 20px; }
+.metric .num { font-size: clamp(24px, 3.4vw, 42px); font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+.metric .lab { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); font-weight: 600; line-height: 1.4; }
+
+.phase-flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 18px 0; }
+.phase {
+  background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 20px 18px;
+  text-align: center; min-height: 160px; display: flex; flex-direction: column; justify-content: center;
+}
+.phase .n { display: inline-block; background: var(--accent); color: #fff; width: 32px; height: 32px; border-radius: 50%; text-align: center; line-height: 32px; font-weight: 800; font-size: 16px; margin: 0 auto 10px; }
+.phase h4 { font-size: clamp(15px, 1.8vw, 20px); font-weight: 800; margin-bottom: 6px; }
+.phase p { font-size: clamp(12px, 1.4vw, 16px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
+
+.benefit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+.benefit { background: var(--bg-soft); border: 2px solid var(--border-soft); padding: 14px 18px; }
+.benefit h4 { font-size: clamp(14px, 1.6vw, 18px); font-weight: 800; margin-bottom: 4px; color: var(--accent); }
+.benefit p { font-size: clamp(12px, 1.3vw, 15px); color: var(--fg-dim); margin: 0; line-height: 1.5; }
+
+.bigvis {
+  display: flex; align-items: center; justify-content: center;
+  margin: 18px 0; gap: 14px; flex-wrap: wrap;
+}
+.card-stack {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.card {
+  background: var(--accent-soft); border: 2px solid var(--accent);
+  padding: 8px 14px; font-weight: 700; font-size: clamp(12px, 1.4vw, 16px);
+  color: var(--accent); min-width: 140px; text-align: center;
+}
+.card.dim { background: var(--bg-soft); border-color: var(--border-soft); color: var(--fg-dim); }
+.card.now { background: var(--accent); color: #fff; }
+.arrow {
+  font-size: clamp(20px, 2.6vw, 30px); color: var(--fg-dim); font-weight: 800;
+}
+.label-under { font-size: clamp(11px, 1.2vw, 13px); color: var(--fg-dim); text-align: center; margin-top: 6px; font-weight: 600; }
+
+#nav {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+  background: rgba(255,255,255,0.94); border: 2px solid var(--border); font-size: 13px;
+  z-index: 100;
+}
+#nav button { padding: 4px 10px; font-weight: 700; color: var(--fg-dim); }
+#nav button:hover { color: var(--fg); }
+#nav .pos { font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; font-weight: 700; }
+#hint { position: fixed; top: 16px; right: 24px; font-size: 11px; color: var(--fg-dim); background: rgba(255,255,255,0.8); padding: 4px 10px; border: 1px solid var(--border-soft); z-index: 100; }
+#pdf-link { position: fixed; top: 16px; left: 24px; padding: 4px 12px; font-size: 11px; background: #6b3aff; color: #fff; font-weight: 700; text-decoration: none; z-index: 100; border: 2px solid #6b3aff; }
+
+@media (max-width: 720px) {
+  .slide { margin: 8px; width: calc(100vw - 16px); height: calc(100vh - 16px); padding: 5vh 6vw; }
+  .split, .metrics, .benefit-grid, .phase-flow { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 0; }
+  html, body { background: #fff; height: auto; overflow: visible; }
+  #deck { position: static; width: auto; height: auto; }
+  .slide {
+    opacity: 1 !important; pointer-events: auto !important;
+    position: relative !important; inset: auto !important;
+    margin: 0 !important;
+    width: 297mm !important; height: 210mm !important;
+    page-break-after: always; break-after: page;
+    border: none !important; overflow: hidden;
+    transition: none !important;
+  }
+  .slide:last-child { page-break-after: auto; }
+  #nav, #hint, #pdf-link { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- 1 ===== Title ===== -->
+  <section class="slide title-slide active">
+    <h1>コードを「歴史」として持つ</h1>
+    <p class="tagline">AI にコードを書かせる時に、なぜ崩れるのか。<br>ai-desk の解き方を、絵だけで理解する。</p>
+    <p class="sub">ai-desk — 沖井広行 · 2026-05</p>
+    <div class="meta">github.com/AoyamaRito/ai-desk</div>
+  </section>
+
+  <!-- 2 ===== The pain ===== -->
+  <section class="slide">
+    <h2><span class="num">1</span>こんな経験、ありませんか?</h2>
+    <ul style="font-size: clamp(18px, 2.2vw, 26px);">
+      <li>AI に「この関数直して」と頼んだら、<strong>別の場所が壊れた</strong></li>
+      <li>3 回修正してもらったら、<strong>構造が崩壊した</strong></li>
+      <li>大きいコードベースで「全体把握して」と頼むと、<strong>幻覚を吐いた</strong></li>
+      <li>AI が DRY 化したあと、<strong>何が変わったか追えなくなった</strong></li>
+    </ul>
+    <p class="lead" style="margin-top: 28px;">これは AI が悪いんじゃなく、<strong>渡し方が悪い</strong>。</p>
+  </section>
+
+  <!-- 3 ===== Why it breaks ===== -->
+  <section class="slide">
+    <h2><span class="num">2</span>なぜ壊れるか — 一言で</h2>
+    <p class="lead">AI には<strong>関係する全部</strong>を一度に見せていないから。</p>
+    <div class="bigvis" style="margin-top: 28px;">
+      <div>
+        <div class="card-stack">
+          <div class="card">関数 A</div>
+        </div>
+        <div class="label-under">AI に渡したのはこれだけ</div>
+      </div>
+      <div class="arrow">vs.</div>
+      <div>
+        <div class="card-stack">
+          <div class="card">関数 A</div>
+          <div class="card dim">└ B が呼ばれる</div>
+          <div class="card dim">　└ C が呼ばれる</div>
+          <div class="card dim">　└ D が呼ばれる</div>
+        </div>
+        <div class="label-under">本当は全部見せないと整合が取れない</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">A だけ直しても B・C・D が古いまま → 噛み合わなくて壊れる。</p>
+  </section>
+
+  <!-- 4 ===== File virtualization ===== -->
+  <section class="slide">
+    <h2><span class="num">3</span>1 ファイルを「仮想的に」分解する</h2>
+    <p class="lead">ファイルは <strong>分けない</strong>。ai-desk が <strong>頭の中で</strong>かたまり (Block) に切り分ける。</p>
+    <div class="bigvis" style="margin-top: 18px;">
+      <div>
+        <div class="card-stack">
+          <div class="card now" style="min-width: 220px; padding: 16px 18px; text-align: left; line-height: 1.6;">
+            <div style="font-size: 0.85em; opacity: 0.8; margin-bottom: 6px;">foo.js</div>
+            function A() { ... }<br>
+            function B() { ... }<br>
+            class C { ... }
+          </div>
+        </div>
+        <div class="label-under">ディスク上は 1 ファイルのまま</div>
+      </div>
+      <div class="arrow">→ 仮想分解 →</div>
+      <div>
+        <div class="card-stack">
+          <div class="card">Block: A</div>
+          <div class="card">Block: B</div>
+          <div class="card">Block: C</div>
+        </div>
+        <div class="label-under">ai-desk の頭の中では<br>独立した単位、それぞれが歴史を持つ</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">物理ファイルは <strong>触らない</strong>。AI が触る作業台では細かく分かれている。<br>編集が終わったら <strong>1 ファイルに戻せる</strong>。両方の良いとこ取り。</p>
+  </section>
+
+  <!-- 5 ===== Core idea 1: history is the body ===== -->
+  <section class="slide">
+    <h2><span class="num">4</span>発想の転換 ① — コードは「今の姿」でなく「歴史」</h2>
+    <p class="lead">普通: ファイル = 今の状態。<br>ai-desk: <strong>かたまり (Block) = 過去の全バージョンの並び</strong>。</p>
+    <div class="bigvis" style="margin-top: 18px;">
+      <div>
+        <div class="card-stack">
+          <div class="card now">関数 A の今</div>
+        </div>
+        <div class="label-under">普通のコード<br>(過去は git の中)</div>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="card-stack">
+          <div class="card dim">v0 (最初)</div>
+          <div class="card dim">v1</div>
+          <div class="card dim">v2</div>
+          <div class="card now">v3 (今 = 派生)</div>
+        </div>
+        <div class="label-under">ai-desk の Block<br>(歴史こそ本体、今は派生)</div>
+      </div>
+    </div>
+    <p class="muted">「今のコード」は、<strong>歴史の最後のページ</strong>を読んでいるだけ。本体はページ全体。</p>
+  </section>
+
+  <!-- 5 ===== Core idea 2: rollback ===== -->
+  <section class="slide">
+    <h2><span class="num">5</span>歴史だから — 戻すのも「消す」じゃない</h2>
+    <p class="lead">過去に戻りたい時、<strong>過去を消す</strong>のではなく <strong>「あの時のページ」を新しく書き写す</strong>。</p>
+    <div class="bigvis" style="margin-top: 18px;">
+      <div class="card-stack">
+        <div class="card dim">v0</div>
+        <div class="card">v1 ← ここに戻したい</div>
+        <div class="card dim">v2</div>
+        <div class="card now">v3 (今)</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="card-stack">
+        <div class="card dim">v0</div>
+        <div class="card dim">v1</div>
+        <div class="card dim">v2</div>
+        <div class="card dim">v3</div>
+        <div class="card now">v4 (中身は v1 と同じ)</div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 18px;">
+      <strong>失敗を恐れずに何度でも往復できる。</strong>過去が残ってるから、<br>
+      「やり直し」が <strong>新しい一歩</strong> になる(削除でなく追加)。
+    </div>
+  </section>
+
+  <!-- 6 ===== Core idea 3: relationship map ===== -->
+  <section class="slide">
+    <h2><span class="num">6</span>発想の転換 ② — 関係も「明示」する</h2>
+    <p class="lead">どの Block が、どの Block を呼んでいるか。<br><strong>コードを読まなくても辿れる地図</strong>を持つ。</p>
+    <div class="bigvis" style="margin-top: 16px;">
+      <div class="card-stack">
+        <div class="card">A</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="card-stack">
+        <div class="card">B</div>
+        <div class="card">C</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="card-stack">
+        <div class="card">D</div>
+      </div>
+    </div>
+    <ul style="margin-top: 18px;">
+      <li><strong>「A を変えたら何が壊れる?」</strong> → 地図を辿れば一発で出る</li>
+      <li><strong>「このバグの原因はどこ?」</strong> → 逆方向に辿る</li>
+      <li><strong>「過去のある時点の地図は?」</strong> → 履歴と組合せで再現</li>
+    </ul>
+  </section>
+
+  <!-- 7 ===== Killer feature: virtual heavy function ===== -->
+  <section class="slide">
+    <h2><span class="num">7</span>キラー機能 — 関係する全部をまとめて AI に渡す</h2>
+    <p class="lead">「A を直して」と頼む時に、<strong>A + 呼ぶ先の B, C, D も一緒に</strong>同じプロンプトに展開する。</p>
+    <div class="bigvis" style="margin-top: 18px;">
+      <div class="card-stack">
+        <div class="card">A</div>
+        <div class="card">B</div>
+        <div class="card">C</div>
+        <div class="card">D</div>
+        <div class="label-under">物理は分散</div>
+      </div>
+      <div class="arrow">→ まとめる →</div>
+      <div class="card-stack">
+        <div class="card now" style="min-width: 200px;">A + B + C + D</div>
+        <div class="label-under">1 つのプロンプト</div>
+      </div>
+      <div class="arrow">AI 編集</div>
+      <div class="card-stack">
+        <div class="card now" style="min-width: 200px;">A' + B' + C' + D'</div>
+        <div class="label-under">編集された 1 テキスト</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 14px;">AI は <strong>呼び出し元と呼ばれる側を同時に</strong>見られる → 整合がとれた状態で直せる。</p>
+  </section>
+
+  <!-- 8 ===== Killer feature 2: distribute back ===== -->
+  <section class="slide">
+    <h2><span class="num">8</span>そして自動で配り直す — ここが本丸</h2>
+    <p class="lead">AI から戻ってきた1テキストを、<strong>機械的に元の各 Block に振り分けて</strong>履歴に追加する。</p>
+    <div class="bigvis" style="margin-top: 18px;">
+      <div class="card-stack">
+        <div class="card now" style="min-width: 200px;">A' + B' + C' + D'</div>
+        <div class="label-under">AI から戻った1テキスト</div>
+      </div>
+      <div class="arrow">→ 自動で分割 →</div>
+      <div class="card-stack">
+        <div class="card">A → 新ページ追加</div>
+        <div class="card">B → 新ページ追加</div>
+        <div class="card dim">C → 変化なし(スキップ)</div>
+        <div class="card">D → 新ページ追加</div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top: 18px;">
+      <strong>1 回の AI 編集が、関連する Block 全てに同時に反映される。</strong><br>
+      「A 直したら B が古いまま壊れた」が <strong>構造的に起きない</strong>。
+    </div>
+  </section>
+
+  <!-- 9 ===== Why each axis matters ===== -->
+  <section class="slide">
+    <h2><span class="num">9</span>3 つの仕掛けが噛み合っている</h2>
+    <div class="phase-flow">
+      <div class="phase">
+        <span class="n">1</span>
+        <h4>かたまり (Block)</h4>
+        <p>関数も、クラスも、ルールも、すべて同じ単位で扱う。AI は<strong>1 種類のものとして読める</strong>。</p>
+      </div>
+      <div class="phase">
+        <span class="n">2</span>
+        <h4>歴史 (Versions)</h4>
+        <p>各 Block が自分の履歴を持つ。<strong>失敗しても戻れる</strong>から、AI に大胆に編集させられる。</p>
+      </div>
+      <div class="phase">
+        <span class="n">3</span>
+        <h4>地図 (Refs)</h4>
+        <p>誰が誰を呼んでいるか明示。<strong>「関係する全部」をまとめて</strong>AI に渡せる。</p>
+      </div>
+    </div>
+    <p class="lead" style="margin-top: 20px; text-align: center;">この 3 つが組み合わさると<br>「<strong>AI に大きな修正を任せても崩壊しない</strong>」という挙動になる。</p>
+  </section>
+
+  <!-- 10 ===== git positioning ===== -->
+  <section class="slide">
+    <h2><span class="num">10</span>git の代わりじゃない。git の上に乗る</h2>
+    <div class="split">
+      <div class="col problem">
+        <h3>git の役割</h3>
+        <ul>
+          <li>ファイル全体の履歴</li>
+          <li>人がチームで開発するため</li>
+          <li>ブランチ・マージ・PR</li>
+        </ul>
+      </div>
+      <div class="col solution">
+        <h3>ai-desk の役割</h3>
+        <ul>
+          <li><strong>関数単位</strong>の履歴と地図</li>
+          <li>AI が編集するため</li>
+          <li>「関係する全部」をまとめる仕組み</li>
+        </ul>
+      </div>
+    </div>
+    <p class="lead" style="margin-top: 22px; text-align: center;">両方使える。git は <strong>保管庫</strong>、ai-desk は <strong>AI が触る作業台</strong>。</p>
+  </section>
+
+  <!-- 11 ===== Evidence ===== -->
+  <section class="slide">
+    <h2><span class="num">11</span>動いている — これは思想じゃなく実装</h2>
+    <div class="metrics">
+      <div class="metric"><div class="num">105</div><div class="lab">テスト全パス</div></div>
+      <div class="metric"><div class="num">4</div><div class="lab">単一HTMLで動くデモ<br>(ゲーム/表計算/ノードグラフ/カンバン)</div></div>
+      <div class="metric"><div class="num">0</div><div class="lab">外部ライブラリ<br>(Node 標準だけで動く)</div></div>
+    </div>
+    <p class="lead" style="margin-top: 28px;">どれも <strong>1 セッションで AI が書いた</strong>。<br>これ自体が「崩壊しない」ことの証拠になっている。</p>
+  </section>
+
+  <!-- 12 ===== Conclusion ===== -->
+  <section class="slide" style="text-align: center; justify-content: center; align-items: center;">
+    <h2 style="font-size: clamp(34px, 5.4vw, 72px); margin-bottom: 28px;">歴史 + 地図 + まとめて渡す</h2>
+    <p style="font-size: clamp(20px, 2.4vw, 32px); font-weight: 700; max-width: 900px; line-height: 1.4;">
+      この 3 つで、AI コーディングは<br>
+      <strong style="color: var(--accent);">「関数だけ直して周りが壊れる」</strong> から抜け出せる。
+    </p>
+    <p style="margin-top: 30px; font-size: clamp(16px, 2vw, 24px); color: var(--fg-dim); line-height: 1.6; max-width: 800px;">
+      新しい言語も、ビルドも、依存もいらない。<br>
+      <strong>渡し方</strong>を変えるだけ。
+    </p>
+    <p style="margin-top: 36px; font-size: clamp(13px, 1.4vw, 17px); color: var(--fg-dim);">
+      <a href="https://github.com/AoyamaRito/ai-desk">github.com/AoyamaRito/ai-desk</a><br>
+      沖井広行 · 蒼山りと
+    </p>
+  </section>
+
+</div>
+
+<a id="pdf-link" href="block-graph.pdf" download>PDF</a>
+<div id="hint">← → / Space で進む · F でフルスクリーン</div>
+<div id="nav">
+  <button id="nav-prev">← prev</button>
+  <span class="pos" id="nav-pos">1 / 13</span>
+  <button id="nav-next">next →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const total = slides.length;
+const posEl = document.getElementById('nav-pos');
+let idx = 0;
+function go(n) {
+  idx = Math.max(0, Math.min(total - 1, n));
+  for (let i = 0; i < total; i++) slides[i].classList.toggle('active', i === idx);
+  posEl.textContent = `${idx + 1} / ${total}`;
+  history.replaceState(null, '', '#' + (idx + 1));
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(idx + 1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(idx - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End')  { e.preventDefault(); go(total - 1); }
+  else if (e.key.toLowerCase() === 'f') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+  }
+});
+document.getElementById('nav-prev').onclick = () => go(idx - 1);
+document.getElementById('nav-next').onclick = () => go(idx + 1);
+let touchX = null;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend',   e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 60) go(idx + (dx < 0 ? 1 : -1));
+  touchX = null;
+});
+const initial = parseInt(location.hash.slice(1), 10);
+if (initial >= 1 && initial <= total) go(initial - 1);
+</script>
+</body>
+</html>

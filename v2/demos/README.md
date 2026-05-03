@@ -4,6 +4,23 @@ ai-desk v2 の主要機構を**動くもの**として実演するデモ集。
 
 ---
 
+## [`block-spreadsheet/`](./block-spreadsheet/) — Block Spreadsheet
+
+A spreadsheet where **every cell is a Block**.
+
+**v2 concepts on display**:
+- **Block / Block.refs**: cells and their formula dependencies
+- **Block.versions**: full edit history per cell (REAL, append-only)
+- **Graph.impact / backward**: transitive recompute & live dep highlighting
+- **Cycle detection**: reject any formula that would create a circular ref
+- **rollback()**: per-cell Undo as new commit (history preserved)
+
+A clean re-implementation of the v1 spreadsheet using v2 primitives. Single HTML, ~700 lines.
+
+> ▶ **[Play (GitHub Pages)](https://aoyamarito.github.io/ai-desk/v2/demos/block-spreadsheet/)**
+
+---
+
 ## [`gravity-battle/`](./gravity-battle/) — Gravity Field Battle
 
 ブラウザで遊べる**カードゲーム**(単一 HTML、依存ゼロ、~1300 行)。

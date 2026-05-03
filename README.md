@@ -48,22 +48,24 @@ $ node v2/ai-desk.js virtual-apply graph.json 'my-app/render.js:fn:render' heavy
 
 ---
 
-## 🎮 Demo: Gravity Field Battle
+## 🎮 Demos
 
-ai-desk v2 の効果を**ブラウザで遊べるカードゲーム**として実演。
+### ⚡ Gravity Field Battle — [プレイする](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
+ブラウザで遊べる**カードゲーム**(単一 HTML、1300 行、依存ゼロ)。
+- AI 対戦相手が **constraintBlock で全可能 play を評価**(公理 A2)
+- 各ターンの盤面 = **Block.versions**、Undo は `rollback`(公理 A6)
+- カードは ai-desk 概念がテーマ(Block / Heavy Function / Gravity Field など)
+- 詳細: [`v2/demos/gravity-battle/`](v2/demos/gravity-battle/)
 
-> **[▶ プレイする](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)**
-> ([ローカルで開く: `v2/demos/gravity-battle/index.html`](v2/demos/gravity-battle/index.html))
+### 📊 Block Spreadsheet — [触ってみる](https://aoyamarito.github.io/ai-desk/v2/demos/block-spreadsheet/)
+**セル = Block** で実装した表計算(単一 HTML、~700 行)。
+- 数式参照 = `Block.refs`(依存グラフ)
+- 編集履歴 = `Block.versions`(append-only、cell ごとの Undo)
+- 再計算 = `Graph.impact()`(変更時に backward 推移閉包で連鎖)
+- **循環参照を構造レベルで検出して拒否**
+- 詳細: [`v2/demos/block-spreadsheet/`](v2/demos/block-spreadsheet/)
 
-- 単一 HTML ファイル(1300 行、依存ゼロ、ビルドなし)
-- 1 セッションで作成、bug ゼロ
-- AI 対戦相手が **constraintBlock で全可能 play を評価**(公理 A2 の生きた実装)
-- 各ターンの盤面 = **Block.versions に commit**、Undo は `rollback`(公理 A6)
-- マーカー一切なし、JS 構文のみで構造表現
-- カードは ai-desk 概念がテーマ(Block / Heavy Function / Constraint Folding / Gravity Field など)
-
-**この規模が 1 セッションで動く事自体が ai-desk の効果のデモ**になっている。
-詳細: [`v2/demos/gravity-battle/README.md`](v2/demos/gravity-battle/README.md)
+**これらの規模が 1 セッションで動く事自体が ai-desk の効果のデモ**になっている。
 
 ---
 

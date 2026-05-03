@@ -381,13 +381,25 @@ app.js の [機能名] を [変更内容] してください。</div>
   <div class="demo-block" style="border: 3px solid #ff9800; background: linear-gradient(135deg, #fff8e1, #ffe0b2); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
     <h3 class="demo-title" style="color: #d84315;">
       ⚡ <a href="v2/demos/gravity-battle/" style="color: #d84315; font-weight: 900;">Gravity Field Battle</a>
-      <span style="font-size: 13px; background: #ff5722; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">NEW · v2</span>
+      <span style="font-size: 13px; background: #ff5722; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
     </h3>
     <p class="demo-desc" style="color: #333;">
       <strong>ai-desk v2 で 1 セッションで作ったカードゲーム</strong>。constraintBlock(AI 全可能 play 評価)、Block.versions(undo)、マーカーゼロ、単一 HTML 1300 行、bug ゼロ。
       ai-desk v2 の効果を <strong>動くもの</strong> として実演する demo。
     </p>
     <div class="demo-frame tall"><iframe src="v2/demos/gravity-battle/" loading="lazy" title="Gravity Field Battle"></iframe></div>
+  </div>
+
+  <div class="demo-block" style="border: 3px solid #1a73e8; background: linear-gradient(135deg, #e8f0fe, #d2e3fc); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #1565c0;">
+      📊 <a href="v2/demos/block-spreadsheet/" style="color: #1565c0; font-weight: 900;">Block Spreadsheet</a>
+      <span style="font-size: 13px; background: #1a73e8; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>セル = Block</strong> として実装した表計算。数式参照 = <code>Block.refs</code>、編集履歴 = <code>Block.versions</code>、再計算 = <code>Graph.impact()</code>。循環参照は構造レベルで検出して拒否。
+      右パネルでセルの依存・被依存・全 version が見える。
+    </p>
+    <div class="demo-frame tall"><iframe src="v2/demos/block-spreadsheet/?embed=1" loading="lazy" title="Block Spreadsheet"></iframe></div>
   </div>
 
   <p style="background: #f0f4ff; border-left: 6px solid #4dabf7; padding: 12px 18px; margin: 24px 0 16px 0; font-size: 14px;">

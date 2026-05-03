@@ -45,15 +45,12 @@ node ai-desk.js impact v1.json '../ai-desk.js:fn:runSkeleton'
 
 ---
 
-## 🎮 Demo
+## 🎮 Demos
 
-[`demos/gravity-battle/`](./demos/gravity-battle/) — ブラウザで遊べるカードゲーム。
+### [`demos/gravity-battle/`](./demos/gravity-battle/) — Gravity Field Battle
+ブラウザで遊べるカードゲーム(constraintBlock で AI 思考、Block.versions で undo)。
+🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
 
-ai-desk v2 の主要機構を**1 つの実装で全部体現**:
-- **constraintBlock + evalConstraint**: AI が全可能 play を評価
-- **Block.versions**: 各ターンが version、Undo で rollback
-- **マーカーゼロ**: JS 構文のみで構造表現
-- **ブラウザ完結**: 単一 HTML、依存ゼロ、ビルドなし
-
-🌐 [プレイする(GitHub Pages)](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
-📂 [README + ソース](./demos/gravity-battle/)
+### [`demos/block-spreadsheet/`](./demos/block-spreadsheet/) — Block Spreadsheet
+セル = Block で実装した表計算(refs で依存、versions で履歴、impact で再計算、cycle 検出)。
+🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/block-spreadsheet/)

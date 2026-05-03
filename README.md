@@ -57,6 +57,23 @@ app.js の [機能名] を [変更内容] してください。
 
 ---
 
+---
+
+## v2(実験中)
+
+ai-desk の原理を**単一の抽象(Block)**に畳み込んだ次世代実装が `v2/` にあります。
+
+```bash
+cd v2 && npm test    # 90 tests, all green
+node v2/ai-desk-v2.js self    # 自分自身を解析する自己読み込み
+```
+
+詳細は [`v2/BIBLE_v2.md`](v2/BIBLE_v2.md)(思想正典)と [`v2/README_v2.md`](v2/README_v2.md)(CLI/API)を参照。
+
+v1(このリポの本体)は維持されつつ、v2 は思想実験として並走します。
+
+---
+
 ## License
 
 MIT — 自由に使ってください。

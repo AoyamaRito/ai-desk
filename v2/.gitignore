@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude / AI tooling local config
+.claude/
+.aider*
+.cursor/
+HANDOFF.md
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs / temp
+*.log
+*.tmp
+tmp/
+snapshots/
+eyes.port
+
+# v2 specific
+e2e-tmp/
+*.local.json
+graph.json
+trash/

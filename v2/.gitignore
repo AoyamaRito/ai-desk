@@ -32,3 +32,6 @@ e2e-tmp/
 *.local.json
 graph.json
 trash/
+
+# CLI hints — written to cwd to dedupe one-time hints per project
+.ai-desk-state.json

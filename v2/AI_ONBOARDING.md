@@ -12,8 +12,14 @@
 
 1. **`BIBLE.md`** — 思想の正典。公理 A0〜A7 を守る。
 2. **`ai-desk.js`** — 唯一の実装ファイル(コア + CLI)。Block・Graph・parseJS が定義されている。
-3. **`e2e.js`** — 61 テストケース。新機能を追加したらここに 1 テスト以上追加する。
+3. **`e2e.js`** — 105 テストケース。新機能を追加したらここに 1 テスト以上追加する。
 4. **`package.json`** — `npm test` で e2e 実行、`type: "module"`(ESM)。
+5. **`3dplus/`** — CPU 3D Twin(81 tests, CommonJS)。3D / WebGL コードを扱う際は突合層として参照(`3dplus/README.md`)。
+
+### 0.1 stderr に出る hint は読む
+
+ai-desk.js は CLI として呼ばれた時、コードの状態に応じて **stderr に 1 度だけ hint** を流す(例: WebGL/Matrix4 等を検出 → `3dplus/` への routing)。
+状態は cwd の `.ai-desk-state.json` に記録され、二度目以降は静かになる。Hint が出たら**指示先のドキュメントを実際に読む**こと。
 
 ---
 

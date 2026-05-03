@@ -13,6 +13,7 @@ import {
   graphStats,
   blockContext, formatContextForLLM,
   parseMD, exportMermaid, inferTags,
+  virtualHeavy, expandVirtualHeavy, virtualApply,
   constraintBlock, evalConstraint,
   observationBlock,
 } from './ai-desk-v2.js';
@@ -1038,6 +1039,81 @@ group('inferTags', () => {
     const lines = Array(60).fill('  // line').join('\n');
     const tags = inferTags(`function f() {\n${lines}\n}`, 'function');
     assert.ok(tags.includes('large'));
+  });
+});
+
+// ============================================================
+// 6o. virtual heavy / virtualApply
+// ============================================================
+group('Virtual Heavy Function', () => {
+  function fixture() {
+    const a = new Block({ id: 'm:fn:a', type: 'function', meta: { name: 'a' } });
+    a.commit({ content: 'function a(){ return 1; }', tags: ['function'] });
+    const b = new Block({ id: 'm:fn:b', type: 'function', meta: { name: 'b' } });
+    b.commit({
+      content: 'function b(){ return a() + 1; }',
+      tags: ['function'],
+      refs: [{ kind: 'calls', target: 'm:fn:a' }],
+    });
+    const c = new Block({ id: 'm:fn:c', type: 'function', meta: { name: 'c' } });
+    c.commit({
+      content: 'function c(){ return b() + a(); }',
+      tags: ['function'],
+      refs: [{ kind: 'calls', target: 'm:fn:b' }, { kind: 'calls', target: 'm:fn:a' }],
+    });
+    const d = new Block({ id: 'm:fn:d', type: 'function', meta: { name: 'd' } });
+    d.commit({ content: 'function d(){}', tags: ['function'] });  // 関係ない
+    return new Graph([a, b, c, d]);
+  }
+
+  test('virtualHeavy が依存先を集める', () => {
+    const g = fixture();
+    const heavy = virtualHeavy(g, 'm:fn:c');
+    const ids = heavy.map(b => b.id).sort();
+    assert.deepEqual(ids, ['m:fn:a', 'm:fn:b', 'm:fn:c']);
+    assert.ok(!ids.includes('m:fn:d'));
+  });
+
+  test('expandVirtualHeavy が BLOCK ヘッダ付き content を返す', () => {
+    const g = fixture();
+    const expanded = expandVirtualHeavy(g, 'm:fn:c');
+    assert.ok(expanded.includes('--- BLOCK: m:fn:c (function) ---'));
+    assert.ok(expanded.includes('--- BLOCK: m:fn:b (function) ---'));
+    assert.ok(expanded.includes('--- BLOCK: m:fn:a (function) ---'));
+    assert.ok(!expanded.includes('m:fn:d'));
+  });
+
+  test('virtualApply が各 Block を更新する', () => {
+    const g = fixture();
+    const expanded = expandVirtualHeavy(g, 'm:fn:c');
+    // a, b, c 全部書き換える形に
+    const newContent = expanded
+      .replace('function a(){ return 1; }', 'function a(){ return 100; }')
+      .replace('function b(){ return a() + 1; }', 'function b(){ return a() * 2; }')
+      .replace('function c(){ return b() + a(); }', 'function c(){ return b() * 10; }');
+    const updates = virtualApply(g, 'm:fn:c', newContent);
+    assert.equal(g.get('m:fn:a').content, 'function a(){ return 100; }');
+    assert.equal(g.get('m:fn:b').content, 'function b(){ return a() * 2; }');
+    assert.equal(g.get('m:fn:c').content, 'function c(){ return b() * 10; }');
+    assert.equal(g.get('m:fn:d').content, 'function d(){}'); // 範囲外、無傷
+    assert.ok(updates.every(u => u.action === 'updated'));
+  });
+
+  test('virtualApply は範囲外の Block を skip', () => {
+    const g = fixture();
+    // d を patch しようとする(範囲外)
+    const fake = `// --- BLOCK: m:fn:d (function) ---\nfunction d(){ return 'hacked'; }`;
+    const updates = virtualApply(g, 'm:fn:c', fake);
+    assert.ok(updates.some(u => u.action === 'skipped-out-of-scope' && u.id === 'm:fn:d'));
+    assert.equal(g.get('m:fn:d').content, 'function d(){}'); // 無傷
+  });
+
+  test('depth で範囲制御', () => {
+    const g = fixture();
+    const heavy0 = virtualHeavy(g, 'm:fn:c', { depth: 0 });
+    assert.deepEqual(heavy0.map(b => b.id), ['m:fn:c']);
+    const heavy1 = virtualHeavy(g, 'm:fn:c', { depth: 1 });
+    assert.equal(heavy1.length, 3);  // c + b + a
   });
 });
 

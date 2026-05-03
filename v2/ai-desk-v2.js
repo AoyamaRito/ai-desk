@@ -985,6 +985,109 @@ export function buildAndSave(files, outPath) {
 }
 
 // ============================================================
+// Virtual Heavy Function — 仮想重厚関数
+// ============================================================
+//
+// 起点 Block + その依存先(forward 推移閉包)を、論理的に **1つの重厚関数**
+// として扱う仕組み。物理的には複数の Block に分散しているが、LLM に渡すときは
+// **1つの巨大 content** に展開する。戻ってきたら **virtualApply** が
+// 各 Block に自動的に逆配分する。
+//
+// 思想:
+//  - §0.1 重厚関数(全文脈を1つに集約)— LLM 視点の利点
+//  - Block 分割(管理・履歴・検索)         — 永続層の利点
+//  両者を物理層と論理層で分離する。
+//
+// 「依存性ごと撃つ」= 1 root Block を patch するとき、refs で辿れる
+// 関連 Block も自動的に対象に含める。
+
+// 仮想重厚関数のメンバ Block を集める(forward 推移閉包)
+export function virtualHeavy(graph, rootId, opts = {}) {
+  const { depth = Infinity, kind = 'calls' } = opts;
+  const collected = new Map();
+  function collect(id, d) {
+    if (collected.has(id) || d > depth) return;
+    const b = graph.get(id);
+    if (!b) return;
+    collected.set(id, b);
+    for (const r of b.refs) {
+      if (kind && r.kind !== kind) continue;
+      collect(r.target, d + 1);
+    }
+  }
+  collect(rootId, 0);
+  return Array.from(collected.values());
+}
+
+// 仮想重厚関数を 1つの content に展開(LLM プロンプト用)
+// 各 Block の境界は コメントヘッダ `// --- <id> (<type>) ---` で示す
+// virtualApply はこのヘッダを目印に逆配分する
+export function expandVirtualHeavy(graph, rootId, opts = {}) {
+  const blocks = virtualHeavy(graph, rootId, opts);
+  const lines = [];
+  lines.push(`// === Virtual Heavy Function rooted at ${rootId} ===`);
+  lines.push(`// ${blocks.length} blocks combined into one logical heavy function`);
+  lines.push('// Edit the bodies; do not change the boundary headers.');
+  lines.push('');
+  for (const b of blocks) {
+    lines.push(`// --- BLOCK: ${b.id} (${b.type}) ---`);
+    if (b.tags.length) lines.push(`// tags: ${b.tags.join(', ')}`);
+    if (b.refs.length) {
+      const refStr = b.refs.map(r => `${r.kind}->${r.target}`).join(', ');
+      lines.push(`// refs: ${refStr}`);
+    }
+    if (b.content) lines.push(b.content);
+    lines.push('');
+  }
+  lines.push(`// === end of virtual heavy ===`);
+  return lines.join('\n');
+}
+
+// 仮想 Apply — 展開された content を受け取って各 Block に逆配分する
+// 「依存性ごと撃つ」の核心 — 1コマンドで重厚関数の範囲全体を更新
+export function virtualApply(graph, rootId, expandedContent, opts = {}) {
+  const heavyBlocks = virtualHeavy(graph, rootId, opts);
+  const heavyById = new Map(heavyBlocks.map(b => [b.id, b]));
+
+  // BLOCK ヘッダで content を切り出す
+  const segments = splitByBlockHeader(expandedContent);
+  const updates = [];
+  for (const seg of segments) {
+    const target = heavyById.get(seg.id);
+    if (!target) {
+      updates.push({ action: 'skipped-out-of-scope', id: seg.id });
+      continue;
+    }
+    const r = target.applyPatch(seg.content.trim());
+    updates.push({ action: r.action, id: seg.id });
+  }
+  return updates;
+}
+
+// `// --- BLOCK: <id> (<type>) ---` ヘッダで content を分割
+function splitByBlockHeader(content) {
+  const re = /^\s*\/\/\s*---\s*BLOCK:\s*(\S+)\s*\(([^)]+)\)\s*---\s*$/gm;
+  const segments = [];
+  const matches = [];
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    matches.push({ index: m.index, end: m.index + m[0].length, id: m[1], type: m[2] });
+  }
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const next = matches[i + 1];
+    let body = content.slice(cur.end, next ? next.index : content.length);
+    // 末尾の `// === end of virtual heavy ===` を除去
+    body = body.replace(/\n?\/\/\s*===\s*end of virtual heavy\s*===\s*$/, '');
+    // 先頭の `// tags:` `// refs:` 行を除去(commit 時に refs/tags は head 継承するため)
+    body = body.replace(/^\s*\/\/\s*tags:.*$/gm, '');
+    body = body.replace(/^\s*\/\/\s*refs:.*$/gm, '');
+    segments.push({ id: cur.id, type: cur.type, content: body });
+  }
+  return segments;
+}
+
+// ============================================================
 // Codegen — Graph から JS ファイルを再生成
 // ============================================================
 //
@@ -1525,6 +1628,33 @@ function runCommand(cmd, args) {
       console.log(JSON.stringify(s, null, 2));
       break;
     }
+    case 'heavy': {
+      // node ai-desk-v2.js heavy <file> <root-id> [--depth=N]
+      // 仮想重厚関数を展開して stdout に出す(LLM に渡す用)
+      if (args.length < 2) return console.error('usage: heavy <file> <root-id> [--depth=N]');
+      const [file, rootId, ...rest] = args;
+      const opts = {};
+      for (const a of rest) {
+        const m = a.match(/^--depth=(\d+)$/);
+        if (m) opts.depth = Number(m[1]);
+      }
+      const g = loadProject([file]);
+      process.stdout.write(expandVirtualHeavy(g, rootId, opts));
+      break;
+    }
+    case 'virtual-apply': {
+      // node ai-desk-v2.js virtual-apply <graph.json> <root-id> <patch-file>
+      // patch-file は expand したフォーマットで戻されたもの。BLOCK ヘッダで分割される。
+      if (args.length < 3) return console.error('usage: virtual-apply <graph.json> <root-id> <patch-file>');
+      const [graphPath, rootId, patchPath] = args;
+      const g = loadGraph(graphPath);
+      const content = patchPath === '-' ? readFileSync(0, 'utf8') : readFileSync(patchPath, 'utf8');
+      const updates = virtualApply(g, rootId, content);
+      saveGraph(g, graphPath);
+      for (const u of updates) console.log(`  ${u.action.padEnd(20)} ${u.id}`);
+      console.log(`${updates.length} blocks processed`);
+      break;
+    }
     case 'mermaid': {
       // node ai-desk-v2.js mermaid <file> [--kind=...] [--type=...]
       if (!args[0]) return console.error('usage: mermaid <file> [--kind=K] [--type=T]');
@@ -1579,7 +1709,7 @@ function runCommand(cmd, args) {
     }
     default:
       console.error('unknown command:', cmd);
-      console.error('commands: skeleton, focus, graph, impact, self, tag, tags, save, load, search, diff, blame, apply, apply-block, resolve, lint, export, stats, context, mermaid, infer-tags, e2e');
+      console.error('commands: skeleton, focus, graph, impact, self, tag, tags, save, load, search, diff, blame, apply, apply-block, resolve, lint, export, stats, context, heavy, virtual-apply, mermaid, infer-tags, e2e');
   }
 }
 

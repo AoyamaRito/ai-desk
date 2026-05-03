@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>3Dplus / point-projection — GPU vs CPU 複式数学PoC</title>
+<script>if (new URLSearchParams(location.search).get('embed') === '1') document.documentElement.classList.add('embed');</script>
+<style>
+  body { margin:0; background:#0d1117; color:#c9d1d9; font-family: ui-monospace, monospace; }
+  html.embed body > header { display: none; }
+  header { padding: 16px 20px; border-bottom: 1px solid #30363d; }
+  h1 { margin:0; font-size: 16px; }
+  .sub { color:#8b949e; font-size: 12px; margin-top:4px; }
+  main { display: grid; grid-template-columns: 1fr 380px; gap: 0; }
+  .stage { position: relative; }
+  canvas { display:block; }
+  #gl      { background: #161b22; }
+  #overlay { position:absolute; left:0; top:0; pointer-events:none; background: transparent; }
+  aside { padding: 16px 20px; border-left: 1px solid #30363d; min-height: 600px; }
+  pre { background:#161b22; border:1px solid #30363d; padding:10px; font-size:11px; overflow:auto; max-height:240px; }
+  .ok { color:#3fb950; }
+  .ng { color:#f85149; }
+  .label { color:#8b949e; font-size:11px; text-transform:uppercase; margin-top:14px; }
+  .row { display:flex; gap:12px; margin: 6px 0; font-size:12px; }
+  .row span { flex:1; }
+  button { background:#21262d; color:#c9d1d9; border:1px solid #30363d; padding:6px 10px; cursor:pointer; }
+  button:hover { background:#30363d; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>3Dplus / point-projection — GPU vs CPU 複式数学PoC</h1>
+  <div class="sub">
+    GPU(WebGL2)が描いた立方体の各頂点に、CPU側 <code>projectScene()</code> が予測した画面座標のマーカーを重ねる。<br>
+    ズレ無く重なれば「同じ数学」。1pxでもズレれば論理バグの証拠（複式数学 §7）。
+  </div>
+</header>
+
+<main>
+  <div class="stage">
+    <canvas id="gl" width="800" height="600"></canvas>
+    <canvas id="overlay" width="800" height="600"></canvas>
+  </div>
+  <aside>
+    <div class="row">
+      <button id="toggle-anim">▮▮ 一時停止</button>
+      <button id="toggle-overlay">マーカー切替</button>
+    </div>
+    <div class="label">回転 (Phase 1)</div>
+    <div class="row">
+      <button id="rot-euler">Euler</button>
+      <button id="rot-quat">Quaternion</button>
+    </div>
+    <div class="label">カメラ (Phase 1)</div>
+    <div class="row">
+      <button id="cam-euler">Euler</button>
+      <button id="cam-lookat">lookAt</button>
+    </div>
+    <div class="label">投影 (Phase 1)</div>
+    <div class="row">
+      <button id="proj-persp">Perspective</button>
+      <button id="proj-ortho">Ortho</button>
+    </div>
+    <div class="label">突合結果（max誤差 px）</div>
+    <pre id="diff">—</pre>
+    <div class="label">assert_projectScene (twin self vs twin)</div>
+    <pre id="assert">—</pre>
+    <div class="label">cpu3d output (頂点0)</div>
+    <pre id="dump">—</pre>
+    <div class="label">凡例</div>
+    <div class="row"><span style="color:#58a6ff;">●</span> CPU予測位置（in frustum）</div>
+    <div class="row"><span style="color:#f85149;">●</span> CPU予測位置（out of frustum）</div>
+    <div class="row"><span style="color:#3fb950;">線</span> CPUが予測したエッジ</div>
+  </aside>
+</main>
+
+<script src="../cpu3d.js"></script>
+<script src="../render.shaders.js"></script>
+<script src="../render.js"></script>
+<script>
+(function () {
+  const s = document.createElement('script');
+  s.src = 'http://localhost:3001/client.js';
+  s.async = true;
+  s.onerror = () => { console.warn('ai-eyes client not found (is server running?)'); };
+  document.head.appendChild(s);
+})();
+
+// Render3D.frame(scene) が GPU描画と CPU Twin を同時に実行。
+// Twin の screen 座標をオーバーレイに重ねてズレを目視確認する。
+
+const glCanvas = document.getElementById('gl');
+const ovCanvas = document.getElementById('overlay');
+const ov = ovCanvas.getContext('2d');
+
+Render3D.init(glCanvas);
+
+// 立方体ジオメトリ（ローカル座標）
+const cubeVerts = [
+  [-1,-1,-1], [ 1,-1,-1], [ 1, 1,-1], [-1, 1,-1],
+  [-1,-1, 1], [ 1,-1, 1], [ 1, 1, 1], [-1, 1, 1]
+];
+const cubeEdges = [
+  [0,1],[1,2],[2,3],[3,0],
+  [4,5],[5,6],[6,7],[7,4],
+  [0,4],[1,5],[2,6],[3,7]
+];
+// 三角形リスト（Render3D の scene 形式: [[a,b,c], ...]）
+const cubeTriList = [
+  [0,1,2],[0,2,3],
+  [4,6,5],[4,7,6],
+  [0,5,1],[0,4,5],
+  [3,2,6],[3,6,7],
+  [0,3,7],[0,7,4],
+  [1,5,6],[1,6,2]
+];
+
+// Phase 1 トグル状態
+let mode = {
+  rotation:   'euler',
+  camera:     'euler',
+  projection: 'persp'
+};
+
+// シーン定義（GPU と CPU で共有する単一の真実）
+function buildScene(t) {
+  const rx = t * 0.5, ry = t * 0.7, rz = 0;
+  const transform = { position: [0, 0, -6], rotation: [rx, ry, rz], scale: [1, 1, 1] };
+  if (mode.rotation === 'quat') {
+    transform.quaternion = Cpu3D._math.quatFromEuler(rx, ry, rz);
+  }
+
+  const cam = {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    fov: Math.PI / 3,
+    aspect: glCanvas.width / glCanvas.height,
+    near: 0.1,
+    far: 100
+  };
+  if (mode.camera === 'lookat') {
+    const r = 8;
+    cam.position = [Math.sin(t * 0.3) * r, 1.5, Math.cos(t * 0.3) * r - 6];
+    cam.lookAt = [0, 0, -6];
+    cam.up = [0, 1, 0];
+  }
+  if (mode.projection === 'ortho') {
+    const halfH = 3;
+    cam.ortho = { left: -halfH * cam.aspect, right: halfH * cam.aspect, bottom: -halfH, top: halfH };
+  }
+
+  return {
+    objects: [{
+      id: 'cube',
+      vertices:  cubeVerts,
+      triangles: cubeTriList,
+      transform,
+      parent: null,
+      material: { color: [0.5, 0.6, 0.9] }
+    }],
+    camera:   cam,
+    viewport: { width: glCanvas.width, height: glCanvas.height }
+  };
+}
+
+// 描画ループ
+let animating  = true;
+let showOverlay = true;
+let t0   = performance.now();
+let lastT = 0;
+
+function frame(now) {
+  if (animating) lastT = (now - t0) / 1000;
+  const t = lastT;
+  const scene = buildScene(t);
+
+  // GPU描画 + CPU Twin（Render3D が Cpu3D.projectScene を内部呼び出し）
+  const twin = Render3D.frame(scene);
+  const obj  = twin.objects[0];
+
+  // オーバーレイ: CPU が予測した頂点位置を描く
+  ov.clearRect(0, 0, ovCanvas.width, ovCanvas.height);
+  if (showOverlay) {
+    ov.strokeStyle = 'rgba(63, 185, 80, 0.5)';
+    ov.lineWidth = 1;
+    for (const [a, b] of cubeEdges) {
+      const va = obj.vertices[a], vb = obj.vertices[b];
+      if (!va.inFrustum && !vb.inFrustum) continue;
+      ov.beginPath();
+      ov.moveTo(va.screen[0], va.screen[1]);
+      ov.lineTo(vb.screen[0], vb.screen[1]);
+      ov.stroke();
+    }
+    for (let i = 0; i < obj.vertices.length; i++) {
+      const v = obj.vertices[i];
+      ov.fillStyle = v.inFrustum ? '#58a6ff' : '#f85149';
+      ov.beginPath();
+      ov.arc(v.screen[0], v.screen[1], 5, 0, Math.PI * 2);
+      ov.fill();
+      ov.fillStyle = '#c9d1d9';
+      ov.font = '10px ui-monospace, monospace';
+      ov.fillText(String(i), v.screen[0] + 7, v.screen[1] - 7);
+    }
+  }
+
+  // 突合: 同じ行列を JS で再計算し CPU Twin の clip 座標と一致するか確認
+  let maxDiff = 0;
+  for (const v of obj.vertices) {
+    const local = [v.local[0], v.local[1], v.local[2], 1];
+    const wm = obj.worldMatrix, vm = twin.view, pm = twin.projection;
+    const w0 = mul4(wm, local);
+    const v0 = mul4(vm, w0);
+    const c0 = mul4(pm, v0);
+    for (let k = 0; k < 4; k++) {
+      maxDiff = Math.max(maxDiff, Math.abs(c0[k] - v.clip[k]));
+    }
+  }
+  const diffEl = document.getElementById('diff');
+  diffEl.textContent = `mode: ${mode.rotation}/${mode.camera}/${mode.projection}\nclip max diff: ${maxDiff.toExponential(3)}\n${maxDiff < 1e-6 ? '✓ CPU路線とCPU路線（再計算）は同一' : '✗ 数値の不一致を検出'}`;
+  diffEl.className = maxDiff < 1e-6 ? 'ok' : 'ng';
+
+  // assert_projectScene の動作確認
+  const expected = {
+    objects: [{ id: 'cube', vertices: obj.vertices.map(v => v.screen.slice()) }]
+  };
+  const ar = Cpu3D.assert_projectScene(twin, expected, { stage: 'screen', eps: 1e-9 });
+  const aEl = document.getElementById('assert');
+  aEl.textContent = `stage=${ar.stage}  eps=${ar.eps}\nok=${ar.ok}  maxError=${ar.maxError}\nmismatches=${ar.mismatches.length}`;
+  aEl.className = ar.ok ? 'ok' : 'ng';
+
+  // ダンプ
+  const v0 = obj.vertices[0];
+  document.getElementById('dump').textContent = JSON.stringify({
+    local: v0.local, world: v0.world, view: v0.view,
+    clip: v0.clip, ndc: v0.ndc, screen: v0.screen, inFrustum: v0.inFrustum,
+    effective: obj.effective
+  }, (k, x) => typeof x === 'number' ? Number(x.toFixed(4)) : x, 2);
+
+  if (animating) requestAnimationFrame(frame);
+}
+
+// Bible §1.5: AI-Eyes Step-by-step Hooks
+window.pause = function() {
+  animating = false;
+  document.getElementById('toggle-anim').textContent = '▶ 再生';
+  console.log('[AI-Eyes] Paused. Use window.step_forward() to advance.');
+};
+window.resume = function() {
+  animating = true;
+  document.getElementById('toggle-anim').textContent = '▮▮ 一時停止';
+  t0 = performance.now() - lastT * 1000;
+  requestAnimationFrame(frame);
+};
+window.step_forward = async function(dt = 0.016) {
+  if (animating) window.pause();
+  lastT += dt;
+  frame(performance.now());
+  try {
+    await fetch('http://localhost:3001/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        html: document.body.innerHTML,
+        url: location.href,
+        label: `step_t_${lastT.toFixed(3)}`
+      })
+    });
+    console.log(`[AI-Eyes] Stepped to t=${lastT.toFixed(3)} and snapshot sent.`);
+  } catch(e) {
+    console.warn('[AI-Eyes] Failed to send snapshot.', e);
+  }
+};
+
+function mul4(m, v) {
+  const out = [0,0,0,0];
+  for (let r = 0; r < 4; r++) {
+    out[r] = m[r]*v[0] + m[r+4]*v[1] + m[r+8]*v[2] + m[r+12]*v[3];
+  }
+  return out;
+}
+
+document.getElementById('toggle-anim').addEventListener('click', (e) => {
+  if (animating) { animating = false; e.target.textContent = '▶ 再開'; }
+  else { animating = true; t0 = performance.now() - lastT * 1000; e.target.textContent = '▮▮ 一時停止'; requestAnimationFrame(frame); }
+});
+document.getElementById('toggle-overlay').addEventListener('click', () => { showOverlay = !showOverlay; });
+
+function highlight(group, active) {
+  for (const id of group) {
+    document.getElementById(id).style.background = (id === active) ? '#1f6feb' : '#21262d';
+  }
+}
+const ROT = ['rot-euler', 'rot-quat'];
+const CAM = ['cam-euler', 'cam-lookat'];
+const PROJ = ['proj-persp', 'proj-ortho'];
+function applyMode() {
+  highlight(ROT,  mode.rotation   === 'quat'   ? 'rot-quat'   : 'rot-euler');
+  highlight(CAM,  mode.camera     === 'lookat' ? 'cam-lookat' : 'cam-euler');
+  highlight(PROJ, mode.projection === 'ortho'  ? 'proj-ortho' : 'proj-persp');
+}
+document.getElementById('rot-euler').onclick   = () => { mode.rotation   = 'euler';   applyMode(); };
+document.getElementById('rot-quat').onclick    = () => { mode.rotation   = 'quat';    applyMode(); };
+document.getElementById('cam-euler').onclick   = () => { mode.camera     = 'euler';   applyMode(); };
+document.getElementById('cam-lookat').onclick  = () => { mode.camera     = 'lookat';  applyMode(); };
+document.getElementById('proj-persp').onclick  = () => { mode.projection = 'persp';   applyMode(); };
+document.getElementById('proj-ortho').onclick  = () => { mode.projection = 'ortho';   applyMode(); };
+applyMode();
+
+// 観測者契約 (Bible §6): window.REAL_* と dispatch
+window.REAL_mode  = mode;
+window.REAL_state = { lastT: 0, paused: false };
+window.dispatch = function(cmd) {
+  if (!cmd || typeof cmd !== 'object') return { ok:false, error:'cmd must be object' };
+  switch (cmd.type) {
+    case 'setMode':
+      if (cmd.rotation)   mode.rotation   = cmd.rotation;
+      if (cmd.camera)     mode.camera     = cmd.camera;
+      if (cmd.projection) mode.projection = cmd.projection;
+      applyMode();
+      return { ok:true, mode: { ...mode } };
+    case 'pause':  animating = false; return { ok:true, paused:true };
+    case 'resume': animating = true; t0 = performance.now() - lastT * 1000; return { ok:true, paused:false };
+    case 'setT':   lastT = +cmd.t; animating = false; return { ok:true, lastT };
+    case 'snapshot': return { ok:true, mode: { ...mode }, lastT };
+    default: return { ok:false, error:`unknown cmd.type: ${cmd.type}` };
+  }
+};
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

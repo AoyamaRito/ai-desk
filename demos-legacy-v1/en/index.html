@@ -376,11 +376,55 @@ ai-eyes and fix [the symptom you're seeing].</div>
 <section class="block" id="demos">
   <h2>Playable demos</h2>
   <p class="lead">Play them right on this page. Click a title to open in a new tab.</p>
-  <p style="background: #fff3cd; border-left: 6px solid #f59e0b; padding: 12px 18px; margin: 16px 0; font-size: 14px;">
-    <strong>Note:</strong> These demos are built on <strong>ai-desk v1</strong>.
-    A next-generation implementation, <code>ai-desk v2</code> (All-as-Block, Versions-as-Body),
-    is in the <a href="https://github.com/AoyamaRito/ai-desk/tree/main/v2"><code>v2/</code></a>
-    directory of the repo. v2 is MVP only — no playable demos yet.
+
+  <!-- v2 demos (latest, canonical) -->
+  <div class="demo-block" style="border: 3px solid #ff9800; background: linear-gradient(135deg, #fff8e1, #ffe0b2); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #d84315;">
+      ⚡ <a href="../../v2/demos/gravity-battle/" style="color: #d84315; font-weight: 900;">Gravity Field Battle</a>
+      <span style="font-size: 13px; background: #ff5722; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>A card game built in one ai-desk v2 session.</strong> constraintBlock evaluates every possible AI play, Block.versions backs undo, zero markers, single 1300-line HTML, zero bugs. A <strong>working</strong> demo of what ai-desk v2 enables.
+    </p>
+    <div class="demo-frame tall"><iframe src="../../v2/demos/gravity-battle/" loading="lazy" title="Gravity Field Battle"></iframe></div>
+  </div>
+
+  <div class="demo-block" style="border: 3px solid #1a73e8; background: linear-gradient(135deg, #e8f0fe, #d2e3fc); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #1565c0;">
+      📊 <a href="../../v2/demos/block-spreadsheet/" style="color: #1565c0; font-weight: 900;">Block Spreadsheet</a>
+      <span style="font-size: 13px; background: #1a73e8; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      A spreadsheet where <strong>each cell is a Block</strong>. Formula references = <code>Block.refs</code>, edit history = <code>Block.versions</code>, recalculation = <code>Graph.impact()</code>. Cycles are rejected at the structural level. The right panel shows each cell's deps, dependents, and full version history.
+    </p>
+    <div class="demo-frame tall"><iframe src="../../v2/demos/block-spreadsheet/?embed=1" loading="lazy" title="Block Spreadsheet"></iframe></div>
+  </div>
+
+  <div class="demo-block" style="border: 3px solid #9334e6; background: linear-gradient(135deg, #f3e8fd, #e0c3fc); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #6a1b9a;">
+      🔗 <a href="../../v2/demos/node-graph/" style="color: #6a1b9a; font-weight: 900;">Node Graph</a>
+      <span style="font-size: 13px; background: #9334e6; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>Nodes = Blocks</strong>, <strong>wires = <code>Block.refs</code></strong>. Wire Const/Add/Sub/Mul/Div/Output to build dataflow. Cycle rejection is structural via <code>Graph.forwardClosure</code> (no dedicated validator — A8 structural enforcement). Every node edit (move / edit / wire / unwire) appends to <code>Block.versions</code>.
+    </p>
+    <div class="demo-frame tall"><iframe src="../../v2/demos/node-graph/?embed=1" loading="lazy" title="Node Graph"></iframe></div>
+  </div>
+
+  <div class="demo-block" style="border: 3px solid #2563eb; background: linear-gradient(135deg, #eff6ff, #dbeafe); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #1e40af;">
+      🗂 <a href="../../v2/demos/kanban/" style="color: #1e40af; font-weight: 900;">Block Kanban</a>
+      <span style="font-size: 13px; background: #2563eb; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>Cards = Blocks</strong>, <strong>columns = Blocks</strong> (<code>children</code> is the REAL of card order). Drag to move = a 2-commit transaction (source &amp; target columns both update <code>children</code>). All card edits (create / move / edit-text / reorder) append to <code>Block.versions</code>. One-click <code>rollback()</code> to any past version from the inspector. Flat design.
+    </p>
+    <div class="demo-frame tall"><iframe src="../../v2/demos/kanban/?embed=1" loading="lazy" title="Block Kanban"></iframe></div>
+  </div>
+
+  <p style="background: #f0f4ff; border-left: 6px solid #4dabf7; padding: 12px 18px; margin: 24px 0 16px 0; font-size: 14px;">
+    <strong>↓ Below are v1-era demos</strong> (now isolated under <code>demos-legacy-v1/</code>).
+    For new code, see <a href="https://github.com/AoyamaRito/ai-desk/tree/main/v2"><code>v2/</code></a>.
   </p>
 
   <div class="demo-block">

@@ -35,8 +35,8 @@ If something looks like a bug: this codebase deliberately duplicates regexes acr
 > Code is written by AI, read by AI. Humans only declare intent and verify results.
 > This repo packages the design principles, tools, and demos that make that division of labor work.
 
-[![tests](https://img.shields.io/badge/tests-19%2F19_PASS-success)](actions/tests/fighter-cancel.test.js)
-[![worlds](https://img.shields.io/badge/worlds_verified-1920-blue)](actions/tests/fighter-cancel.test.js)
+[![tests](https://img.shields.io/badge/tests-19%2F19_PASS-success)](demos-legacy-v1/actions/tests/fighter-cancel.test.js)
+[![worlds](https://img.shields.io/badge/worlds_verified-1920-blue)](demos-legacy-v1/actions/tests/fighter-cancel.test.js)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ---
@@ -69,7 +69,7 @@ Many human-era best practices violate the hypotheses above and are **counter-pro
 
 - **TDD where attention scatters and one goal can't be bundled** — Test-driven development with tests in separate files, or where the AI can't see the full target spec mid-cycle, leads the AI astray (triple violation: §1 spotlight + §3 switch cost + §4 missing info). The AI writes throwaway code that only passes the immediate test, then later tests reveal contradictions and you spiral into refactor hell.
 
-  The thing being rejected is not "tests" but **"goal scatter."** Tests themselves are required by Bible §7 (double-entry). **A test set bundled around one goal where AI sees the full context** (e.g., this repo's [`fighter-cancel.test.js`](actions/tests/fighter-cancel.test.js) — 19 exhaustive cases in one file with the corresponding logic in a single scope) is in fact an AI-native-optimal verification surface.
+  The thing being rejected is not "tests" but **"goal scatter."** Tests themselves are required by Bible §7 (double-entry). **A test set bundled around one goal where AI sees the full context** (e.g., this repo's [`fighter-cancel.test.js`](demos-legacy-v1/actions/tests/fighter-cancel.test.js) — 19 exhaustive cases in one file with the corresponding logic in a single scope) is in fact an AI-native-optimal verification surface.
 - **DRY / extraction into shared helpers** — "Pull this out into another file for reuse" forces a file-switch cost on every reference and shreds AI cognition (§3). Bible §0.1.2 "no sharing" rejects this head-on.
 - **Abstraction / encapsulation** — From the human side this is "hiding complexity." From the AI side it is "hiding information," which is the trigger for hallucination (§4).
 - **SQL / RDBMS** — Implicit knowledge outside the code (schema, indexes, triggers, etc.) is invisible to the AI: §4 missing-info → hallucination. On top of that: L3 purity violation, no reverse lookup, destructive overwrites — a **quadruple violation**. The replacement is JSON Event Sourcing + sequential-hash blocks.
@@ -77,7 +77,7 @@ Many human-era best practices violate the hypotheses above and are **counter-pro
 ### Recommended verification patterns
 
 - **End-to-end tests** — single goal is structurally guaranteed. Crosses every layer and gives AI full context. **The first-recommended verification surface for AI-native development.**
-- **Exhaustive test sets** — "enumerate all possible worlds, check for contradictions" style (e.g. [`fighter-cancel.test.js`](actions/tests/fighter-cancel.test.js), 1920 worlds in one file).
+- **Exhaustive test sets** — "enumerate all possible worlds, check for contradictions" style (e.g. [`fighter-cancel.test.js`](demos-legacy-v1/actions/tests/fighter-cancel.test.js), 1920 worlds in one file).
 
 ---
 
@@ -151,8 +151,8 @@ Detail in [Bible §5](AI_NATIVE_MASTER_BIBLE.md).
 > **[Open the playable demo (LP) in your browser](https://aoyamarito.github.io/ai-desk/en/)**
 
 ```bash
-open actions/index.html
-node --test actions/tests/fighter-cancel.test.js
+open demos-legacy-v1/actions/index.html
+node --test demos-legacy-v1/actions/tests/fighter-cancel.test.js
 ```
 
 ---
@@ -180,8 +180,8 @@ node --test actions/tests/fighter-cancel.test.js
 | [`AI_NATIVE_MASTER_BIBLE.en.md`](AI_NATIVE_MASTER_BIBLE.en.md) | The canonical document (English mirror). Asymmetry → Heavy Functions → 4-layer → REAL/SHADOW → 3Dplus → Event Sourcing → double-entry math. Japanese version stays canonical |
 | [`AI_UNDERSTANDING_MANIFESTO.en.md`](AI_UNDERSTANDING_MANIFESTO.en.md) | AI cognition characteristics: ±300-line spotlight, recency bias, file-switch cost |
 | [`CONSTRAINT_FOLDING_MASTER.md`](CONSTRAINT_FOLDING_MASTER.md) | LLM application guide for the constraint-folding pattern (Japanese) |
-| [`actions/ACTION_NATIVE_FOLDING_GUIDE.md`](actions/ACTION_NATIVE_FOLDING_GUIDE.md) | Action-game application guide |
-| [`3dplus/README.md`](3dplus/README.md) | 3D implementation guide for double-entry math |
+| [`demos-legacy-v1/actions/ACTION_NATIVE_FOLDING_GUIDE.md`](demos-legacy-v1/actions/ACTION_NATIVE_FOLDING_GUIDE.md) | Action-game application guide |
+| [`demos-legacy-v1/3dplus/README.md`](demos-legacy-v1/3dplus/README.md) | 3D implementation guide for double-entry math |
 
 ---
 
@@ -210,19 +210,19 @@ node eyes-e2e.js "goal"   # compress current state to one text and exit 0/1
 - [`constraint-janken.js`](constraint-janken.js) — three-player rock-paper-scissors, 27 worlds. **Read this first.**
 
 ### Action-game application
-- [**`action-demos.html`**](https://aoyamarito.github.io/ai-desk/action-demos.html) + `action-demos.js` — 9 action-game algorithms (playable)
-- [**`actions/index.html`**](https://aoyamarito.github.io/ai-desk/actions/index.html) — `fighter-cancel` implementation + 19/19 exhaustive tests
+- [**`action-demos.html`**](https://aoyamarito.github.io/ai-desk/demos-legacy-v1/action-demos.html) + `action-demos.js` — 9 action-game algorithms (playable)
+- [**`demos-legacy-v1/actions/index.html`**](https://aoyamarito.github.io/ai-desk/demos-legacy-v1/actions/index.html) — `fighter-cancel` implementation + 19/19 exhaustive tests
 
 ### Mining-paradigm proof of concept
-- [`examples/`](examples/) — recovering legacy shipping-fee logic 100% from 50 samples
+- [`demos-legacy-v1/examples/`](demos-legacy-v1/examples/) — recovering legacy shipping-fee logic 100% from 50 samples
 
 ### Double-entry math / 3Dplus verification layer
-- [`3dplus/cpu3d.js`](3dplus/cpu3d.js) + [`3dplus/render.js`](3dplus/render.js) — CPU Twin and GPU renderer pair (shared scene-JSON format)
-- [`3dplus/tests/`](3dplus/tests/) — 77/77 PASS
+- [`demos-legacy-v1/3dplus/cpu3d.js`](demos-legacy-v1/3dplus/cpu3d.js) + [`demos-legacy-v1/3dplus/render.js`](demos-legacy-v1/3dplus/render.js) — CPU Twin and GPU renderer pair (shared scene-JSON format)
+- [`demos-legacy-v1/3dplus/tests/`](demos-legacy-v1/3dplus/tests/) — 77/77 PASS
 
 ```bash
-node --test 3dplus/tests/projection.test.js
-open 3dplus/examples/point-projection.html  # GPU vs CPU diff demo
+node --test demos-legacy-v1/3dplus/tests/projection.test.js
+open demos-legacy-v1/3dplus/examples/point-projection.html  # GPU vs CPU diff demo
 ```
 
 ---

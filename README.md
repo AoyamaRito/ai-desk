@@ -4,7 +4,7 @@
 
 AI にプログラムを書かせるための土台。
 
-> [ブラウザでデモを触る](https://aoyamarito.github.io/ai-desk/actions/index.html)
+> [▶ ブラウザでデモを触る(Gravity Field Battle)](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
 
 ---
 

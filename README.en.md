@@ -6,7 +6,7 @@ A foundation for letting AI write your programs.
 
 All you do is tell the AI what you want, in plain language. Reading, writing, fixing, and testing the code is the AI's job.
 
-> [Try the demos in your browser](https://aoyamarito.github.io/ai-desk/en/)
+> [Try the demos in your browser](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
 
 ---
 

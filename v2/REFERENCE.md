@@ -29,7 +29,7 @@ node ai-desk.js search src/foo.js 'TODO'
 # 自己読み込み(ai-desk.js が ai-desk.js を解析する)
 node ai-desk.js self
 
-# テスト走らせる(61 tests, all green)
+# テスト走らせる(105 tests, all green)
 npm test
 ```
 
@@ -193,7 +193,7 @@ node ai-desk.js load v1-graph.json
 ## ステータス
 
 **MVP**(2026-05-03 朝)。
-- 61 e2e tests, all green
+- 105 e2e tests, all green
 - 自己読み込み・v1 リアルファイル(2269行)解析動作確認済み
 - parseJS は正規表現ベース、文字列リテラル誤検出など既知の限界あり
 - AST 化(Zero-Dep を保つなら自作 parser)は v2.1 以降

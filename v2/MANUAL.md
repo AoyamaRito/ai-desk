@@ -31,7 +31,7 @@
 
 ```bash
 cd /Users/AoyamaRito/PJs/ai-desk
-npm test                           # 61 e2e tests, all green
+npm test                           # 105 e2e tests, all green
 node ai-desk.js                 # self-test(Block/Graph/parseJS の動作デモ)
 node ai-desk.js self            # 自分自身を解析(自己読み込み)
 ```
@@ -146,7 +146,7 @@ node ai-desk.js export graph.json src/foo.js out.js
 |---|---|
 | `apply <graph.json> <patch.js> <moduleId>` | ファイル単位 patch |
 | `apply-block <graph.json> <blockId> <patch-file>` | 1 Block 単位 patch(`-` で stdin) |
-| `virtual-apply <graph.json> <rootId> <patch-file>` | 仮想重厚関数の逆配分(後述) |
+| `virtual-apply <graph.json> <rootId> <patch-file>` | 仮想重厚関数の逆配分(`-` で stdin、後述) |
 
 ### 3.4 仮想重厚関数
 
@@ -660,7 +660,7 @@ node ai-desk.js load   graph.json           # verify が ok か
 | ファイル | 行数 | 役割 |
 |---|---|---|
 | `ai-desk.js` | 1761 | 全実装(Block / Graph / parse / apply / virtual heavy / CLI) |
-| `e2e.js` | 1148 | 61 テストケース |
+| `e2e.js` | 1198 | 105 テストケース |
 | `BIBLE.md` | — | 公理 A0〜A7。思想の正典 |
 | `AI_ONBOARDING.md` | — | LLM の作業ルール |
 | `REFERENCE.md` | — | CLI / API 早見表 |
@@ -685,5 +685,5 @@ node ai-desk.js load   graph.json           # verify が ok か
 ---
 
 **Date**: 2026-05-03
-**Status**: MVP(61 e2e tests green、self-parse 動作確認済み)
+**Status**: MVP(105 e2e tests green、self-parse 動作確認済み)
 **正典**: [`BIBLE.md`](./BIBLE.md)

@@ -631,12 +631,62 @@ function extractInlineTags(source, declStart) {
   return Array.from(tags);
 }
 
+// 文字列リテラル / コメント / 正規表現リテラルを skip しながら brace を数える
 function matchBrace(source, openIdx) {
+  return matchPair(source, openIdx, '{', '}');
+}
+
+function matchParen(source, openIdx) {
+  return matchPair(source, openIdx, '(', ')');
+}
+
+function matchPair(source, openIdx, openCh, closeCh) {
   let depth = 0;
+  let inString = null; // null | '"' | "'" | '`'
+  let escape = false;
+  let inTemplate = 0;  // template literal 内の ${} ネスト
   for (let i = openIdx; i < source.length; i++) {
     const c = source[i];
-    if (c === '{') depth++;
-    else if (c === '}') {
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+
+    // 文字列リテラル中
+    if (inString) {
+      if (c === inString) inString = null;
+      else if (inString === '`' && c === '$' && source[i + 1] === '{') {
+        inTemplate++;
+        i++;
+      }
+      continue;
+    }
+    if (inTemplate > 0 && c === '}') {
+      inTemplate--;
+      continue;
+    }
+
+    // 文字列開始
+    if (c === '"' || c === "'" || c === '`') { inString = c; continue; }
+
+    // 行コメント
+    if (c === '/' && source[i + 1] === '/') {
+      const nl = source.indexOf('\n', i);
+      i = nl < 0 ? source.length : nl;
+      continue;
+    }
+    // ブロックコメント
+    if (c === '/' && source[i + 1] === '*') {
+      const end = source.indexOf('*/', i + 2);
+      i = end < 0 ? source.length : end + 1;
+      continue;
+    }
+    // 正規表現リテラル(雑判定: 直前が "(" "," "=" 等なら regex とみなす)
+    if (c === '/' && isRegexContext(source, i)) {
+      i = skipRegex(source, i);
+      continue;
+    }
+
+    if (c === openCh) depth++;
+    else if (c === closeCh) {
       depth--;
       if (depth === 0) return i;
     }
@@ -644,15 +694,37 @@ function matchBrace(source, openIdx) {
   return source.length - 1;
 }
 
-function matchParen(source, openIdx) {
-  let depth = 0;
-  for (let i = openIdx; i < source.length; i++) {
+// '/' の直前が「式の終わり(値)」なら割り算、そうでなければ regex
+function isRegexContext(source, slashIdx) {
+  for (let j = slashIdx - 1; j >= 0; j--) {
+    const c = source[j];
+    if (c === ' ' || c === '\t') continue;
+    if (c === '\n') return true;  // 行頭は regex
+    // 「値」の終わり = 割り算
+    if (/[\w$\]\)]/.test(c)) return false;
+    // 「式の境界」= regex
+    return true;
+  }
+  return true;
+}
+
+function skipRegex(source, startIdx) {
+  // /.../flags の閉じる位置を返す。class([])内の `/` は無視。
+  let inClass = false;
+  let escape = false;
+  for (let i = startIdx + 1; i < source.length; i++) {
     const c = source[i];
-    if (c === '(') depth++;
-    else if (c === ')') {
-      depth--;
-      if (depth === 0) return i;
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '[') inClass = true;
+    else if (c === ']') inClass = false;
+    else if (c === '/' && !inClass) {
+      // フラグを skip
+      let j = i + 1;
+      while (j < source.length && /[gimuysd]/.test(source[j])) j++;
+      return j - 1;
     }
+    if (c === '\n') return i; // 改行で終わり(雑、unterminated regex)
   }
   return source.length - 1;
 }
@@ -670,35 +742,46 @@ function escapeRe(s) {
 }
 
 // content 中の brace 整合性をチェック
-// 文字列リテラル(`'"`)とコメント(// /**/)の中の `{` `}` は無視。
+// 文字列リテラル(`'"`)・コメント(// /**/)・正規表現リテラル(/.../)を skip。
 // 戻り値: 不整合があれば { error, ... }、整合してれば null
 export function checkBraces(content) {
   let depth = 0;
-  let inString = null; // null | "'" | '"' | '`'
+  let inString = null;
   let escape = false;
+  let inTemplate = 0;
   for (let i = 0; i < content.length; i++) {
     const c = content[i];
     if (escape) { escape = false; continue; }
     if (c === '\\') { escape = true; continue; }
     if (inString) {
       if (c === inString) inString = null;
+      else if (inString === '`' && c === '$' && content[i + 1] === '{') {
+        inTemplate++;
+        i++;
+      }
+      continue;
+    }
+    if (inTemplate > 0 && c === '}') {
+      inTemplate--;
       continue;
     }
     if (c === '"' || c === "'" || c === '`') { inString = c; continue; }
-    // 行コメント
     if (c === '/' && content[i + 1] === '/') {
       const nl = content.indexOf('\n', i);
       i = nl < 0 ? content.length : nl;
       continue;
     }
-    // ブロックコメント
     if (c === '/' && content[i + 1] === '*') {
       const end = content.indexOf('*/', i + 2);
       i = end < 0 ? content.length : end + 1;
       continue;
     }
+    if (c === '/' && isRegexContext(content, i)) {
+      i = skipRegex(content, i);
+      continue;
+    }
     if (c === '{') depth++;
-    if (c === '}') {
+    else if (c === '}') {
       depth--;
       if (depth < 0) return { error: 'extra-closing-brace', at: i };
     }

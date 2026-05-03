@@ -59,3 +59,7 @@ node ai-desk.js impact v1.json '../ai-desk.js:fn:runSkeleton'
 ノード = Block、配線 = `Block.refs`。Const/Add/Mul/.../Output を繋いで dataflow。サイクル検出は `Graph.forwardClosure` で構造的拒否(専用 validator なし、A8 §4.1.1)。
 🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/node-graph/)
 
+### [`demos/kanban/`](./demos/kanban/) — Block Kanban
+カード = Block、カラム = Block(`children` がカード順序の REAL)。移動 = 双方の column が children 更新する 2 commit。フラットデザイン。
+🌐 [プレイ](https://aoyamarito.github.io/ai-desk/v2/demos/kanban/)
+

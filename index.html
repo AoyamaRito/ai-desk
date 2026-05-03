@@ -414,6 +414,18 @@ app.js の [機能名] を [変更内容] してください。</div>
     <div class="demo-frame tall"><iframe src="v2/demos/node-graph/?embed=1" loading="lazy" title="Node Graph"></iframe></div>
   </div>
 
+  <div class="demo-block" style="border: 3px solid #2563eb; background: linear-gradient(135deg, #eff6ff, #dbeafe); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+    <h3 class="demo-title" style="color: #1e40af;">
+      🗂 <a href="v2/demos/kanban/" style="color: #1e40af; font-weight: 900;">Block Kanban</a>
+      <span style="font-size: 13px; background: #2563eb; color: #fff; padding: 3px 10px; border-radius: 12px; margin-left: 8px; font-weight: 700;">v2</span>
+    </h3>
+    <p class="demo-desc" style="color: #333;">
+      <strong>カード = Block</strong>、<strong>カラム = Block</strong>(<code>children</code> がカード順序の REAL)。ドラッグでカード移動 = source / target 双方の column が <code>children</code> を更新する 2 commit。
+      各カードの編集履歴(create / move / edit-text / reorder)が <code>Block.versions</code> に append-only。インスペクタから過去 version への <code>rollback()</code> も 1 クリック。フラットデザイン。
+    </p>
+    <div class="demo-frame tall"><iframe src="v2/demos/kanban/?embed=1" loading="lazy" title="Block Kanban"></iframe></div>
+  </div>
+
   <p style="background: #f0f4ff; border-left: 6px solid #4dabf7; padding: 12px 18px; margin: 24px 0 16px 0; font-size: 14px;">
     <strong>↓ 以下は v1 時代のデモ集</strong>(<code>demos-legacy-v1/</code> に隔離済み)。
     新規コードは <a href="https://github.com/AoyamaRito/ai-desk/tree/main/v2"><code>v2/</code></a> を参照してください。

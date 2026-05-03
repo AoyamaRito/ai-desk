@@ -37,6 +37,22 @@ Single HTML, ~720 lines. Pure 2D canvas. Zero deps.
 
 ---
 
+## [`kanban/`](./kanban/) — Block Kanban
+
+A Trello-like board where **every card is a Block** and **every column is a Block** whose `children` list is the canonical card ordering.
+
+**v2 concepts on display**:
+- **Card = Block**: text edits, moves, reorders all become new versions.
+- **Column = Block**: `Block.children` is the ordering — moving a card commits BOTH columns (source removes, target inserts).
+- **Per-card history**: every move / edit / reorder is recorded; inspector shows the full timeline.
+- **`rollback()` per card**: restore an old text as a new commit (history preserved).
+
+Single HTML, ~750 lines. Pure DOM (no canvas, since it's text-heavy UI). Flat design.
+
+> ▶ **[Play (GitHub Pages)](https://aoyamarito.github.io/ai-desk/v2/demos/kanban/)**
+
+---
+
 ## [`gravity-battle/`](./gravity-battle/) — Gravity Field Battle
 
 ブラウザで遊べる**カードゲーム**(単一 HTML、依存ゼロ、~1300 行)。

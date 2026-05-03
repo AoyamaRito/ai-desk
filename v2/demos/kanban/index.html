@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kanban — ai-desk v2 demo</title>
+<style>
+  :root {
+    --bg:        #fafbfc;
+    --panel:     #ffffff;
+    --col-bg:    #f3f4f6;
+    --border:    #e5e7eb;
+    --line:      #1a1d24;
+    --text:      #1a1d24;
+    --muted:     #6b7280;
+    --accent:    #2563eb;
+    --accent-soft:#eff6ff;
+    --danger:    #dc2626;
+    --mono:      'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Hiragino Sans", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 450;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    user-select: none;
+    letter-spacing: -0.005em;
+  }
+  #stage {
+    max-width: 1320px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    gap: 16px;
+    height: calc(100vh - 48px);
+  }
+  .header-row {
+    display: flex; align-items: baseline; gap: 14px;
+    padding-bottom: 8px;
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+  .subtitle { font-size: 12px; color: var(--muted); font-weight: 450; letter-spacing: 0; }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Board */
+  .board {
+    padding: 0;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 100%;
+  }
+  .col {
+    width: 260px; flex-shrink: 0;
+    background: var(--col-bg);
+    display: flex; flex-direction: column;
+    max-height: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    --col-accent: #94a3b8;
+  }
+  .col[data-accent="0"] { --col-accent: #94a3b8; }  /* slate */
+  .col[data-accent="1"] { --col-accent: #3b82f6; }  /* blue */
+  .col[data-accent="2"] { --col-accent: #f59e0b; }  /* amber */
+  .col[data-accent="3"] { --col-accent: #10b981; }  /* emerald */
+  .col[data-accent="4"] { --col-accent: #8b5cf6; }  /* violet */
+  .col[data-accent="5"] { --col-accent: #ef4444; }  /* red */
+  .col::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: var(--col-accent);
+  }
+  .col.selected { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .col.dragging { opacity: 0.35; }
+  .col-head {
+    padding: 14px 14px 10px;
+    display: flex; align-items: center; gap: 8px;
+    cursor: grab;
+  }
+  .col-head .col-title {
+    flex: 1 1 auto;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 0;
+    color: var(--text);
+  }
+  .col-head .col-title:focus {
+    outline: 1px solid var(--line);
+    background: #fff;
+    padding: 2px 6px;
+    margin: 0 -6px;
+    text-transform: none;
+    letter-spacing: 0;
+    border-radius: 2px;
+  }
+  .col-head .count {
+    font-size: 11px;
+    color: #fff;
+    background: var(--col-accent);
+    font-family: var(--mono);
+    font-weight: 600;
+    min-width: 22px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    text-align: center;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .col-head .x {
+    cursor: pointer; color: var(--muted); padding: 0 4px; font-weight: 600; font-size: 16px; line-height: 1;
+  }
+  .col-head .x:hover { color: var(--danger); }
+
+  .cards {
+    padding: 0 10px 4px;
+    display: flex; flex-direction: column; gap: 8px;
+    overflow-y: auto; flex: 1 1 auto;
+    min-height: 30px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 30px 10px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.45;
+    cursor: grab;
+    position: relative;
+    word-break: break-word;
+    transition: border-color 0.08s, transform 0.04s;
+  }
+  .card:hover { border-color: var(--line); }
+  .card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .card.dragging { opacity: 0.3; }
+  .card.editing { cursor: text; padding-right: 14px; border-color: var(--accent); }
+  .card .x {
+    position: absolute; top: 6px; right: 8px;
+    font-size: 14px; line-height: 1; color: var(--muted);
+    cursor: pointer; padding: 2px 4px; opacity: 0;
+    border-radius: 2px;
+  }
+  .card:hover .x { opacity: 1; }
+  .card .x:hover { color: var(--danger); }
+  .card .versions-badge {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .card textarea {
+    width: 100%;
+    min-height: 38px;
+    resize: vertical;
+    font: inherit;
+    font-weight: 500;
+    line-height: 1.45;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: inherit;
+  }
+
+  .add-card {
+    margin: 0 10px 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border-radius: 4px;
+  }
+  .add-card:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+
+  .add-col {
+    width: 200px; flex-shrink: 0;
+    padding: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+  .add-col:hover { border-color: var(--line); color: var(--text); }
+
+  /* Drop indicator: thin accent bar */
+  .drop-indicator {
+    height: 2px;
+    background: var(--accent);
+    margin: 0;
+    pointer-events: none;
+    border-radius: 1px;
+  }
+
+  /* Drag ghost: pure white card with accent border, slight tilt */
+  #ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 1000;
+    padding: 12px 14px;
+    background: var(--panel);
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.45;
+    width: 240px;
+    transform: rotate(-2deg);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.20);
+  }
+  #ghost.col-ghost { width: 260px; transform: rotate(-1deg); }
+
+  /* Inspector */
+  .inspector {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .inspector h4 {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 700; margin-bottom: 8px;
+  }
+  .inspector .meta {
+    font-family: var(--mono);
+    font-size: 12px; line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 18px;
+    word-break: break-all;
+  }
+  .inspector .meta b { color: var(--text); font-weight: 700; }
+
+  .version-list {
+    background: transparent;
+    max-height: 320px;
+    overflow-y: auto;
+    margin: 0 -4px;
+  }
+  .version-entry {
+    padding: 7px 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; gap: 8px; align-items: baseline;
+    border-radius: 4px;
+  }
+  .version-entry:hover { background: rgba(0,0,0,0.03); color: var(--text); }
+  .version-entry.current {
+    color: var(--text);
+    font-weight: 600;
+    background: var(--accent-soft);
+    border-left: 2px solid var(--accent);
+    padding-left: 6px;
+  }
+  .version-entry .ver-idx { color: var(--muted); min-width: 20px; }
+  .version-entry .ver-time { color: var(--muted); flex-shrink: 0; font-weight: 450; }
+  .version-entry .ver-action { color: var(--text); font-weight: 500; min-width: 60px; flex-shrink: 0; }
+  .version-entry .ver-text {
+    color: var(--muted); flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 450;
+  }
+  .version-entry .ver-rollback {
+    font-size: 10px;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    font-weight: 500;
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+  }
+  .version-entry .ver-rollback:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Controls */
+  #controls {
+    display: flex; gap: 8px;
+  }
+  #controls button {
+    padding: 8px 16px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    font-family: inherit;
+    letter-spacing: -0.005em;
+  }
+  #controls button:hover { border-color: var(--line); }
+  #controls button.demo {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  #controls button.demo:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  #controls button.danger { color: var(--danger); }
+  #controls button.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  .help {
+    font-size: 12px; color: var(--muted);
+    padding: 0 4px;
+    font-weight: 450;
+  }
+  .help kbd {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* compact */
+  body.compact { padding: 12px; font-size: 12px; }
+  body.compact #stage { gap: 10px; height: calc(100vh - 24px); }
+  body.compact .header-row { display: none; }
+  body.compact .help { display: none; }
+  body.compact .main { grid-template-columns: 1fr 220px; gap: 10px; }
+  body.compact .col { width: 200px; }
+  body.compact .add-col { width: 160px; padding: 10px; font-size: 11px; }
+  body.compact .col-head { padding: 10px 12px 8px; }
+  body.compact .col-head .col-title { font-size: 11px; }
+  body.compact .card { padding: 9px 24px 8px 11px; font-size: 12px; }
+  body.compact .inspector { padding: 12px; }
+  body.compact .inspector h4 { font-size: 9px; }
+  body.compact .meta { font-size: 11px; }
+  body.compact .version-list { max-height: 220px; }
+  body.compact .version-entry { font-size: 10px; padding: 4px 6px; }
+  body.compact #controls button { padding: 5px 12px; font-size: 11px; }
+  @media (max-width: 720px) {
+    body.compact .main { grid-template-columns: 1fr; }
+    body.compact .inspector { max-height: 140px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="header-row">
+    <h1>Block Kanban</h1>
+    <div class="subtitle">ai-desk v2 demo · each card = Block · each column = Block (children = ordered card ids)</div>
+  </div>
+
+  <div class="main">
+    <div class="board" id="board"></div>
+    <aside class="inspector">
+      <h4>Selected Block</h4>
+      <div class="meta" id="meta">— click a card —</div>
+      <h4>Block.versions</h4>
+      <div class="version-list" id="version-list"><div class="version-entry">—</div></div>
+    </aside>
+  </div>
+
+  <div id="controls">
+    <button class="demo" id="load-demo">Load sample</button>
+    <button class="danger" id="clear">Clear</button>
+    <button id="export">Export JSON</button>
+  </div>
+
+  <div class="help">
+    <kbd>Drag card</kbd> move between/within columns · <kbd>Click card</kbd> select · <kbd>Dbl-click</kbd> edit · <kbd>Drag column header</kbd> reorder · <kbd>Rollback</kbd> in version list
+  </div>
+</div>
+
+<div id="ghost" style="display:none;"></div>
+
+<script type="module">
+// ============================================================
+// Compact mode
+// ============================================================
+function applyCompact() {
+  const embed = new URLSearchParams(location.search).get('embed') === '1';
+  const narrow = window.innerWidth < 880;
+  document.body.classList.toggle('compact', embed || narrow);
+}
+applyCompact();
+window.addEventListener('resize', applyCompact);
+
+// ============================================================
+// ai-desk v2 portable subset (Block, Graph, Versions)
+// ============================================================
+function hashVersion(v) {
+  const { hash, ...rest } = v;
+  const stable = JSON.stringify(rest, Object.keys(rest).sort());
+  let h = 0x811c9dc5;
+  for (let i = 0; i < stable.length; i++) {
+    h ^= stable.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+function makeVersion({ content, refs = [], children = [], tags = [], meta = {} }, prev = null) {
+  const v = { timestamp: Date.now(), prevHash: prev ? prev.hash : null, content, refs, children, tags, meta };
+  v.hash = hashVersion(v);
+  return v;
+}
+class Block {
+  constructor({ id, type, versions = [], meta = {} }) {
+    this.id = id; this.type = type; this.versions = versions; this.meta = meta;
+  }
+  commit(v = {}) {
+    const prev = this.head();
+    const nv = makeVersion(v, prev);
+    this.versions.push(nv);
+    return nv;
+  }
+  head() { return this.versions[this.versions.length - 1] || null; }
+  get content()  { return this.head()?.content ?? null; }
+  get refs()     { return this.head()?.refs ?? []; }
+  get children() { return this.head()?.children ?? []; }
+  rollback(idx) {
+    const t = this.versions[idx];
+    if (!t) return null;
+    return this.commit({
+      content: t.content, refs: t.refs, children: t.children, tags: t.tags,
+      meta: { action: 'rollback', to: idx },
+    });
+  }
+}
+class Graph {
+  constructor() { this.blocks = new Map(); this.boardOrder = []; }
+  add(b) { this.blocks.set(b.id, b); return this; }
+  remove(id) { this.blocks.delete(id); }
+  get(id) { return this.blocks.get(id); }
+  all() { return Array.from(this.blocks.values()); }
+  columns() { return this.boardOrder.map(id => this.get(id)).filter(Boolean); }
+  cards()   { return this.all().filter(b => b.type === 'card'); }
+  // which column has this card in its current children?
+  columnOf(cardId) {
+    for (const c of this.columns()) {
+      if (c.children.includes(cardId)) return c;
+    }
+    return null;
+  }
+}
+
+// ============================================================
+// World state
+// ============================================================
+const graph = new Graph();
+let nextCardId = 1;
+let nextColId = 1;
+let selectedId = null;
+
+// ============================================================
+// Column / Card ops
+// ============================================================
+function newColId()  { return 'col_' + (nextColId++); }
+function newCardId() { return 'card_' + (nextCardId++); }
+
+function addColumn(title) {
+  const id = newColId();
+  const b = new Block({ id, type: 'column', meta: {} });
+  b.commit({
+    content: { title: title || 'Untitled' },
+    children: [],
+    meta: { action: 'create' },
+  });
+  graph.add(b);
+  graph.boardOrder.push(id);
+  return id;
+}
+
+function renameColumn(id, title) {
+  const b = graph.get(id);
+  if (!b || b.content.title === title) return;
+  b.commit({
+    content: { title },
+    children: b.children,
+    meta: { action: 'rename' },
+  });
+}
+
+function removeColumn(id) {
+  const b = graph.get(id);
+  if (!b) return;
+  // also remove all cards inside
+  for (const cardId of b.children) graph.remove(cardId);
+  graph.remove(id);
+  graph.boardOrder = graph.boardOrder.filter(c => c !== id);
+  if (selectedId === id) selectedId = null;
+}
+
+function reorderColumn(id, newIndex) {
+  const cur = graph.boardOrder.indexOf(id);
+  if (cur < 0) return;
+  graph.boardOrder.splice(cur, 1);
+  graph.boardOrder.splice(Math.max(0, Math.min(graph.boardOrder.length, newIndex)), 0, id);
+}
+
+function addCard(colId, text) {
+  const col = graph.get(colId);
+  if (!col) return null;
+  const id = newCardId();
+  const b = new Block({ id, type: 'card', meta: { createdInCol: colId } });
+  b.commit({
+    content: { text: text || 'New card' },
+    meta: { action: 'create', col: colId },
+  });
+  graph.add(b);
+  col.commit({
+    content: col.content,
+    children: [...col.children, id],
+    meta: { action: 'add-card', cardId: id },
+  });
+  return id;
+}
+
+function editCardText(id, text) {
+  const b = graph.get(id);
+  if (!b || b.content.text === text) return;
+  b.commit({
+    content: { ...b.content, text },
+    meta: { action: 'edit-text' },
+  });
+}
+
+function moveCard(cardId, toColId, toIndex) {
+  const fromCol = graph.columnOf(cardId);
+  const toCol = graph.get(toColId);
+  if (!toCol) return;
+  const sameCol = fromCol && fromCol.id === toColId;
+  if (sameCol) {
+    const cur = fromCol.children.indexOf(cardId);
+    const next = [...fromCol.children];
+    next.splice(cur, 1);
+    const insertAt = toIndex > cur ? toIndex - 1 : toIndex;
+    next.splice(Math.max(0, Math.min(next.length, insertAt)), 0, cardId);
+    if (next.every((id, i) => id === fromCol.children[i])) return;
+    fromCol.commit({
+      content: fromCol.content, children: next,
+      meta: { action: 'reorder', cardId },
+    });
+    // Card itself: also commit to record the move in its history
+    const card = graph.get(cardId);
+    card.commit({
+      content: card.content,
+      meta: { action: 'reorder', col: toColId, to: insertAt },
+    });
+  } else {
+    if (fromCol) {
+      fromCol.commit({
+        content: fromCol.content,
+        children: fromCol.children.filter(id => id !== cardId),
+        meta: { action: 'remove-card', cardId },
+      });
+    }
+    const next = [...toCol.children];
+    next.splice(Math.max(0, Math.min(next.length, toIndex)), 0, cardId);
+    toCol.commit({
+      content: toCol.content, children: next,
+      meta: { action: 'insert-card', cardId, at: toIndex },
+    });
+    // Card itself: commit so its history records the move
+    const card = graph.get(cardId);
+    card.commit({
+      content: card.content,
+      meta: { action: 'move', from: fromCol?.id, to: toColId, at: toIndex },
+    });
+  }
+}
+
+function removeCard(cardId) {
+  const col = graph.columnOf(cardId);
+  if (col) {
+    col.commit({
+      content: col.content,
+      children: col.children.filter(id => id !== cardId),
+      meta: { action: 'remove-card', cardId },
+    });
+  }
+  graph.remove(cardId);
+  if (selectedId === cardId) selectedId = null;
+}
+
+// ============================================================
+// Drag/drop state machine
+// ============================================================
+const ghostEl = document.querySelector('#ghost');
+let drag = null;  // { kind: 'card'|'column', id, offsetX, offsetY, dropTarget?: ... }
+
+function startDrag(kind, id, e, originEl) {
+  drag = { kind, id, dropTarget: null };
+  ghostEl.className = kind === 'column' ? 'col-ghost' : '';
+  if (kind === 'card') {
+    ghostEl.textContent = graph.get(id).content.text;
+  } else {
+    ghostEl.textContent = graph.get(id).content.title;
+  }
+  ghostEl.style.display = 'block';
+  positionGhost(e);
+  if (originEl) originEl.classList.add('dragging');
+  document.body.style.cursor = 'grabbing';
+}
+
+function positionGhost(e) {
+  ghostEl.style.left = (e.clientX + 12) + 'px';
+  ghostEl.style.top  = (e.clientY + 12) + 'px';
+}
+
+function endDrag(e) {
+  if (!drag) return;
+  // apply drop
+  if (drag.dropTarget) {
+    const t = drag.dropTarget;
+    if (drag.kind === 'card' && t.kind === 'card-pos') {
+      moveCard(drag.id, t.colId, t.idx);
+    } else if (drag.kind === 'column' && t.kind === 'col-pos') {
+      reorderColumn(drag.id, t.idx);
+    }
+  }
+  ghostEl.style.display = 'none';
+  document.body.style.cursor = '';
+  drag = null;
+  refreshAll();
+}
+
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  positionGhost(e);
+  computeDropTarget(e);
+  showDropIndicator();
+});
+
+document.addEventListener('pointerup', e => {
+  if (!drag) return;
+  endDrag(e);
+});
+
+function computeDropTarget(e) {
+  // For card drag: find col at point, then determine insert index by Y position among cards.
+  // For column drag: find board's column slot by X position.
+  drag.dropTarget = null;
+  if (drag.kind === 'card') {
+    const colEl = e.target.closest ? e.target.closest('.col') : null;
+    let colHit = colEl;
+    if (!colHit) {
+      // fallback: hit-test all column DOM
+      const cols = document.querySelectorAll('.col');
+      for (const c of cols) {
+        const r = c.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { colHit = c; break; }
+      }
+    }
+    if (!colHit) return;
+    const colId = colHit.dataset.id;
+    const cardsEl = colHit.querySelector('.cards');
+    const cardEls = Array.from(cardsEl.querySelectorAll('.card'));
+    let idx = cardEls.length;
+    for (let i = 0; i < cardEls.length; i++) {
+      const r = cardEls[i].getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (e.clientY < mid) { idx = i; break; }
+    }
+    drag.dropTarget = { kind: 'card-pos', colId, idx, beforeEl: cardEls[idx] || null, cardsEl };
+  } else if (drag.kind === 'column') {
+    const boardEl = document.querySelector('#board');
+    const colEls = Array.from(boardEl.querySelectorAll('.col'));
+    let idx = colEls.length;
+    for (let i = 0; i < colEls.length; i++) {
+      const r = colEls[i].getBoundingClientRect();
+      const mid = r.left + r.width / 2;
+      if (e.clientX < mid) { idx = i; break; }
+    }
+    drag.dropTarget = { kind: 'col-pos', idx };
+  }
+}
+
+function showDropIndicator() {
+  // Clear existing indicators
+  for (const ind of document.querySelectorAll('.drop-indicator')) ind.remove();
+  for (const c of document.querySelectorAll('.col-drop-target')) c.classList.remove('col-drop-target');
+  if (!drag || !drag.dropTarget) return;
+  const t = drag.dropTarget;
+  if (t.kind === 'card-pos') {
+    const ind = document.createElement('div');
+    ind.className = 'drop-indicator';
+    if (t.beforeEl) {
+      t.beforeEl.parentNode.insertBefore(ind, t.beforeEl);
+    } else {
+      t.cardsEl.appendChild(ind);
+    }
+  } else if (t.kind === 'col-pos') {
+    // could show vertical bar; keep minimal — just shadow the parent board
+  }
+}
+
+// ============================================================
+// Render
+// ============================================================
+const boardEl = document.querySelector('#board');
+
+function render() {
+  boardEl.innerHTML = '';
+  for (const col of graph.columns()) {
+    boardEl.appendChild(renderColumn(col));
+  }
+  // "Add column" button at end
+  const add = document.createElement('div');
+  add.className = 'add-col';
+  add.textContent = '+ add column';
+  add.addEventListener('click', () => {
+    const title = prompt('Column title:', 'New column');
+    if (title) {
+      addColumn(title);
+      refreshAll();
+    }
+  });
+  boardEl.appendChild(add);
+}
+
+function renderColumn(col) {
+  const colEl = document.createElement('div');
+  colEl.className = 'col';
+  if (col.id === selectedId) colEl.classList.add('selected');
+  colEl.dataset.id = col.id;
+  // Cycle accent color by board position so each column gets a distinct hue.
+  const idx = graph.boardOrder.indexOf(col.id);
+  colEl.dataset.accent = (idx >= 0 ? idx : 0) % 6;
+
+  const head = document.createElement('div');
+  head.className = 'col-head';
+  const title = document.createElement('div');
+  title.className = 'col-title';
+  title.contentEditable = 'true';
+  title.spellcheck = false;
+  title.textContent = col.content.title;
+  title.addEventListener('blur', () => {
+    const t = title.textContent.trim() || 'Untitled';
+    renameColumn(col.id, t);
+    refreshAll();
+  });
+  title.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); title.blur(); }
+    if (e.key === 'Escape') { title.textContent = col.content.title; title.blur(); }
+  });
+  title.addEventListener('click', e => { e.stopPropagation(); selectedId = col.id; refreshInspector(); refreshSelectionStyle(); });
+  // drag column from header (but not when editing title)
+  head.addEventListener('pointerdown', e => {
+    if (e.target === title) return;
+    e.preventDefault();
+    selectedId = col.id;
+    refreshInspector();
+    refreshSelectionStyle();
+    startDrag('column', col.id, e, colEl);
+  });
+  const count = document.createElement('div');
+  count.className = 'count';
+  count.textContent = col.children.length;
+  const x = document.createElement('div');
+  x.className = 'x';
+  x.textContent = '×';
+  x.title = 'remove column';
+  x.addEventListener('click', e => {
+    e.stopPropagation();
+    if (confirm(`Remove column "${col.content.title}" and all its cards?`)) {
+      removeColumn(col.id);
+      refreshAll();
+    }
+  });
+  head.append(title, count, x);
+
+  const cards = document.createElement('div');
+  cards.className = 'cards';
+  for (const cardId of col.children) {
+    const cardBlock = graph.get(cardId);
+    if (!cardBlock) continue;
+    cards.appendChild(renderCard(cardBlock));
+  }
+
+  const addCardBtn = document.createElement('div');
+  addCardBtn.className = 'add-card';
+  addCardBtn.textContent = '+ add card';
+  addCardBtn.addEventListener('click', () => {
+    const id = addCard(col.id, 'New task');
+    selectedId = id;
+    refreshAll();
+    // immediately enter edit mode
+    setTimeout(() => {
+      const el = document.querySelector(`.card[data-id="${id}"]`);
+      if (el) startCardEdit(el, graph.get(id));
+    }, 0);
+  });
+
+  colEl.append(head, cards, addCardBtn);
+  return colEl;
+}
+
+function renderCard(card) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.id = card.id;
+  if (card.id === selectedId) el.classList.add('selected');
+
+  const text = document.createElement('div');
+  text.textContent = card.content.text;
+  el.appendChild(text);
+
+  const badge = document.createElement('div');
+  badge.className = 'versions-badge';
+  badge.textContent = `v${card.versions.length}`;
+  el.appendChild(badge);
+
+  const x = document.createElement('div');
+  x.className = 'x';
+  x.textContent = '×';
+  x.addEventListener('click', e => {
+    e.stopPropagation();
+    if (confirm('Remove this card? (history kept in trash via Block versions)')) {
+      removeCard(card.id);
+      refreshAll();
+    }
+  });
+  el.appendChild(x);
+
+  el.addEventListener('click', e => {
+    if (e.target === x) return;
+    selectedId = card.id;
+    refreshInspector();
+    refreshSelectionStyle();
+  });
+  el.addEventListener('dblclick', e => {
+    if (e.target === x) return;
+    startCardEdit(el, card);
+  });
+  el.addEventListener('pointerdown', e => {
+    // allow text-edit click; only start drag if not editing
+    if (el.classList.contains('editing')) return;
+    if (e.target === x) return;
+    selectedId = card.id;
+    refreshInspector();
+    refreshSelectionStyle();
+    let started = false;
+    const x0 = e.clientX, y0 = e.clientY;
+    const move = (ev) => {
+      if (!started && (Math.abs(ev.clientX - x0) > 4 || Math.abs(ev.clientY - y0) > 4)) {
+        started = true;
+        startDrag('card', card.id, ev, el);
+      }
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  });
+
+  return el;
+}
+
+function startCardEdit(el, card) {
+  if (el.classList.contains('editing')) return;
+  el.classList.add('editing');
+  el.innerHTML = '';
+  const ta = document.createElement('textarea');
+  ta.value = card.content.text;
+  ta.rows = 2;
+  el.appendChild(ta);
+  ta.focus();
+  ta.select();
+  const finish = (commitChange) => {
+    if (commitChange) {
+      const v = ta.value.trim();
+      if (v) editCardText(card.id, v);
+    }
+    el.classList.remove('editing');
+    refreshAll();
+  };
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  ta.addEventListener('blur', () => finish(true));
+}
+
+function refreshSelectionStyle() {
+  for (const c of document.querySelectorAll('.card.selected, .col.selected')) c.classList.remove('selected');
+  if (!selectedId) return;
+  const el = document.querySelector(`[data-id="${selectedId}"]`);
+  if (el) el.classList.add('selected');
+}
+
+// ============================================================
+// Inspector panel
+// ============================================================
+function refreshInspector() {
+  const meta = document.querySelector('#meta');
+  const list = document.querySelector('#version-list');
+  if (!selectedId) {
+    meta.innerHTML = '— click a card —';
+    list.innerHTML = '<div class="version-entry">—</div>';
+    return;
+  }
+  const b = graph.get(selectedId);
+  if (!b) { meta.innerHTML = '(removed)'; list.innerHTML = '<div class="version-entry">—</div>'; return; }
+  if (b.type === 'card') {
+    const col = graph.columnOf(b.id);
+    meta.innerHTML = `
+      id: <b>${b.id}</b><br>
+      type: card<br>
+      column: <b>${col ? col.content.title : '(orphan)'}</b><br>
+      text: <b>${escapeHtml(b.content.text)}</b><br>
+      versions: <b>${b.versions.length}</b>
+    `;
+  } else if (b.type === 'column') {
+    meta.innerHTML = `
+      id: <b>${b.id}</b><br>
+      type: column<br>
+      title: <b>${escapeHtml(b.content.title)}</b><br>
+      cards: <b>${b.children.length}</b><br>
+      versions: <b>${b.versions.length}</b>
+    `;
+  }
+
+  list.innerHTML = '';
+  b.versions.forEach((ver, idx) => {
+    const cur = idx === b.versions.length - 1;
+    const el = document.createElement('div');
+    el.className = 'version-entry' + (cur ? ' current' : '');
+    const t = new Date(ver.timestamp).toLocaleTimeString('en-US', { hour12: false });
+    let snippet = '';
+    if (b.type === 'card') {
+      snippet = ver.content?.text ? escapeHtml(String(ver.content.text)).slice(0, 30) : '';
+    } else if (b.type === 'column') {
+      snippet = ver.content?.title ? escapeHtml(String(ver.content.title)) : '';
+    }
+    el.innerHTML = `
+      <span class="ver-idx">${idx}</span>
+      <span class="ver-time">${t}</span>
+      <span class="ver-action">${ver.meta?.action || ''}</span>
+      <span class="ver-text">${snippet}</span>
+      ${cur ? '' : `<button class="ver-rollback" data-idx="${idx}">rollback</button>`}
+    `;
+    el.querySelector('.ver-rollback')?.addEventListener('click', e => {
+      e.stopPropagation();
+      const i = Number(e.target.dataset.idx);
+      const target = b.versions[i];
+      // For card rollback: restore content (text), keep current location.
+      // For column rollback: restore content (title) AND children list — careful, may reference removed cards.
+      if (b.type === 'card') {
+        editCardText(b.id, target.content.text);
+      } else if (b.type === 'column') {
+        // simplest: restore title only (re-installing children is risky if cards were deleted)
+        renameColumn(b.id, target.content.title);
+      }
+      refreshAll();
+    });
+    list.appendChild(el);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function refreshAll() {
+  render();
+  refreshInspector();
+}
+
+// ============================================================
+// Demo + controls
+// ============================================================
+function loadDemo() {
+  clearAll();
+  const back  = addColumn('Backlog');
+  const prog  = addColumn('In Progress');
+  const rev   = addColumn('Review');
+  const done  = addColumn('Done');
+  addCard(back, 'Define onboarding flow');
+  addCard(back, 'Audit error states');
+  addCard(back, 'Refresh icon set');
+  addCard(prog, 'Refactor settings panel');
+  addCard(prog, 'API rate-limit dashboard');
+  addCard(rev, 'Pricing page copy');
+  addCard(rev, 'Mobile nav prototype');
+  addCard(done, 'Q1 roadmap');
+  addCard(done, 'Brand guidelines v2');
+  refreshAll();
+}
+
+function clearAll() {
+  graph.blocks.clear();
+  graph.boardOrder = [];
+  selectedId = null;
+  refreshAll();
+}
+
+document.querySelector('#load-demo').addEventListener('click', loadDemo);
+document.querySelector('#clear').addEventListener('click', clearAll);
+document.querySelector('#export').addEventListener('click', () => {
+  const out = {
+    boardOrder: graph.boardOrder,
+    blocks: graph.all().map(b => ({
+      id: b.id,
+      type: b.type,
+      meta: b.meta,
+      versions: b.versions.length,
+      head: { content: b.content, refs: b.refs, children: b.children },
+    })),
+    exportedAt: Date.now(),
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kanban-blocks.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// boot
+loadDemo();
+</script>
+</body>
+</html>

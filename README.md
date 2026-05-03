@@ -72,6 +72,13 @@ $ node v2/ai-desk.js virtual-apply graph.json 'my-app/render.js:fn:render' heavy
 - インスペクタで選択ノードの全 version 可視化
 - 詳細: [`v2/demos/node-graph/`](v2/demos/node-graph/)
 
+### 🗂 Block Kanban — [触ってみる](https://aoyamarito.github.io/ai-desk/v2/demos/kanban/)
+**カード = Block**、**カラム = Block**(<code>children</code> がカード順序の REAL)の Trello 風ボード(単一 HTML、~750 行、フラットデザイン)。
+- ドラッグでカード移動 = source / target 双方の column が `children` を更新する 2 commit
+- カード自身も `move` を自分の history に記録(create / move / edit-text の連鎖が version で読める)
+- インスペクタから過去 version への `rollback()` を 1 クリック
+- 詳細: [`v2/demos/kanban/`](v2/demos/kanban/)
+
 **これらの規模が 1 セッションで動く事自体が ai-desk の効果のデモ**になっている。
 
 ---

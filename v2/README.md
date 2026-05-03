@@ -42,3 +42,18 @@ node ai-desk.js impact v1.json '../ai-desk.js:fn:runSkeleton'
 ```
 
 詳細は [`BIBLE.md`](./BIBLE.md) §9「v1 → v2 の移行指針」。
+
+---
+
+## 🎮 Demo
+
+[`demos/gravity-battle/`](./demos/gravity-battle/) — ブラウザで遊べるカードゲーム。
+
+ai-desk v2 の主要機構を**1 つの実装で全部体現**:
+- **constraintBlock + evalConstraint**: AI が全可能 play を評価
+- **Block.versions**: 各ターンが version、Undo で rollback
+- **マーカーゼロ**: JS 構文のみで構造表現
+- **ブラウザ完結**: 単一 HTML、依存ゼロ、ビルドなし
+
+🌐 [プレイする(GitHub Pages)](https://aoyamarito.github.io/ai-desk/v2/demos/gravity-battle/)
+📂 [README + ソース](./demos/gravity-battle/)

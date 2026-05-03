@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gravity Field Battle — ai-desk v2 demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Comic Sans MS', 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #fff8e1 0%, #ffe5d6 35%, #ffd4f5 70%, #d4ecff 100%);
+    color: #2d3748;
+    min-height: 100vh;
+    overflow: hidden;
+    padding: 16px;
+  }
+  #stage {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto auto auto;
+    gap: 10px;
+    height: calc(100vh - 32px);
+  }
+  .player-info {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 16px;
+    border: 3px solid;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.08);
+  }
+  .player-info.opponent { border-color: #ff7eb6; background: linear-gradient(135deg, #ffe0ec, #ffd4e5); }
+  .player-info.player { border-color: #4dabf7; background: linear-gradient(135deg, #d4ecff, #c0e3ff); }
+  .name { font-size: 16px; font-weight: 900; color: #2d3748; text-shadow: 1px 1px 0 #fff; }
+
+  .hp-area { position: relative; cursor: pointer; padding: 4px; border-radius: 12px; }
+  .hp-area.drop-target {
+    background: rgba(255, 100, 100, 0.3);
+    box-shadow: 0 0 0 3px #ff5252, 0 0 24px rgba(255, 82, 82, 0.6);
+  }
+  .hp-bar {
+    width: 220px; height: 24px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 12px; overflow: hidden;
+    position: relative;
+    border: 3px solid #2d3748;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.1);
+  }
+  .hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff5252, #ffb74d, #ffeb3b);
+    transition: width 0.5s ease-out;
+  }
+  .hp-text {
+    position: absolute; inset: 0;
+    text-align: center; line-height: 22px;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    font-size: 14px;
+    color: #2d3748;
+  }
+  .mana { font-size: 16px; color: #1976d2; font-weight: 900; }
+  .mana::before { content: '✨ '; }
+
+  .battlefield {
+    display: flex; justify-content: center; gap: 12px;
+    min-height: 130px; padding: 12px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.4);
+    border: 3px dashed rgba(0,0,0,0.15);
+    align-items: center;
+    flex-wrap: wrap;
+    transition: all 0.2s;
+  }
+  .battlefield.opponent { border-color: rgba(255, 126, 182, 0.5); }
+  .battlefield.player { border-color: rgba(77, 171, 247, 0.5); }
+  .battlefield.empty::before {
+    content: 'empty';
+    color: rgba(0,0,0,0.3); font-size: 14px; font-style: italic; font-weight: 600;
+  }
+
+  /* Field creatures */
+  .creature {
+    width: 92px; height: 116px;
+    background: linear-gradient(135deg, #b3e5fc 0%, #4fc3f7 100%);
+    border: 3px solid #0277bd;
+    border-radius: 14px;
+    padding: 6px;
+    position: relative;
+    display: flex; flex-direction: column;
+    transition: all 0.3s ease;
+    user-select: none;
+    box-shadow: 0 4px 0 rgba(2, 119, 189, 0.4);
+  }
+  .creature.opponent {
+    background: linear-gradient(135deg, #ffccdd 0%, #ff7eb6 100%);
+    border-color: #c2185b;
+    box-shadow: 0 4px 0 rgba(194, 24, 91, 0.4);
+  }
+  .creature.player.can-attack {
+    cursor: grab;
+    animation: creatureGlow 1.8s ease-in-out infinite;
+  }
+  .creature.player.can-attack:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 8px 0 rgba(255, 193, 7, 0.5), 0 0 24px rgba(255, 193, 7, 0.7);
+    border-color: #ffc107;
+    animation: none;
+  }
+  @keyframes creatureGlow {
+    0%, 100% {
+      box-shadow: 0 4px 0 rgba(2, 119, 189, 0.4), 0 0 8px rgba(255, 193, 7, 0.3);
+    }
+    50% {
+      box-shadow: 0 4px 0 rgba(2, 119, 189, 0.4), 0 0 24px rgba(255, 193, 7, 0.7);
+    }
+  }
+  .creature.dragging { opacity: 0.5; cursor: grabbing; }
+  .creature.summoning-sick { opacity: 0.65; filter: grayscale(0.3); }
+  .creature.summoning-sick::after {
+    content: '💤';
+    position: absolute; top: 4px; left: 4px;
+    font-size: 16px;
+  }
+  .creature.attacked-this-turn { opacity: 0.55; filter: grayscale(0.6); }
+  .creature.drop-target {
+    box-shadow: 0 0 0 4px #ff5252, 0 0 32px rgba(255, 82, 82, 0.7) !important;
+    transform: scale(1.08);
+    animation: none !important;
+  }
+  .creature.dying { animation: deathAnim 0.6s ease-out forwards; }
+  @keyframes deathAnim {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3) rotate(20deg); opacity: 0.9; filter: brightness(1.5) hue-rotate(60deg); }
+    100% { transform: scale(0.2) rotate(360deg); opacity: 0; }
+  }
+  .creature.attacking { animation: attackPulse 0.5s ease-out; z-index: 10; }
+  @keyframes attackPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); box-shadow: 0 0 40px #ffeb3b; }
+  }
+  .creature.taking-damage { animation: hitFlash 0.4s ease-out; }
+  @keyframes hitFlash {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(2.5) hue-rotate(330deg) saturate(2); }
+  }
+  .creature-icon { text-align: center; font-size: 30px; }
+  .creature-name { font-size: 10px; text-align: center; color: #fff; font-weight: 900; text-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
+  .creature-stats {
+    display: flex; justify-content: space-between;
+    padding: 2px 4px; margin-top: auto;
+    font-size: 14px; font-weight: 900;
+  }
+  .stat-atk-display {
+    color: #ff5252;
+    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+  }
+  .stat-hp-display {
+    color: #43a047;
+    text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+  }
+
+  /* Hand */
+  .hand {
+    display: flex; justify-content: center; gap: 12px;
+    padding: 10px; min-height: 180px;
+  }
+  .card {
+    width: 104px; height: 156px;
+    background: linear-gradient(135deg, #c5e1ff 0%, #82b1ff 100%);
+    border: 3px solid #1976d2;
+    border-radius: 14px;
+    padding: 8px;
+    position: relative;
+    transition: all 0.3s ease;
+    display: flex; flex-direction: column;
+    user-select: none;
+    box-shadow: 0 4px 0 rgba(25, 118, 210, 0.4);
+  }
+  .card.spell {
+    background: linear-gradient(135deg, #f8bbd0 0%, #f06292 100%);
+    border-color: #c2185b;
+    box-shadow: 0 4px 0 rgba(194, 24, 91, 0.4);
+  }
+  .card.draggable {
+    cursor: grab;
+    animation: softGlow 2.5s ease-in-out infinite;
+  }
+  .card.draggable:hover {
+    transform: translateY(-14px) scale(1.05);
+    box-shadow: 0 12px 24px rgba(0, 100, 200, 0.4), 0 0 30px rgba(255, 255, 100, 0.5);
+    animation: none;
+  }
+  @keyframes softGlow {
+    0%, 100% { box-shadow: 0 4px 0 rgba(25, 118, 210, 0.4), 0 0 6px rgba(255, 235, 59, 0.3); }
+    50% { box-shadow: 0 4px 0 rgba(25, 118, 210, 0.4), 0 0 18px rgba(255, 235, 59, 0.7); }
+  }
+  /* hint tooltip */
+  .card.draggable::before {
+    content: '⬆ DRAG TO SUMMON';
+    position: absolute;
+    top: -42px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: linear-gradient(135deg, #fff176, #ffeb3b);
+    color: #d84315;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 900;
+    border: 2px solid #f57f17;
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 50;
+  }
+  .card.draggable.spell::before {
+    content: '⬆ DRAG TO CAST';
+    background: linear-gradient(135deg, #ce93d8, #ab47bc);
+    color: #fff;
+    border-color: #6a1b9a;
+  }
+  .card.draggable:hover::before {
+    opacity: 1;
+    animation: hintBob 1.2s ease-in-out infinite;
+  }
+  @keyframes hintBob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-5px); }
+  }
+  .card.dragging { opacity: 0.5; cursor: grabbing; }
+  .card.unaffordable { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
+
+  .card-cost {
+    position: absolute; top: -10px; right: -10px;
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #4fc3f7, #0288d1);
+    border-radius: 50%;
+    text-align: center; line-height: 28px;
+    font-weight: 900;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(2, 136, 209, 0.6);
+    font-size: 16px;
+    color: #fff;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+  }
+  .card-type-tag {
+    position: absolute; top: -8px; left: -8px;
+    padding: 3px 8px;
+    font-size: 9px;
+    border-radius: 10px;
+    font-weight: 900;
+    background: #4caf50; color: #fff;
+    border: 2px solid #2e7d32;
+  }
+  .card-type-tag.spell { background: #ab47bc; border-color: #6a1b9a; }
+  .card-name {
+    font-size: 11px; font-weight: 900;
+    text-align: center; margin-top: 10px; margin-bottom: 4px;
+    color: #2d3748;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.7);
+  }
+  .card-icon { text-align: center; font-size: 28px; margin: 4px 0; }
+  .card-effect {
+    font-size: 9px; text-align: center;
+    color: #2d3748; line-height: 1.3; flex-grow: 1;
+    font-weight: 600;
+  }
+  .card-stats {
+    display: flex; justify-content: space-around;
+    font-size: 13px; margin-top: 4px; font-weight: 900;
+  }
+
+  /* Battle message banner */
+  #battle-msg {
+    position: fixed; top: 35%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #ffeb3b, #ff9800);
+    color: #d84315;
+    border: 4px solid #fff;
+    padding: 18px 36px;
+    font-size: 24px; font-weight: 900;
+    border-radius: 16px;
+    box-shadow: 0 0 40px rgba(255, 193, 7, 0.7), 0 8px 0 rgba(0,0,0,0.2);
+    z-index: 150;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.3s;
+    text-shadow: 2px 2px 0 #fff;
+  }
+  #battle-msg.show {
+    opacity: 1;
+    animation: msgPulse 0.6s ease-out;
+  }
+  @keyframes msgPulse {
+    0% { transform: translate(-50%, -50%) scale(0.5) rotate(-5deg); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.15) rotate(2deg); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  /* Float numbers */
+  .float-num {
+    position: absolute;
+    font-size: 40px;
+    font-weight: 900;
+    pointer-events: none;
+    animation: floatUp 1.4s ease-out forwards;
+    text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 0 0 8px currentColor;
+    z-index: 100;
+    font-family: 'Comic Sans MS', sans-serif;
+  }
+  .float-num.damage { color: #ff1744; }
+  .float-num.heal { color: #00c853; }
+  @keyframes floatUp {
+    0% { transform: translate(-50%, 0) scale(0.3) rotate(-10deg); opacity: 0; }
+    20% { opacity: 1; transform: translate(-50%, -10px) scale(1.6) rotate(5deg); }
+    100% { transform: translate(-50%, -120px) scale(1) rotate(0); opacity: 0; }
+  }
+
+  /* Status / log / controls */
+  #log {
+    height: 70px; overflow-y: auto;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 12px;
+    font-size: 12px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    color: #2d3748;
+  }
+  .log-entry { margin: 1px 0; padding: 1px 0; }
+  .log-entry.system { color: #1976d2; font-weight: 700; }
+  .log-entry.damage { color: #d32f2f; }
+  .log-entry.heal { color: #388e3c; }
+  .log-entry.combat { color: #f57c00; font-weight: 700; }
+  .log-entry.thinking { color: #757575; font-style: italic; }
+  .log-entry.summon { color: #00897b; font-weight: 700; }
+
+  #controls {
+    display: flex; gap: 10px;
+    justify-content: center;
+    padding: 6px;
+  }
+  button {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    color: #fff;
+    border: 3px solid #0277bd;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 14px; font-weight: 900;
+    transition: all 0.15s;
+    box-shadow: 0 4px 0 #01579b;
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.3);
+    font-family: inherit;
+  }
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 #01579b;
+  }
+  button:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #01579b;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  button.end-turn {
+    background: linear-gradient(135deg, #ff7043, #ff5722);
+    border-color: #d84315;
+    box-shadow: 0 4px 0 #bf360c;
+  }
+  button.end-turn:hover { box-shadow: 0 6px 0 #bf360c; }
+  button.end-turn:active { box-shadow: 0 2px 0 #bf360c; }
+  button.end-turn.highlighted {
+    animation: endTurnPulse 1s ease-in-out infinite;
+    background: linear-gradient(135deg, #ffeb3b, #ff9800);
+    border-color: #e65100;
+  }
+  @keyframes endTurnPulse {
+    0%, 100% { transform: translateY(0); box-shadow: 0 4px 0 #e65100, 0 0 16px rgba(255, 193, 7, 0.6); }
+    50% { transform: translateY(-4px); box-shadow: 0 8px 0 #e65100, 0 0 36px rgba(255, 193, 7, 1); }
+  }
+
+  .gravity-active { animation: gravityPulse 1.5s ease-in-out; }
+  @keyframes gravityPulse {
+    0%, 100% { background: linear-gradient(135deg, #fff8e1 0%, #ffe5d6 35%, #ffd4f5 70%, #d4ecff 100%); }
+    50% { background: linear-gradient(135deg, #fff59d 0%, #ffab91 35%, #ce93d8 70%, #81d4fa 100%); }
+  }
+  .hp-shake { animation: shake 0.4s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  .thinking-dots { display: inline-block; width: 60px; }
+  .thinking-dots::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+  h1 {
+    font-size: 26px; text-align: center;
+    color: #d84315;
+    text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(255, 152, 0, 0.5);
+    letter-spacing: 1px;
+  }
+  .subtitle { text-align: center; font-size: 11px; color: #5d4037; font-weight: 600; }
+  #status {
+    text-align: center; padding: 6px;
+    font-size: 14px; color: #2d3748;
+    font-weight: 900;
+    background: rgba(255,255,255,0.6);
+    border-radius: 8px;
+  }
+  .help-text {
+    text-align: center; font-size: 11px;
+    color: #1976d2; padding: 6px;
+    background: rgba(187, 222, 251, 0.5);
+    border-radius: 8px;
+    font-weight: 700;
+    border: 2px dashed rgba(25, 118, 210, 0.3);
+  }
+
+  .victory-modal {
+    position: fixed; inset: 0;
+    background: rgba(255, 248, 225, 0.92);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; animation: fadeIn 0.5s;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .victory-content {
+    background: linear-gradient(135deg, #fff, #ffe5d6);
+    padding: 40px 60px; border-radius: 20px;
+    text-align: center;
+    border: 4px solid #ff9800;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2), 0 0 60px rgba(255, 193, 7, 0.4);
+  }
+  .victory-content h2 {
+    font-size: 42px; margin-bottom: 16px;
+    text-shadow: 3px 3px 0 #fff;
+  }
+  .victory-content.win h2 { color: #00c853; }
+  .victory-content.lose h2 { color: #d50000; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div>
+    <h1>⚡ Gravity Field Battle ⚡</h1>
+    <div class="subtitle">ai-desk v2 demo · Powered by constraintBlock</div>
+  </div>
+  <div class="player-info opponent">
+    <div class="name">🤖 AI Opponent</div>
+    <div class="hp-area" id="opponent-hp-area" data-target-type="face" data-who="opponent">
+      <div class="hp-bar" id="opponent-hp"><div class="hp-fill"></div><div class="hp-text">20 / 20</div></div>
+    </div>
+    <div class="mana">Mana: <span id="opponent-mana">0</span></div>
+  </div>
+  <div class="battlefield opponent" id="opponent-field"></div>
+  <div id="status">Battle Start!</div>
+  <div class="battlefield player" id="player-field" data-target-type="summon" data-who="player"></div>
+  <div class="player-info player">
+    <div class="name">🧙 You</div>
+    <div class="hp-area" id="player-hp-area">
+      <div class="hp-bar" id="player-hp"><div class="hp-fill"></div><div class="hp-text">20 / 20</div></div>
+    </div>
+    <div class="mana">Mana: <span id="player-mana">0</span></div>
+  </div>
+  <div class="hand" id="player-hand"></div>
+  <div class="help-text" id="help-text">🎴 Click or drag a card to play · ⚔️ Drag your glowing creatures onto an enemy creature or HP bar to attack</div>
+  <div id="log"></div>
+  <div id="controls">
+    <button class="end-turn" id="end-turn">End Turn</button>
+    <button id="undo">Undo (Versions)</button>
+    <button id="rules">Rules</button>
+    <button id="reset">Restart</button>
+  </div>
+</div>
+<div id="battle-msg"></div>
+
+<script type="module">
+// ============================================================
+// ai-desk v2 portable subset
+// ============================================================
+function hashVersion(v) {
+  const { hash, ...rest } = v;
+  const stable = JSON.stringify(rest, Object.keys(rest).sort());
+  let h = 0x811c9dc5;
+  for (let i = 0; i < stable.length; i++) {
+    h ^= stable.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+function makeVersion({ content, refs = [], children = [], tags = [], meta = {} }, prev = null) {
+  const v = { timestamp: Date.now(), prevHash: prev ? prev.hash : null, content, refs, children, tags, meta };
+  v.hash = hashVersion(v);
+  return v;
+}
+class Block {
+  constructor({ id, type, versions = [], meta = {} }) {
+    this.id = id; this.type = type; this.versions = versions; this.meta = meta;
+  }
+  commit(v = {}) {
+    const prev = this.head();
+    const nv = makeVersion(v, prev);
+    this.versions.push(nv);
+    return nv;
+  }
+  head() { return this.versions[this.versions.length - 1] || null; }
+  get content() { return this.head()?.content ?? null; }
+  rollback(i) {
+    const t = this.versions[i];
+    if (!t) throw new Error('no such version');
+    return this.commit({ content: t.content, refs: t.refs, children: t.children, tags: t.tags, meta: { ...t.meta, rollback: true } });
+  }
+}
+function constraintBlock({ id, axes, values, derive }) {
+  const b = new Block({ id, type: 'constraint' });
+  b.commit({ content: { axes, values, derive }, tags: ['constraint'] });
+  return b;
+}
+function evalConstraint(block, filter = {}) {
+  const { axes, values, derive } = block.content;
+  function* gen(idx, current) {
+    if (idx === axes.length) { yield current; return; }
+    const axis = axes[idx];
+    for (const v of values[axis]) yield* gen(idx + 1, { ...current, [axis]: v });
+  }
+  const worlds = [];
+  for (const w of gen(0, {})) {
+    const derived = derive(w) || {};
+    const merged = { ...w, ...derived };
+    let pass = true;
+    for (const [k, v] of Object.entries(filter)) {
+      if (k.startsWith('_')) continue;
+      if (merged[k] !== v) { pass = false; break; }
+    }
+    if (pass) worlds.push(merged);
+  }
+  if (worlds.length === 0) return { _contradiction: true, worlds: [] };
+  return { _worlds: worlds.length, worlds };
+}
+
+// ============================================================
+// Cards
+// ============================================================
+const CARDS = [
+  { id: 'block',         name: 'Block',           type: 'creature', cost: 1, atk: 1, hp: 2, icon: '🔷', effect: 'Basic unit' },
+  { id: 'real-shadow',   name: 'REAL/SHADOW',     type: 'creature', cost: 2, atk: 2, hp: 2, icon: '👥', effect: 'Body & shadow' },
+  { id: 'heavy-fn',      name: 'Heavy Function',  type: 'creature', cost: 3, atk: 3, hp: 4, icon: '🏛️', effect: 'Tough, locality' },
+  { id: 'virtual-heavy', name: 'Virtual Heavy',   type: 'creature', cost: 4, atk: 4, hp: 3, icon: '✨', effect: 'Physical & logical' },
+  { id: 'migration',     name: 'Migration',       type: 'creature', cost: 4, atk: 5, hp: 2, icon: '🚀', effect: 'High dmg, fragile' },
+  { id: 'constraint',    name: 'Constraint Folding', type: 'spell', cost: 2, atk: 0, hp: 0, icon: '🌀', effect: 'Destroy 1 enemy creature' },
+  { id: 'gravity',       name: 'Gravity Field',   type: 'spell',    cost: 2, atk: 0, hp: 0, icon: '🌌', effect: 'Your creatures +2 ATK' },
+  { id: 'versions',      name: 'Versions',        type: 'spell',    cost: 4, atk: 0, hp: 0, icon: '⏪', effect: 'Heal & wake all yours' },
+];
+
+function buildDeck() {
+  const deck = [];
+  for (const c of CARDS) {
+    deck.push({ ...c });
+    if (c.type === 'creature' && Math.random() < 0.7) deck.push({ ...c });
+  }
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+// ============================================================
+// Game state
+// ============================================================
+const stateBlock = new Block({ id: 'game-state', type: 'state' });
+let creatureDragUid = null;
+let cardDragId = null;
+
+function newGame() {
+  const initial = {
+    turn: 1,
+    activePlayer: 'player',
+    player:   { hp: 20, mana: 1, maxMana: 1, deck: buildDeck(), hand: [], field: [] },
+    opponent: { hp: 20, mana: 1, maxMana: 1, deck: buildDeck(), hand: [], field: [] },
+    log: ['Battle started!'],
+    over: null,
+  };
+  for (let i = 0; i < 3; i++) {
+    initial.player.hand.push(initial.player.deck.shift());
+    initial.opponent.hand.push(initial.opponent.deck.shift());
+  }
+  stateBlock.versions = [];
+  stateBlock.commit({ content: initial });
+  return getState();
+}
+function getState() { return JSON.parse(JSON.stringify(stateBlock.content)); }
+function commitState(s, meta = {}) { stateBlock.commit({ content: s, meta }); }
+
+// ============================================================
+// Card play
+// ============================================================
+function playCard(state, who, cardId) {
+  const me = state[who];
+  const opp = state[who === 'player' ? 'opponent' : 'player'];
+  const idx = me.hand.findIndex(c => c.id === cardId);
+  if (idx < 0) return state;
+  const card = me.hand[idx];
+  if (me.mana < card.cost) return state;
+
+  me.mana -= card.cost;
+  me.hand.splice(idx, 1);
+  const sideLabel = who === 'player' ? '🧙' : '🤖';
+
+  if (card.type === 'creature') {
+    me.field.push({
+      ...card,
+      currentHp: card.hp,
+      maxHp: card.hp,
+      summonedTurn: state.turn,
+      attackedThisTurn: 0,
+      uid: 'c' + Math.random().toString(36).slice(2, 8),
+    });
+    state.log.push(`${sideLabel} summons ${card.icon} ${card.name}`);
+    state.lastEvent = { type: 'summon', who, name: card.name, icon: card.icon };
+  } else {
+    if (card.id === 'constraint') {
+      if (opp.field.length > 0) {
+        const target = opp.field.shift();
+        state.log.push(`🌀 Constraint Folding — ${target.icon} ${target.name} destroyed`);
+        state.lastEvent = { type: 'spell-destroy', who, target };
+      } else {
+        state.log.push(`🌀 Constraint Folding fizzled (no target)`);
+      }
+    } else if (card.id === 'gravity') {
+      me.field.forEach(c => c.atk += 2);
+      state.log.push(`🌌 Gravity Field — your creatures +2 ATK`);
+      state.lastEvent = { type: 'spell-buff', who, count: me.field.length };
+    } else if (card.id === 'versions') {
+      me.field.forEach(c => {
+        c.currentHp = c.maxHp;
+        c.summonedTurn = -1;
+      });
+      state.log.push(`⏪ Versions — restore + wake all your creatures`);
+      state.lastEvent = { type: 'spell-heal', who };
+    }
+  }
+
+  if (opp.hp <= 0) state.over = who === 'player' ? 'win' : 'lose';
+  if (me.hp <= 0) state.over = who === 'player' ? 'lose' : 'win';
+  return state;
+}
+
+// ============================================================
+// Attack
+// ============================================================
+function attackCreature(state, attackerWho, attackerUid, targetUid) {
+  const me = state[attackerWho];
+  const opp = state[attackerWho === 'player' ? 'opponent' : 'player'];
+  const attacker = me.field.find(c => c.uid === attackerUid);
+  const target = opp.field.find(c => c.uid === targetUid);
+  if (!attacker || !target) return state;
+  if (attacker.summonedTurn === state.turn) return state;
+  if (attacker.attackedThisTurn) return state;
+
+  const dmgToTarget = attacker.atk;
+  const dmgToAttacker = target.atk;
+  target.currentHp -= dmgToTarget;
+  attacker.currentHp -= dmgToAttacker;
+  attacker.attackedThisTurn = 1;
+
+  state.log.push(`⚔️ ${attacker.icon}${attacker.name} → ${target.icon}${target.name} (${dmgToTarget} dmg)`);
+  state.log.push(`   Counter ${target.icon}${target.name} → ${attacker.icon}${attacker.name} (${dmgToAttacker} dmg)`);
+
+  state.lastEvent = {
+    type: 'creature-vs-creature',
+    attackerUid, targetUid,
+    attackerWho, targetWho: attackerWho === 'player' ? 'opponent' : 'player',
+    dmgToTarget, dmgToAttacker,
+    attackerName: attacker.name, targetName: target.name,
+    attackerIcon: attacker.icon, targetIcon: target.icon,
+    targetDied: target.currentHp <= 0,
+    attackerDied: attacker.currentHp <= 0,
+  };
+
+  if (target.currentHp <= 0) state.log.push(`💀 ${target.icon}${target.name} defeated`);
+  if (attacker.currentHp <= 0) state.log.push(`💀 ${attacker.icon}${attacker.name} defeated`);
+
+  me.field = me.field.filter(c => c.currentHp > 0);
+  opp.field = opp.field.filter(c => c.currentHp > 0);
+
+  return state;
+}
+
+function attackFace(state, attackerWho, attackerUid) {
+  const me = state[attackerWho];
+  const opp = state[attackerWho === 'player' ? 'opponent' : 'player'];
+  const attacker = me.field.find(c => c.uid === attackerUid);
+  if (!attacker) return state;
+  if (attacker.summonedTurn === state.turn) return state;
+  if (attacker.attackedThisTurn) return state;
+
+  const dmg = attacker.atk;
+  opp.hp = Math.max(0, opp.hp - dmg);
+  attacker.attackedThisTurn = 1;
+
+  state.log.push(`⚔️ ${attacker.icon}${attacker.name} → direct attack (${dmg} dmg)`);
+  state.lastEvent = {
+    type: 'face-attack',
+    attackerUid,
+    attackerWho,
+    targetWho: attackerWho === 'player' ? 'opponent' : 'player',
+    dmg,
+    attackerName: attacker.name,
+    attackerIcon: attacker.icon,
+  };
+
+  if (opp.hp <= 0) state.over = attackerWho === 'player' ? 'win' : 'lose';
+  return state;
+}
+
+// ============================================================
+// AI
+// ============================================================
+function aiThinkCard(state) {
+  const me = state.opponent;
+  const opp = state.player;
+  const playable = me.hand.filter(c => c.cost <= me.mana);
+  if (playable.length === 0) return null;
+
+  const cb = constraintBlock({
+    id: 'ai-card-' + state.turn + '-' + me.hand.length,
+    axes: ['cardIdx'],
+    values: { cardIdx: playable.map((_, i) => i) },
+    derive: (combo) => {
+      const card = playable[combo.cardIdx];
+      let value = 0;
+      if (card.type === 'creature') {
+        value += card.atk * 2.5;
+        value += card.hp * 1.2;
+        value -= card.cost * 0.4;
+      } else {
+        if (card.id === 'constraint' && opp.field.length > 0) {
+          const strongest = opp.field.reduce((a, b) => a.atk > b.atk ? a : b);
+          value += strongest.atk * 3 + strongest.currentHp;
+        }
+        if (card.id === 'gravity' && me.field.length > 0) {
+          value += me.field.length * 4;
+        }
+        if (card.id === 'versions' && me.field.length > 0) {
+          const damaged = me.field.filter(c => c.currentHp < c.maxHp);
+          value += damaged.length * 3 + me.field.filter(c => c.summonedTurn === state.turn).length * 2;
+        }
+        value -= card.cost * 0.4;
+      }
+      if (me.hp < 8 && card.type === 'creature' && card.hp >= 3) value += 4;
+      return { value, name: card.name };
+    },
+  });
+
+  const result = evalConstraint(cb);
+  if (result._contradiction) return null;
+  result.worlds.sort((a, b) => b.value - a.value);
+  if (result.worlds[0].value < 0) return null;
+  return { card: playable[result.worlds[0].cardIdx], evaluation: result.worlds[0], total: result.worlds.length };
+}
+
+function aiThinkAttack(state) {
+  const me = state.opponent;
+  const opp = state.player;
+  const ready = me.field.filter(c => c.summonedTurn !== state.turn && !c.attackedThisTurn && c.currentHp > 0);
+  if (ready.length === 0) return null;
+
+  const attacker = ready[0];
+  const targets = [
+    ...opp.field.map(c => ({ kind: 'creature', uid: c.uid, ref: c })),
+    { kind: 'face', ref: { hp: opp.hp } },
+  ];
+  const cb = constraintBlock({
+    id: 'ai-attack-' + state.turn + '-' + attacker.uid,
+    axes: ['targetIdx'],
+    values: { targetIdx: targets.map((_, i) => i) },
+    derive: (combo) => {
+      const t = targets[combo.targetIdx];
+      let value = 0;
+      if (t.kind === 'face') {
+        value += attacker.atk * 4;
+        if (attacker.atk >= opp.hp) value += 100;
+      } else {
+        const c = t.ref;
+        if (attacker.atk >= c.currentHp) value += c.atk * 3 + c.currentHp + 5;
+        if (c.atk >= attacker.currentHp) value -= attacker.atk * 2;
+        if (attacker.atk < c.currentHp && attacker.currentHp > c.atk) value += 2;
+      }
+      return { value, kind: t.kind };
+    },
+  });
+
+  const result = evalConstraint(cb);
+  if (result._contradiction) return null;
+  result.worlds.sort((a, b) => b.value - a.value);
+  if (result.worlds[0].value <= 0) return null;
+  const best = result.worlds[0];
+  const target = targets[best.targetIdx];
+  return { attacker, target, evaluation: best };
+}
+
+// ============================================================
+// Render
+// ============================================================
+function render() {
+  const s = getState();
+
+  document.querySelector('#opponent-hp .hp-fill').style.width = `${(s.opponent.hp / 20) * 100}%`;
+  document.querySelector('#opponent-hp .hp-text').textContent = `${s.opponent.hp} / 20`;
+  document.querySelector('#opponent-mana').textContent = `${s.opponent.mana} / ${s.opponent.maxMana}`;
+  document.querySelector('#player-hp .hp-fill').style.width = `${(s.player.hp / 20) * 100}%`;
+  document.querySelector('#player-hp .hp-text').textContent = `${s.player.hp} / 20`;
+  document.querySelector('#player-mana').textContent = `${s.player.mana} / ${s.player.maxMana}`;
+
+  const oppField = document.querySelector('#opponent-field');
+  const playerField = document.querySelector('#player-field');
+  oppField.innerHTML = '';
+  playerField.innerHTML = '';
+  oppField.classList.toggle('empty', s.opponent.field.length === 0);
+  playerField.classList.toggle('empty', s.player.field.length === 0);
+
+  for (const c of s.opponent.field) {
+    oppField.appendChild(renderCreature(c, 'opponent', s.turn));
+  }
+  for (const c of s.player.field) {
+    playerField.appendChild(renderCreature(c, 'player', s.turn));
+  }
+
+  const handEl = document.querySelector('#player-hand');
+  handEl.innerHTML = '';
+  s.player.hand.forEach((card) => {
+    const el = renderCard(card, s.player.mana < card.cost, s.activePlayer === 'player');
+    handEl.appendChild(el);
+  });
+
+  const logEl = document.querySelector('#log');
+  logEl.innerHTML = s.log.slice(-10).map(line => {
+    let cls = 'log-entry';
+    if (line.includes('dmg') || line.includes('damage')) cls += ' damage';
+    if (line.includes('Heal') || line.includes('restore')) cls += ' heal';
+    if (line.includes('summon')) cls += ' summon';
+    if (line.includes('⚔️') || line.includes('Counter')) cls += ' combat';
+    if (line.includes('AI:') || line.includes('thinking')) cls += ' thinking';
+    if (line.includes('Battle') || line.includes('Turn')) cls += ' system';
+    return `<div class="${cls}">${line}</div>`;
+  }).join('');
+  logEl.scrollTop = logEl.scrollHeight;
+
+  document.querySelector('#status').textContent =
+    s.over ? (s.over === 'win' ? '🎉 Victory!' : '💀 Defeat...') :
+    s.activePlayer === 'player' ? `Turn ${s.turn} — Your turn` : `Turn ${s.turn} — AI thinking`;
+
+  document.querySelector('#undo').disabled = stateBlock.versions.length < 3 || s.activePlayer !== 'player' || s.over;
+  const endBtn = document.querySelector('#end-turn');
+  endBtn.disabled = s.activePlayer !== 'player' || s.over;
+  const noPlayable = !s.player.hand.some(c => c.cost <= s.player.mana);
+  const noAttackers = !s.player.field.some(c => c.summonedTurn !== s.turn && !c.attackedThisTurn && c.currentHp > 0);
+  const onlyEndTurn = noPlayable && noAttackers && s.activePlayer === 'player' && !s.over;
+  endBtn.classList.toggle('highlighted', onlyEndTurn);
+
+  if (s.over) showVictoryModal(s.over);
+}
+
+function renderCreature(c, who, currentTurn) {
+  const el = document.createElement('div');
+  const isMine = who === 'player';
+  const sick = c.summonedTurn === currentTurn;
+  const exhausted = c.attackedThisTurn;
+  const canAttack = isMine && !sick && !exhausted && getState().activePlayer === 'player' && !getState().over;
+  el.className = `creature ${who}` +
+    (sick ? ' summoning-sick' : '') +
+    (exhausted ? ' attacked-this-turn' : '') +
+    (canAttack ? ' can-attack' : '');
+  el.dataset.uid = c.uid;
+  el.dataset.who = who;
+  el.dataset.targetType = 'creature';
+  el.draggable = canAttack;
+  el.innerHTML = `
+    <div class="creature-icon">${c.icon}</div>
+    <div class="creature-name">${c.name}</div>
+    <div class="creature-stats">
+      <span class="stat-atk-display">⚔️${c.atk}</span>
+      <span class="stat-hp-display">❤️${c.currentHp}/${c.maxHp}</span>
+    </div>
+  `;
+  if (canAttack) {
+    el.addEventListener('dragstart', onCreatureDragStart);
+    el.addEventListener('dragend', onCreatureDragEnd);
+  }
+  if (who === 'opponent') {
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drop-target'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
+    el.addEventListener('drop', onCreatureDrop);
+  }
+  return el;
+}
+
+function renderCard(card, unaffordable, playable) {
+  const el = document.createElement('div');
+  const canPlay = !unaffordable && playable;
+  el.className = 'card' + (unaffordable ? ' unaffordable' : '') + (card.type === 'spell' ? ' spell' : '') + (canPlay ? ' draggable' : '');
+  const stats = card.type === 'creature'
+    ? `<div class="card-stats"><span class="stat-atk-display">⚔️ ${card.atk}</span><span class="stat-hp-display">❤️ ${card.hp}</span></div>`
+    : '';
+  el.innerHTML = `
+    <div class="card-cost">${card.cost}</div>
+    <div class="card-type-tag ${card.type}">${card.type === 'creature' ? 'UNIT' : 'SPELL'}</div>
+    <div class="card-name">${card.name}</div>
+    <div class="card-icon">${card.icon}</div>
+    <div class="card-effect">${card.effect}</div>
+    ${stats}
+  `;
+  el.dataset.cardId = card.id;
+  if (canPlay) {
+    el.addEventListener('click', onCardClick);
+    el.draggable = true;
+    el.addEventListener('dragstart', onCardDragStart);
+    el.addEventListener('dragend', onCardDragEnd);
+  }
+  return el;
+}
+
+async function onCardClick(e) {
+  const cardId = e.currentTarget.dataset.cardId;
+  const s = getState();
+  if (s.activePlayer !== 'player' || s.over) return;
+  const card = s.player.hand.find(c => c.id === cardId);
+  if (!card || s.player.mana < card.cost) return;
+  const newState = playCard(s, 'player', cardId);
+  commitState(newState, { played: cardId, by: 'player' });
+  if (cardId === 'gravity') gravityFlash();
+  render();
+  await animateLastEvent(newState);
+}
+
+function onCardDragStart(e) {
+  cardDragId = e.currentTarget.dataset.cardId;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', cardDragId);
+}
+function onCardDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  cardDragId = null;
+}
+function onCreatureDragStart(e) {
+  creatureDragUid = e.currentTarget.dataset.uid;
+  e.currentTarget.classList.add('dragging');
+  document.querySelector('#opponent-hp-area').classList.add('drop-target');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', creatureDragUid);
+}
+function onCreatureDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelector('#opponent-hp-area').classList.remove('drop-target');
+  document.querySelectorAll('.creature.drop-target').forEach(el => el.classList.remove('drop-target'));
+  creatureDragUid = null;
+}
+
+const playerFieldEl = document.querySelector('#player-field');
+playerFieldEl.addEventListener('dragover', e => {
+  if (cardDragId) e.preventDefault();
+});
+playerFieldEl.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (!cardDragId) return;
+  const s = getState();
+  if (s.activePlayer !== 'player' || s.over) { cardDragId = null; return; }
+  const card = s.player.hand.find(c => c.id === cardDragId);
+  if (!card || s.player.mana < card.cost) { cardDragId = null; return; }
+  const newState = playCard(s, 'player', cardDragId);
+  commitState(newState, { played: cardDragId, by: 'player' });
+  if (cardDragId === 'gravity') gravityFlash();
+  cardDragId = null;
+  render();
+  await animateLastEvent(newState);
+});
+
+const oppHpArea = document.querySelector('#opponent-hp-area');
+oppHpArea.addEventListener('dragover', e => {
+  if (creatureDragUid) e.preventDefault();
+});
+oppHpArea.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (!creatureDragUid) return;
+  const s = getState();
+  if (s.activePlayer !== 'player' || s.over) return;
+  const newState = attackFace(s, 'player', creatureDragUid);
+  commitState(newState, { attack: 'face', by: 'player' });
+  render();
+  await animateLastEvent(newState);
+});
+
+function onCreatureDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-target');
+  if (!creatureDragUid) return;
+  const targetUid = e.currentTarget.dataset.uid;
+  const s = getState();
+  if (s.activePlayer !== 'player' || s.over) return;
+  const newState = attackCreature(s, 'player', creatureDragUid, targetUid);
+  commitState(newState, { attack: 'creature', by: 'player' });
+  render();
+  animateLastEvent(newState);
+}
+
+function showVictoryModal(result) {
+  if (document.querySelector('.victory-modal')) return;
+  const el = document.createElement('div');
+  el.className = 'victory-modal';
+  el.innerHTML = `
+    <div class="victory-content ${result}">
+      <h2>${result === 'win' ? '🎉 Victory!' : '💀 Defeat...'}</h2>
+      <div style="margin: 12px 0; color: #555; font-weight: 700;">${stateBlock.versions.length} versions recorded</div>
+      <button onclick="document.querySelector('.victory-modal').remove(); window.__newGame();">Play Again</button>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+// ============================================================
+// Animations
+// ============================================================
+function showBattleMsg(text) {
+  const el = document.querySelector('#battle-msg');
+  el.textContent = text;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1200);
+}
+function floatNumberAt(x, y, num, type = 'damage') {
+  const el = document.createElement('div');
+  el.className = `float-num ${type}`;
+  el.textContent = type === 'damage' ? `-${num}` : `+${num}`;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1500);
+}
+function floatNumberOn(targetEl, num, type = 'damage') {
+  if (!targetEl) return;
+  const r = targetEl.getBoundingClientRect();
+  floatNumberAt(r.left + r.width / 2, r.top + r.height / 2, num, type);
+}
+function shakeHpBar(who) {
+  const el = document.querySelector(`#${who}-hp`);
+  if (!el) return;
+  el.classList.add('hp-shake');
+  setTimeout(() => el.classList.remove('hp-shake'), 400);
+}
+function gravityFlash() {
+  document.body.classList.add('gravity-active');
+  setTimeout(() => document.body.classList.remove('gravity-active'), 1500);
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function animateLastEvent(s) {
+  const e = s.lastEvent;
+  if (!e) return;
+  if (e.type === 'creature-vs-creature') {
+    const attacker = document.querySelector(`.creature[data-uid="${e.attackerUid}"]`);
+    const target = document.querySelector(`.creature[data-uid="${e.targetUid}"]`);
+    showBattleMsg(`${e.attackerIcon} ${e.attackerName} VS ${e.targetIcon} ${e.targetName}`);
+    if (attacker) attacker.classList.add('attacking');
+    await sleep(250);
+    if (target) {
+      target.classList.add('taking-damage');
+      floatNumberOn(target, e.dmgToTarget, 'damage');
+    }
+    if (attacker && e.dmgToAttacker > 0) {
+      floatNumberOn(attacker, e.dmgToAttacker, 'damage');
+      setTimeout(() => attacker.classList.add('taking-damage'), 100);
+    }
+    await sleep(400);
+    if (e.targetDied) {
+      const t = document.querySelector(`.creature[data-uid="${e.targetUid}"]`);
+      if (t) { t.classList.add('dying'); }
+      showBattleMsg(`💀 ${e.targetIcon} ${e.targetName} defeated!`);
+      await sleep(500);
+    }
+    if (e.attackerDied) {
+      const a = document.querySelector(`.creature[data-uid="${e.attackerUid}"]`);
+      if (a) { a.classList.add('dying'); }
+      if (!e.targetDied) showBattleMsg(`💀 ${e.attackerIcon} ${e.attackerName} defeated!`);
+      await sleep(500);
+    }
+  } else if (e.type === 'face-attack') {
+    showBattleMsg(`${e.attackerIcon} ${e.attackerName} → Direct Hit!`);
+    const hpEl = document.querySelector(`#${e.targetWho}-hp`);
+    floatNumberOn(hpEl, e.dmg, 'damage');
+    shakeHpBar(e.targetWho);
+    await sleep(500);
+  } else if (e.type === 'summon') {
+    showBattleMsg(`${e.icon} ${e.name} summoned!`);
+    await sleep(400);
+  } else if (e.type === 'spell-destroy') {
+    showBattleMsg(`🌀 ${e.target.icon} ${e.target.name} destroyed!`);
+    await sleep(600);
+  } else if (e.type === 'spell-buff') {
+    showBattleMsg(`🌌 Gravity Field! ${e.count} units +2 ATK`);
+    gravityFlash();
+    await sleep(700);
+  } else if (e.type === 'spell-heal') {
+    showBattleMsg(`⏪ Versions! All restored!`);
+    document.querySelectorAll(`#${e.who}-field .creature`).forEach(c => floatNumberOn(c, '✓', 'heal'));
+    await sleep(600);
+  }
+}
+
+// ============================================================
+// Game flow
+// ============================================================
+async function endTurn() {
+  let s = getState();
+  if (s.activePlayer !== 'player' || s.over) return;
+
+  s.activePlayer = 'opponent';
+  s.turn += 1;
+  s.opponent.maxMana = Math.min(10, s.opponent.maxMana + 1);
+  s.opponent.mana = s.opponent.maxMana;
+  s.opponent.field.forEach(c => c.attackedThisTurn = 0);
+  if (s.opponent.deck.length > 0) s.opponent.hand.push(s.opponent.deck.shift());
+  s.log.push(`--- Turn ${s.turn}: AI's turn ---`);
+  commitState(s, { turnStart: 'opponent' });
+  render();
+
+  document.querySelector('#status').innerHTML = `🤖 AI thinking<span class="thinking-dots"></span>`;
+  await sleep(700);
+
+  let loops = 0;
+  while (loops++ < 6) {
+    s = getState();
+    if (s.over) break;
+    const decision = aiThinkCard(s);
+    if (!decision) break;
+    s.log.push(`💭 AI: "${decision.card.icon}${decision.card.name}" (value ${decision.evaluation.value.toFixed(1)} / ${decision.total} options)`);
+    const updated = playCard(s, 'opponent', decision.card.id);
+    commitState(updated, { played: decision.card.id, by: 'opponent' });
+    if (decision.card.id === 'gravity') gravityFlash();
+    render();
+    await animateLastEvent(updated);
+    if (updated.over) return;
+    await sleep(500);
+  }
+
+  loops = 0;
+  while (loops++ < 8) {
+    s = getState();
+    if (s.over) break;
+    const decision = aiThinkAttack(s);
+    if (!decision) break;
+    let updated;
+    if (decision.target.kind === 'face') {
+      updated = attackFace(s, 'opponent', decision.attacker.uid);
+    } else {
+      updated = attackCreature(s, 'opponent', decision.attacker.uid, decision.target.uid);
+    }
+    commitState(updated, { attack: decision.target.kind, by: 'opponent' });
+    render();
+    await animateLastEvent(updated);
+    if (updated.over) return;
+    await sleep(400);
+  }
+
+  s = getState();
+  if (s.over) return;
+  s.activePlayer = 'player';
+  s.turn += 1;
+  s.player.maxMana = Math.min(10, s.player.maxMana + 1);
+  s.player.mana = s.player.maxMana;
+  s.player.field.forEach(c => c.attackedThisTurn = 0);
+  if (s.player.deck.length > 0) s.player.hand.push(s.player.deck.shift());
+  s.log.push(`--- Turn ${s.turn}: Your turn ---`);
+  commitState(s, { turnStart: 'player' });
+  render();
+}
+
+function undo() {
+  if (stateBlock.versions.length < 3) return;
+  for (let i = stateBlock.versions.length - 2; i >= 0; i--) {
+    const m = stateBlock.versions[i].meta;
+    if (m && m.turnStart === 'player') {
+      stateBlock.rollback(i);
+      const s = getState();
+      s.log.push(`⏪ Rolled back to version #${i + 1}`);
+      commitState(s);
+      render();
+      return;
+    }
+  }
+}
+
+function showRules() {
+  if (document.querySelector('.rules-modal')) return;
+  const el = document.createElement('div');
+  el.className = 'victory-modal rules-modal';
+  el.innerHTML = `
+    <div class="victory-content" style="max-width: 620px; text-align: left; max-height: 85vh; overflow-y: auto;">
+      <h2 style="text-align: center; color: #1976d2; font-size: 28px;">⚡ Rules</h2>
+      <div style="font-size: 14px; line-height: 1.7; color: #2d3748; font-weight: 600;">
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">🎯 Goal</p>
+        <p style="margin-left: 14px;">Reduce opponent's HP to 0 (you lose if yours hits 0).</p>
+
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">🎴 Two card types</p>
+        <p style="margin-left: 14px;">
+          🟦 <b>Unit</b>: Summoned to the field, attacks each turn.<br>
+          🟪 <b>Spell</b>: Instant effect (destroy / heal / buff).
+        </p>
+
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">🎮 Controls</p>
+        <p style="margin-left: 14px;">
+          • <b>Click a card</b>: play it (summon or cast)<br>
+          • <b>Drag your unit → enemy unit</b>: trade damage (both take ATK)<br>
+          • <b>Drag your unit → enemy HP bar</b>: direct face damage
+        </p>
+
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">⚡ Action rules</p>
+        <p style="margin-left: 14px;">
+          • Mana grows by +1 per turn (max 10)<br>
+          • <b>Summoning sick (💤)</b>: can't attack the turn it was summoned<br>
+          • Each unit attacks once per turn<br>
+          • When nothing else to do, the End Turn button glows
+        </p>
+
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">🌟 Spell details</p>
+        <p style="margin-left: 14px;">
+          🌀 <b>Constraint Folding</b> (2): Destroy 1 enemy creature<br>
+          🌌 <b>Gravity Field</b> (2): All your creatures gain +2 ATK (permanent)<br>
+          ⏪ <b>Versions</b> (4): Heal all + remove summoning sickness
+        </p>
+
+        <p style="color: #d84315; font-weight: 900; margin-top: 12px; font-size: 16px;">💡 v2 philosophy in action</p>
+        <p style="margin-left: 14px; color: #455a64;">
+          • <b>constraintBlock</b>: The AI evaluates all possible plays and picks the best (Constraint Folding axiom)<br>
+          • <b>Block.versions</b>: Each turn's board is a new version; Undo uses rollback<br>
+          • <b>Zero markers</b>: Only JS syntax expresses structure
+        </p>
+
+        <p style="text-align: center; margin-top: 24px;">
+          <button onclick="document.querySelector('.rules-modal').remove();">Got it!</button>
+        </p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => {
+    if (e.target === el) el.remove();
+  });
+}
+
+window.__newGame = () => { newGame(); render(); };
+document.querySelector('#end-turn').addEventListener('click', endTurn);
+document.querySelector('#undo').addEventListener('click', undo);
+document.querySelector('#reset').addEventListener('click', () => {
+  document.querySelector('.victory-modal')?.remove();
+  newGame(); render();
+});
+document.querySelector('#rules').addEventListener('click', showRules);
+
+newGame();
+render();
+</script>
+</body>
+</html>

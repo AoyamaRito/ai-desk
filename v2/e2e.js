@@ -1115,6 +1115,56 @@ group('Virtual Heavy Function', () => {
     const heavy1 = virtualHeavy(g, 'm:fn:c', { depth: 1 });
     assert.equal(heavy1.length, 3);  // c + b + a
   });
+
+  // MANUAL §4.5/§4.7: content が head と同一なら新 version は作らない
+  test('virtualApply: content 同一なら新 version 作らない (unchanged)', () => {
+    const g = fixture();
+    const heavy = virtualHeavy(g, 'm:fn:c');
+    const before = heavy.map(b => b.versions.length);
+    const segments = heavy.map(b =>
+      `// --- BLOCK: ${b.id} (${b.type}) ---\n${b.content}\n`
+    ).join('\n');
+    const updates = virtualApply(g, 'm:fn:c', segments);
+    const after = heavy.map(b => b.versions.length);
+    assert.equal(updates.length, 3);
+    for (const u of updates) assert.equal(u.action, 'unchanged');
+    assert.deepEqual(before, after);  // versions 数は不変
+  });
+
+  // MANUAL §4.5/§4.6: expand → そのまま virtualApply で全 unchanged(編集なし round-trip)
+  test('virtualApply: expand 出力をそのまま戻すと全 unchanged', () => {
+    const g = fixture();
+    const before = ['m:fn:a', 'm:fn:b', 'm:fn:c'].map(id => g.get(id).versions.length);
+    const expanded = expandVirtualHeavy(g, 'm:fn:c');
+    const updates = virtualApply(g, 'm:fn:c', expanded);
+    const after = ['m:fn:a', 'm:fn:b', 'm:fn:c'].map(id => g.get(id).versions.length);
+    for (const u of updates) assert.equal(u.action, 'unchanged');
+    assert.deepEqual(before, after);
+  });
+
+  // MANUAL §4.5/§4.8 #6: 入力中の // refs: // tags: 行は除去され、refs/tags は head から継承
+  test('virtualApply: // refs: / // tags: 行は無視され head から継承', () => {
+    const g = fixture();
+    const c = g.get('m:fn:c');
+    const originalRefs = c.refs.map(r => `${r.kind}:${r.target}`).sort();
+    const originalTags = [...c.tags].sort();
+    const patch =
+`// --- BLOCK: m:fn:c (function) ---
+// tags: BOGUS_TAG_THAT_SHOULD_BE_IGNORED
+// refs: calls->NONEXISTENT_TARGET
+function c(){ return b() + 999; }
+`;
+    const updates = virtualApply(g, 'm:fn:c', patch);
+    const cAfter = g.get('m:fn:c');
+    assert.equal(cAfter.content, 'function c(){ return b() + 999; }');
+    assert.equal(updates.find(u => u.id === 'm:fn:c').action, 'updated');
+    // refs / tags は元のまま(head 継承)
+    assert.deepEqual(
+      cAfter.refs.map(r => `${r.kind}:${r.target}`).sort(),
+      originalRefs,
+    );
+    assert.deepEqual([...cAfter.tags].sort(), originalTags);
+  });
 });
 
 // ============================================================

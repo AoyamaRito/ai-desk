@@ -29,7 +29,7 @@ In AI-facing code, locality is the highest-priority design principle. Splitting 
 
 ## 0.15 Condition Folding
 
-Prefer designs where complex conditional logic (nested if/else, switch chains) is **folded into a pure function** that returns the result in one shot.
+Prefer designs where complex conditional logic (nested if/else, switch chains) is **folded into a pure function** that returns the result in one shot. By holding complexity as a "data structure" in bulk, we maximize the **cognitive grounding** for the AI.
 
 1. **Eliminate the branch tree**:
    Instead of evaluating conditions sequentially as branches, hold them in bulk as a **data structure** and derive results by filtering and mapping. Branches are cognitive splits for AI and produce path combinatorial explosions.
@@ -332,6 +332,12 @@ Declare the execution-layer / Twin correspondence at the top of the file or in a
 ```
 
 This lets the AI auto-decide "when one is edited, sync-update the other."
+
+---
+**Version**: 3.5 (Final Architecture Edition)
+**Date**: 2026-05-01
+**Author**: Hiroyuki OKINOI / Pen name: Aoyama Rito (蒼山りと)
+te the other."
 
 ---
 **Version**: 3.5 (Final Architecture Edition)

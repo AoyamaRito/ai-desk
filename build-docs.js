@@ -34,7 +34,10 @@ if (!Array.isArray(config.documents) || config.documents.length === 0) {
 }
 
 // ---- Phase 1: ai-desk check on all sources (drift / corruption fence).
-const aiDeskPath = path.resolve(__dirname, 'ai-desk.js');
+let aiDeskPath = path.resolve(__dirname, 'ai-desk.js');
+if (!fs.existsSync(aiDeskPath)) {
+  aiDeskPath = path.resolve(__dirname, 'v2', 'ai-desk.js');
+}
 const sources = [...new Set(config.documents.map(d => d.source))];
 for (const src of sources) {
   const srcPath = path.resolve(__dirname, src);

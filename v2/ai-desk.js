@@ -1,4 +1,4 @@
-// ai-desk-v2.js
+// ai-desk.js
 // All-as-Block, Versions-as-Body architecture
 //
 // 思想:
@@ -1417,11 +1417,11 @@ export function observationBlock({ id, observedId, snapshot, tags = [] }) {
 // ============================================================
 //
 // 使い方:
-//   node ai-desk-v2.js                    -- self-test
-//   node ai-desk-v2.js skeleton <file>    -- ファイルの Block 構造を表示
-//   node ai-desk-v2.js focus <file> <id>  -- 特定 Block の内容を表示
-//   node ai-desk-v2.js graph <file...>    -- 複数ファイルから Graph 抽出して JSON 出力
-//   node ai-desk-v2.js impact <file> <id> -- ある Block を変更したときの影響範囲
+//   node ai-desk.js                    -- self-test
+//   node ai-desk.js skeleton <file>    -- ファイルの Block 構造を表示
+//   node ai-desk.js focus <file> <id>  -- 特定 Block の内容を表示
+//   node ai-desk.js graph <file...>    -- 複数ファイルから Graph 抽出して JSON 出力
+//   node ai-desk.js impact <file> <id> -- ある Block を変更したときの影響範囲
 
 const isMain =
   typeof process !== 'undefined' &&
@@ -1467,9 +1467,9 @@ function runCommand(cmd, args) {
       break;
     }
     case 'self': {
-      // 自己読み込みテスト: ai-desk-v2.js が ai-desk-v2.js を解析する
+      // 自己読み込みテスト: ai-desk.js が ai-desk.js を解析する
       const me = new URL(import.meta.url).pathname;
-      const blocks = parseJS(readFileSync(me, 'utf8'), 'ai-desk-v2');
+      const blocks = parseJS(readFileSync(me, 'utf8'), 'ai-desk');
       console.log(`self-parse: ${blocks.length} blocks extracted from ${me}`);
       for (const b of blocks) {
         const callOut = b.refs.filter(r => r.kind === 'calls').length;
@@ -1479,7 +1479,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'tag': {
-      // タグでフィルタ: node ai-desk-v2.js tag <file> <tag>
+      // タグでフィルタ: node ai-desk.js tag <file> <tag>
       if (!args[0] || !args[1]) return console.error('usage: tag <file> <tag>');
       const blocks = parseJS(readFileSync(args[0], 'utf8'), args[0]);
       const g = new Graph(blocks);
@@ -1491,7 +1491,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'save': {
-      // node ai-desk-v2.js save <out.json> <files...>
+      // node ai-desk.js save <out.json> <files...>
       if (args.length < 2) return console.error('usage: save <out.json> <files...>');
       const [out, ...files] = args;
       const g = buildAndSave(files, out);
@@ -1499,7 +1499,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'load': {
-      // node ai-desk-v2.js load <in.json>
+      // node ai-desk.js load <in.json>
       if (!args[0]) return console.error('usage: load <in.json>');
       const g = loadGraph(args[0]);
       console.log(`loaded ${g.all().length} blocks from ${args[0]}`);
@@ -1507,7 +1507,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'search': {
-      // node ai-desk-v2.js search <file> <query>
+      // node ai-desk.js search <file> <query>
       if (!args[0] || !args[1]) return console.error('usage: search <file> <query>');
       const g = loadProject([args[0]]);
       const hits = g.search(args[1]);
@@ -1518,7 +1518,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'diff': {
-      // node ai-desk-v2.js diff <file> <id> [i] [j]
+      // node ai-desk.js diff <file> <id> [i] [j]
       if (!args[0] || !args[1]) return console.error('usage: diff <file> <id> [i] [j]');
       const g = loadProject([args[0]]);
       const b = g.get(args[1]);
@@ -1530,7 +1530,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'blame': {
-      // node ai-desk-v2.js blame <file> <id> <ref-target>
+      // node ai-desk.js blame <file> <id> <ref-target>
       if (!args[0] || !args[1] || !args[2]) {
         return console.error('usage: blame <file> <id> <ref-target>');
       }
@@ -1542,7 +1542,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'apply': {
-      // node ai-desk-v2.js apply <graph.json> <patch.js> <moduleId>
+      // node ai-desk.js apply <graph.json> <patch.js> <moduleId>
       if (args.length < 3) return console.error('usage: apply <graph.json> <patch.js> <moduleId>');
       const [graphPath, patchPath, moduleId] = args;
       const g = loadGraph(graphPath);
@@ -1553,7 +1553,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'apply-block': {
-      // node ai-desk-v2.js apply-block <graph.json> <block-id> <patch-file>
+      // node ai-desk.js apply-block <graph.json> <block-id> <patch-file>
       // patch-file は関数1個分のソース。-- を渡すと stdin から読む
       if (args.length < 3) return console.error('usage: apply-block <graph.json> <block-id> <patch-file|->');
       const [graphPath, blockId, patchSrc] = args;
@@ -1568,7 +1568,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'resolve': {
-      // node ai-desk-v2.js resolve <graph.json>
+      // node ai-desk.js resolve <graph.json>
       if (!args[0]) return console.error('usage: resolve <graph.json>');
       const g = loadGraph(args[0]);
       const resolved = resolveImports(g);
@@ -1578,7 +1578,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'lint': {
-      // node ai-desk-v2.js lint <file> [--only=K1,K2] [--summary]
+      // node ai-desk.js lint <file> [--only=K1,K2] [--summary]
       if (!args[0]) return console.error('usage: lint <file> [--only=K1,K2] [--summary]');
       const opts = {};
       let summary = false;
@@ -1607,7 +1607,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'export': {
-      // node ai-desk-v2.js export <graph.json> <moduleId> [out.js]
+      // node ai-desk.js export <graph.json> <moduleId> [out.js]
       if (args.length < 2) return console.error('usage: export <graph.json> <moduleId> [out.js]');
       const [graphPath, moduleId, outPath] = args;
       const g = loadGraph(graphPath);
@@ -1621,7 +1621,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'stats': {
-      // node ai-desk-v2.js stats <file>
+      // node ai-desk.js stats <file>
       if (!args[0]) return console.error('usage: stats <file>');
       const g = loadProject([args[0]]);
       const s = graphStats(g);
@@ -1629,7 +1629,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'heavy': {
-      // node ai-desk-v2.js heavy <file> <root-id> [--depth=N]
+      // node ai-desk.js heavy <file> <root-id> [--depth=N]
       // 仮想重厚関数を展開して stdout に出す(LLM に渡す用)
       if (args.length < 2) return console.error('usage: heavy <file> <root-id> [--depth=N]');
       const [file, rootId, ...rest] = args;
@@ -1643,7 +1643,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'virtual-apply': {
-      // node ai-desk-v2.js virtual-apply <graph.json> <root-id> <patch-file>
+      // node ai-desk.js virtual-apply <graph.json> <root-id> <patch-file>
       // patch-file は expand したフォーマットで戻されたもの。BLOCK ヘッダで分割される。
       if (args.length < 3) return console.error('usage: virtual-apply <graph.json> <root-id> <patch-file>');
       const [graphPath, rootId, patchPath] = args;
@@ -1656,7 +1656,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'mermaid': {
-      // node ai-desk-v2.js mermaid <file> [--kind=...] [--type=...]
+      // node ai-desk.js mermaid <file> [--kind=...] [--type=...]
       if (!args[0]) return console.error('usage: mermaid <file> [--kind=K] [--type=T]');
       const opts = {};
       for (const a of args.slice(1)) {
@@ -1668,7 +1668,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'infer-tags': {
-      // node ai-desk-v2.js infer-tags <file> <id>
+      // node ai-desk.js infer-tags <file> <id>
       if (args.length < 2) return console.error('usage: infer-tags <file> <id>');
       const [file, id] = args;
       const g = loadProject([file]);
@@ -1680,7 +1680,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'context': {
-      // node ai-desk-v2.js context <file> <blockId> [depth]
+      // node ai-desk.js context <file> <blockId> [depth]
       if (args.length < 2) return console.error('usage: context <file> <blockId> [depth]');
       const [file, blockId, depthArg] = args;
       const g = loadProject([file]);
@@ -1694,7 +1694,7 @@ function runCommand(cmd, args) {
       break;
     }
     case 'tags': {
-      // 全タグの一覧と件数: node ai-desk-v2.js tags <file>
+      // 全タグの一覧と件数: node ai-desk.js tags <file>
       if (!args[0]) return console.error('usage: tags <file>');
       const blocks = parseJS(readFileSync(args[0], 'utf8'), args[0]);
       const tagCount = new Map();
@@ -1714,7 +1714,7 @@ function runCommand(cmd, args) {
 }
 
 function runSelfTest() {
-  console.log('=== ai-desk-v2 self-test ===\n');
+  console.log('=== ai-desk self-test ===\n');
 
   const a = new Block({ id: 'a', type: 'function' });
   a.commit({ content: 'function a(){}' });

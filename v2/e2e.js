@@ -1,4 +1,4 @@
-// e2e.js — ai-desk-v2 の end-to-end テスト
+// e2e.js — ai-desk の end-to-end テスト
 // 純JS、Zero-Dep。Node 標準の node:assert と node:child_process のみ使用。
 
 import { strict as assert } from 'node:assert';
@@ -16,7 +16,7 @@ import {
   virtualHeavy, expandVirtualHeavy, virtualApply,
   constraintBlock, evalConstraint,
   observationBlock,
-} from './ai-desk-v2.js';
+} from './ai-desk.js';
 
 const TMP = './e2e-tmp';
 let pass = 0, fail = 0;
@@ -83,7 +83,7 @@ group('Block', () => {
     const v1 = b.commit({ content: 'x' });
     // 異なる timestamp を保証するため少し時間を置く処理が必要だが、
     // ミリ秒解像度なので連続 commit だと同じ timestamp になる
-    // → ai-desk-v2 で解決必要(後述)
+    // → ai-desk で解決必要(後述)
     const v2 = b.commit({ content: 'y' });
     if (v1.timestamp !== v2.timestamp) {
       assert.equal(b.at(v1.timestamp).content, 'x');
@@ -356,7 +356,7 @@ export function foo() { return 42; }
 // ============================================================
 group('CLI', () => {
   function run(args) {
-    return execSync(`node ai-desk-v2.js ${args}`, { encoding: 'utf8' });
+    return execSync(`node ai-desk.js ${args}`, { encoding: 'utf8' });
   }
 
   test('self-test 実行', () => {
@@ -1118,11 +1118,11 @@ group('Virtual Heavy Function', () => {
 });
 
 // ============================================================
-// 7. 自己読み込み(ai-desk-v2.js が ai-desk-v2.js を解析)
+// 7. 自己読み込み(ai-desk.js が ai-desk.js を解析)
 // ============================================================
 group('Self-parse', () => {
   test('自分自身を Block に分解できる', () => {
-    const src = readFileSync('./ai-desk-v2.js', 'utf8');
+    const src = readFileSync('./ai-desk.js', 'utf8');
     const blocks = parseJS(src, 'self');
     const g = new Graph(blocks);
     assert.ok(g.byType('function').length > 5);

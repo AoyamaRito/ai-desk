@@ -1,9 +1,9 @@
-# ai-desk-v2
+# ai-desk
 
 **All-as-Block, Versions-as-Body** — AI-native code management.
 
-> 思想の正典は [`BIBLE_v2.md`](./BIBLE_v2.md)。
-> LLM が作業する時のルールは [`AI_ONBOARDING_v2.md`](./AI_ONBOARDING_v2.md)。
+> 思想の正典は [`BIBLE.md`](./BIBLE.md)。
+> LLM が作業する時のルールは [`AI_ONBOARDING.md`](./AI_ONBOARDING.md)。
 
 ai-desk(v1)の原理を**単一の抽象(Block)**に畳み込んだ実装。
 コード片・ドキュメント・制約・観測 — すべてを **Block** として扱い、
@@ -15,19 +15,19 @@ ai-desk(v1)の原理を**単一の抽象(Block)**に畳み込んだ実装。
 
 ```bash
 # v1/v2 どちらの JS ファイルでも、構造を Block に分解できる
-node ai-desk-v2.js skeleton ../ai-desk/ai-desk.js
+node ai-desk.js skeleton ../ai-desk/ai-desk.js
 
 # 関数・クラス・モジュールのグラフ構造を JSON 1ファイルに永続化
-node ai-desk-v2.js save graph.json src/*.js
+node ai-desk.js save graph.json src/*.js
 
 # 「この関数を変えたら何に影響する?」(forward/backward の推移閉包)
-node ai-desk-v2.js impact src/foo.js src/foo.js:fn:bar
+node ai-desk.js impact src/foo.js src/foo.js:fn:bar
 
 # content 検索(type/tag で絞り込み可)
-node ai-desk-v2.js search src/foo.js 'TODO'
+node ai-desk.js search src/foo.js 'TODO'
 
-# 自己読み込み(ai-desk-v2.js が ai-desk-v2.js を解析する)
-node ai-desk-v2.js self
+# 自己読み込み(ai-desk.js が ai-desk.js を解析する)
+node ai-desk.js self
 
 # テスト走らせる(61 tests, all green)
 npm test
@@ -37,7 +37,7 @@ npm test
 
 ---
 
-## 設計の核心(BIBLE_v2 より抜粋)
+## 設計の核心(BIBLE より抜粋)
 
 ### 1. Block = 統一単位
 
@@ -100,7 +100,7 @@ JS の構文(`function` / `class` / `const x = () => ...` / `import`)を `parseJ
 
 | コマンド | 用途 |
 |---|---|
-| `node ai-desk-v2.js` | self-test(動作確認) |
+| `node ai-desk.js` | self-test(動作確認) |
 | `skeleton <file>` | Block 構造を表示 |
 | `focus <file> <id>` | 特定 Block の content を表示 |
 | `graph <files...>` | 複数ファイルから Graph 抽出 → JSON 出力 |
@@ -129,7 +129,7 @@ import {
   applyPatch, resolveImports,
   constraintBlock, evalConstraint,
   observationBlock,
-} from './ai-desk-v2.js';
+} from './ai-desk.js';
 ```
 
 ### Constraint Folding(Block 化された)
@@ -182,11 +182,11 @@ v1 のコードは何の変更もせずに v2 で読める。
 
 ```bash
 # v1 のコードを v2 で解析(マーカーは tags に自動取り込み)
-node ai-desk-v2.js save v1-graph.json ../ai-desk/ai-desk.js ../ai-desk/action-demos.js
-node ai-desk-v2.js load v1-graph.json
+node ai-desk.js save v1-graph.json ../ai-desk/ai-desk.js ../ai-desk/action-demos.js
+node ai-desk.js load v1-graph.json
 ```
 
-詳細は [`BIBLE_v2.md`](./BIBLE_v2.md) §9「v1 → v2 の移行指針」。
+詳細は [`BIBLE.md`](./BIBLE.md) §9「v1 → v2 の移行指針」。
 
 ---
 

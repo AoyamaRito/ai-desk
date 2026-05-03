@@ -1,17 +1,17 @@
-# AI Onboarding v2 — LLM が ai-desk-v2 で作業するときのルール
+# AI Onboarding v2 — LLM が ai-desk で作業するときのルール
 
-このドキュメントは LLM(Claude / GPT / Gemini 等)が `ai-desk-v2` 上で
+このドキュメントは LLM(Claude / GPT / Gemini 等)が `ai-desk` 上で
 コードを生成・編集・解析するときに守るべき規律をまとめる。
 
 人間向けの解説ではない。LLM 専用。
-読んだら即適用する。`BIBLE_v2.md` を補完する運用マニュアル。
+読んだら即適用する。`BIBLE.md` を補完する運用マニュアル。
 
 ---
 
 ## 0. 最初に把握する情報
 
-1. **`BIBLE_v2.md`** — 思想の正典。公理 A0〜A7 を守る。
-2. **`ai-desk-v2.js`** — 唯一の実装ファイル(コア + CLI)。Block・Graph・parseJS が定義されている。
+1. **`BIBLE.md`** — 思想の正典。公理 A0〜A7 を守る。
+2. **`ai-desk.js`** — 唯一の実装ファイル(コア + CLI)。Block・Graph・parseJS が定義されている。
 3. **`e2e.js`** — 61 テストケース。新機能を追加したらここに 1 テスト以上追加する。
 4. **`package.json`** — `npm test` で e2e 実行、`type: "module"`(ESM)。
 
@@ -135,7 +135,7 @@ group('新機能名', () => {
 
 ## 7. CLI コマンド追加のルール
 
-`ai-desk-v2.js` の `runCommand()` に case を追加する:
+`ai-desk.js` の `runCommand()` に case を追加する:
 
 ```js
 case 'mycommand': {
@@ -148,7 +148,7 @@ case 'mycommand': {
 そして:
 1. デフォルトケース(`'commands: ...'` の出力)に `mycommand` を追加。
 2. e2e の CLI グループにテストを追加(`run('mycommand ...')`)。
-3. `README_v2.md` のコマンド表に行を追加。
+3. `REFERENCE.md` のコマンド表に行を追加。
 
 ---
 
@@ -166,7 +166,7 @@ case 'mycommand': {
 Constraint を Block にする:
 
 ```js
-import { constraintBlock, evalConstraint } from './ai-desk-v2.js';
+import { constraintBlock, evalConstraint } from './ai-desk.js';
 
 const cb = constraintBlock({
   id: 'shipping',
@@ -241,11 +241,11 @@ observationBlock({
 
 ## 13. このドキュメント自体の更新
 
-ai-desk-v2 で運用が進むにつれ、新しい禁忌や規約が必要になる。
+ai-desk で運用が進むにつれ、新しい禁忌や規約が必要になる。
 気づいた LLM/人間は **このファイルに追記** すること。
 更新は通常の commit で `docs(onboarding): ...` 形式で。
 
 ---
 
 **Date**: 2026-05-03(初版)
-**正典**: [`BIBLE_v2.md`](./BIBLE_v2.md)
+**正典**: [`BIBLE.md`](./BIBLE.md)

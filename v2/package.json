@@ -1,12 +1,12 @@
 {
-  "name": "ai-desk-v2",
+  "name": "ai-desk",
   "version": "0.1.0",
   "description": "All-as-Block, Versions-as-Body — AI-native code management",
   "type": "module",
-  "main": "ai-desk-v2.js",
+  "main": "ai-desk.js",
   "scripts": {
     "test": "node e2e.js",
-    "self": "node ai-desk-v2.js self"
+    "self": "node ai-desk.js self"
   },
   "license": "MIT",
   "private": true

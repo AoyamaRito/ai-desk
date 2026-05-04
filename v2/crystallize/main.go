@@ -35,6 +35,10 @@ func main() {
 		parseHelperHarness()
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "--phase5" {
+		parseJSHarness()
+		return
+	}
 	cases := []testCase{
 		{
 			Name:  "empty version",

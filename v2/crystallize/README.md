@@ -1,4 +1,4 @@
-# crystallize — Phase 1+2+3+4 prototype
+# crystallize — Phase 1+2+3+4+5 prototype
 
 ai-desk v2 の Block を Go にネイティブ翻訳する仕組み(Crystallization)の最初の検証。
 **A9 Crystallization Compliance** の実証 phase。
@@ -128,6 +128,41 @@ parseJS は ~80 行で複雑だが、helper はすべて crystal 側にあるの
 
 ---
 
+## Phase 5 — parseJS 本体翻訳
+
+REAL = `ai-desk-core.js` の `parseJS(source, moduleId)`。
+JS で source code を function / class / arrow / import に分解する核 parser(~80 行)。
+
+SHADOW = `parsejs.go` の `ParseJS(source, moduleId string) []ParseResult`。
+
+### 結果
+
+**10/10 全件一致**(対象は flat ParseResult 比較、Block の version chain は対象外)。
+
+### 翻訳の決定事項(transcription contract 重要)
+
+JS regex の **lookbehind** `(?<=[;}{])` は Go RE2 非対応:
+- 書き換え: `(^|[;}{])` で boundary char を capture group 1 として consume する形式に変更
+- match start 位置は capture 1 の長さ分ずれるので、`jsLikeStart()` で JS の m.index 相当に補正
+
+JS regex の `/m` flag(行頭マッチ):
+- Go では default で `^` は input 先頭のみ、`(?m)` flag で行頭マッチ有効化
+- inline tags 直前の関数を取りこぼすので必須
+
+JS の `JSON.stringify` vs Go の `json.MarshalIndent`:
+- Go は default で `<` `>` `&` を Unicode escape(HTML 安全)
+- `json.NewEncoder + SetEscapeHTML(false)` で JS と同じ生 ASCII 出力に
+
+### 教訓
+
+- parseJS まで翻訳できた = ai-desk core の **「source → Block」変換ロジック全体**が
+  Go ネイティブで実行可能になった
+- crystallize は単なる翻訳ではなく、**JS と Go の文法差を contract として明示**する作業。
+  lookbehind / multiline / JSON escape の差は AI 翻訳で必ず引っかかるので、
+  人間と AI が共有する translation contract として記録された
+
+---
+
 ## 使い方
 
 ```bash
@@ -152,6 +187,11 @@ diff js3.json go3.json
 ./crystallize --phase4 --emit-cases | node verify-phase4.js > js4.json
 ./crystallize --phase4 --emit-go-results > go4.json
 diff js4.json go4.json
+
+# Phase 5 — parseJS 本体
+./crystallize --phase5 --emit-cases | node verify-phase5.js > js5.json
+./crystallize --phase5 --emit-go-results > go5.json
+diff js5.json go5.json
 ```
 
 ## 構成
@@ -160,8 +200,9 @@ diff js4.json go4.json
 - `sameops.go` — Phase 2 SHADOW
 - `jsanalysis.go` — Phase 3 SHADOW
 - `parsehelpers.go` — Phase 4 SHADOW
-- `main.go` — dispatch (no-arg / --phase2 / --phase3 / --phase4)
-- `sameops_cases.go` / `jsanalysis_cases.go` / `parsehelpers_cases.go` — cases / harness
-- `verify.js` / `verify-phase2.js` / `verify-phase3.js` / `verify-phase4.js` — JS 側検証
+- `parsejs.go` — Phase 5 SHADOW
+- `main.go` — dispatch (no-arg / --phase2 ~ --phase5)
+- `*_cases.go` — phase 別 cases / harness
+- `verify.js` / `verify-phaseN.js` — JS 側検証
 - `go.mod` — module 定義
 

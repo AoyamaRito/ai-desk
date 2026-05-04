@@ -20,9 +20,25 @@ export const mesh = {
 export const state = {
   rotSpeed: -0.012,    // 反時計回り(cube と区別)
   age: 0,
+  pulse: 0,
+  lastClickWorldPos: null,
 };
 
 export function transition(state, event) {
-  if (event.kind === 'tick') return { ...state, age: state.age + 1 };
+  if (event.kind === 'tick') {
+    return {
+      ...state,
+      age: state.age + 1,
+      pulse: state.pulse > 0 ? state.pulse - 0.04 : 0,
+    };
+  }
+  if (event.kind === 'click') {
+    return {
+      ...state,
+      rotSpeed: -state.rotSpeed,
+      pulse: 1,
+      lastClickWorldPos: event.worldPos,
+    };
+  }
   return state;
 }

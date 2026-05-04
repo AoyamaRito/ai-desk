@@ -30,13 +30,28 @@ export const mesh = {
 export const state = {
   rotSpeed: 0.01,           // rad/tick(internal scalar、coord 系外)
   age: 0,                   // tick count(internal)
+  pulse: 0,                 // click pulse(0→1 で減衰、scale 効果用)
+  lastClickWorldPos: null,  // inter-Block 共有値: world coord([x,y,z])
 };
 
 // ─── 畳込み遷移関数(pure) ─────────────────────────────────────────
 // state, event → newState。副作用なし、A0/A4 整合。
 export function transition(state, event) {
   if (event.kind === 'tick') {
-    return { ...state, age: state.age + 1 };
+    return {
+      ...state,
+      age: state.age + 1,
+      pulse: state.pulse > 0 ? state.pulse - 0.03 : 0,
+    };
+  }
+  if (event.kind === 'click') {
+    // 反転 + pulse、click 位置を world coord で記録(inter-Block 共有可能)
+    return {
+      ...state,
+      rotSpeed: -state.rotSpeed,
+      pulse: 1,
+      lastClickWorldPos: event.worldPos,
+    };
   }
   return state;
 }

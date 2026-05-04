@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { loadPrefab } from './prefabLoader.js';
+import { setupInput } from './input.js';
 import * as cube from './assets/cube.asset.js';
 import * as boxGlb from './assets/box-glb.asset.js';
 
@@ -29,13 +30,40 @@ const [cubeHandle, boxHandle] = await Promise.all([
 
 const handles = [cubeHandle, boxHandle];
 
+// 入力 adapter 設置(A10 境界): mouse → ray cast → world hit → dispatch
+setupInput(canvas, camera, handles);
+
+// 60 frame ごとに ai-eyes に prefab state を送る(AI 観測 boundary)。
+// screen coord は使わず、各 prefab の id / age / rotSpeed / pulse / lastClickWorldPos のみ。
+let frameCount = 0;
+function reportToAiEyes() {
+  if (typeof window.aiEyes?.sendStructure !== 'function') return;
+  const snapshot = handles.map(h => {
+    const s = h.getState();
+    return {
+      id: h.mesh.userData.prefabId,
+      worldPos: h.mesh.position.toArray(),
+      state: { age: s.age, rotSpeed: s.rotSpeed, pulse: +s.pulse.toFixed(3), lastClickWorldPos: s.lastClickWorldPos },
+    };
+  });
+  window.aiEyes.sendStructure({ kind: 'prefab-state', frame: frameCount, prefabs: snapshot });
+}
+
 function tick() {
   for (const h of handles) {
     h.dispatch({ kind: 'tick' });
     const s = h.getState();
     h.mesh.rotation.y = s.age * s.rotSpeed;
+
+    // click pulse を scale で表現(intra-Block 視覚効果)
+    const baseScale = h.mesh.userData.baseScale ?? h.mesh.scale.x;
+    h.mesh.userData.baseScale = baseScale;
+    const pulseScale = baseScale * (1 + s.pulse * 0.3);
+    h.mesh.scale.setScalar(pulseScale);
   }
   renderer.render(scene, camera);
+  frameCount++;
+  if (frameCount % 60 === 0) reportToAiEyes();
   requestAnimationFrame(tick);
 }
 tick();

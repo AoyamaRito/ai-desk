@@ -18,7 +18,7 @@
 // 他 v2 ツールから:
 //   `import { Kernel, Axioms, BlockSchema } from './AiRunAndRead_BIBLE.js'`
 
-export const VERSION = "2.7";
+export const VERSION = "2.8";
 export const DATE = "2026-05-04";
 export const AUTHOR = "沖井広行(蒼山りと)";
 
@@ -153,32 +153,47 @@ export const Axioms = {
   },
   A10: {
     id: "A10", name: "Single Coordinate Domain",
-    summary: "Block の state / 入力 / UI / render input はすべて world coord で表現する。screen coord は render output と input adapter 境界でのみ存在し、内部に侵入させない。OS resource(text input / file picker / permission / network)は modal dialog 経由で値返却し、world と coord 共存させない。",
+    summary:
+      "**inter-Block / scene-level** の state / 入力 / UI / render input は world coord で表現する。" +
+      "**intra-Block(asset.js 内部の mesh.vertices / bone offset / 内部 anchor 等)は local coord OK** — 境界は `asset.transform`(local → world 変換器)。" +
+      "screen coord は render output と input adapter 境界でのみ存在し、Block 状態に侵入させない。OS resource(text input / file picker / permission / network)は modal dialog 経由で値返却し、world と coord 共存させない。",
     why:
       "voxel editor 3 試行(2026-05-03)が失敗した根本原因は、CSS 3D の parent-relative transform が world-coord 統一と原理的に喧嘩したこと。" +
       "world / model / screen / canvas pixel / DOM event の coord が混在すると、Block 間の意味論が coord 系ごとに分裂し、A0(認知非対称性)・A1(ローカリティ極大)・A5(All-as-Block)が同時に破れる。" +
       "world coord 統一を axiom として強制すると、CSS 3D / DOM transform / 画面座標 UI 等の選択肢が構造的に弾かれ、WebGL / three.js / WebGPU 系の scene graph 中心実装に自動収束する。" +
+      "ただし intra-Block(asset.js 内部)は local coord を許す — そうしないと頂点 / bone / 内部 anchor を世界原点固定でしか書けなくなり、A5(All-as-Block: 各 Block は内部に閉じた coord 空間を持つ)が破れる。" +
       "screen coord は render output(world → screen)と入力 adapter(screen → world ray)の **境界変換**でのみ存在する。OS resource は modal dialog で「world から外に出る → 値を持って戻る」形に統一し、coord の常時共存を排除する。",
+    boundaries: {
+      "inter-Block / scene": "world coord 必須(asset.transform.position, refs target との位置関係, 入力 ray hit, HUD ortho world coord)",
+      "intra-Block / asset.js": "local coord OK(mesh.vertices, bones, 内部 pivot, 内部 anim、すべて asset 原点基準)",
+      "asset.transform": "境界変換器(local → world)、ここで初めて world coord に乗る",
+      "screen": "render output と input adapter の boundary でのみ存在(Block 内部 / Block 間 ともに不可侵)",
+      "OS resource": "modal dialog で値返却(text input / file / permission / network)、world と並走しない",
+    },
     examples: [
-      "OK: 各 asset Block が world transform + state を持ち、scene graph に並ぶ",
+      "OK(intra): asset.js の mesh.vertices = [[0,1,0],[1,0,0],...] (asset 原点基準 local)",
+      "OK(intra): asset.js の bones = [{name:'head', offset:[0,1.6,0]}] (asset 内部 local)",
+      "OK(inter): export const transform = { position:[5,0,0], rotation:[0,Math.PI,0], scale:1 } (world)",
+      "OK(inter): 他 asset と共有する位置は state.lastWorldPos に world coord で持つ",
       "OK: HUD は camera-following ortho camera が見る world 領域(右上 HP バー = ortho world (0.95, 0.95))",
       "OK: マウス入力 → ray cast → world hit → Block state へ渡す",
       "OK: text input が必要な場面は modal dialog → string 返却 → world に戻る",
       "NG: CSS 3D で transform を parent-relative に書く(world-coord 統一不能)",
-      "NG: screen pixel 座標を Block state に持ち込む",
-      "NG: 「画面座標で書きたいから」だけの理由で coord 系を分裂させる",
+      "NG: screen pixel 座標を Block state に持ち込む(asset 内 / 間 共に不可)",
+      "NG: 他 asset 参照を local coord で書く(world coord 必須)",
     ],
     violations: [
+      "inter-Block 通信(他 asset 参照 / refs / event payload)に local coord を使う",
       "Block state / event payload に screen / canvas / pixel coord を持つ",
       "CSS 3D / DOM transform を render path に使う(parent-relative で world 統一不能)",
       "input handler が ray cast 経由せず screen coord で直接 Block を変える",
       "HUD を world geometry でなく独立 DOM overlay として書く(world と coord 系が常時並走)",
     ],
-    refs: ["A0","A1","A5","Vocabulary.crystallize","memo:2026-05-04_voxel-failure"],
+    refs: ["A0","A1","A5","Vocabulary.crystallize","Vocabulary.world-coord","Vocabulary.prefab","memo:2026-05-04_voxel-failure"],
     enforcementNote:
       "敗因が voxel 3 試行で明示された後の正典化 — 3D / 2D / game / tool すべてに共通する coord 戦略。" +
       "実装 engine は world-coord scene graph を持つもの(WebGL / three.js / WebGPU)に強制収束、CSS 3D は永久封印。" +
-      "Block prefab(asset js module)は world transform + state + 畳込み遷移関数の triple で表現される。",
+      "Block prefab(asset js module)は world transform + state + 畳込み遷移関数の triple で表現される — transform が境界、内部は local が自然。",
   },
 };
 
@@ -324,20 +339,20 @@ export const Vocabulary = {
       note: "5 段フロー: REAL(JS) → TRANSCRIPTION(AI 翻訳) → SHADOW(Go source) → COMPILE(go build) → CRYSTAL(native binary)。AI が中間段の翻訳者。JIT が「泥道を走りながらアスファルト敷く」のに対し、結晶化は「隣に最高級高速道路を建設」する事前 AOT。",
     },
     "world-coord": {
-      meaning: "Block の state / 入力 / UI / render input が共通で住む唯一の coord 系。screen coord は境界変換でのみ存在。",
+      meaning: "**inter-Block / scene-level** の state / 入力 / UI / render input が共通で住む唯一の coord 系。intra-Block(asset.js 内部)は local coord OK、境界は asset.transform。screen coord は境界変換でのみ存在。",
       replaces: "model / view / screen / canvas / DOM coord の混在",
       etymology: "world(世界)+ coord(座標)。3D scene graph で標準的な「scene 全体の絶対座標系」。",
-      operation_vector: "coord 分裂 → 単一 domain  (voxel 失敗を構造的に弾く軸)",
+      operation_vector: "coord 分裂 → 単一 domain (inter-Block レベル)、intra は local 許容で実装可能性を保つ",
       axiom_ref: ["A10"],
       note: "WebGL / three.js / WebGPU の scene graph 中心実装に強制収束。CSS 3D / DOM transform は永久封印。HUD は ortho camera が見る world 領域として実装。",
     },
     prefab: {
-      meaning: "Block の game asset 形態 — world transform + state + 畳込み遷移関数の triple",
+      meaning: "Block の game asset 形態 — world transform + state + 畳込み遷移関数の triple。内部(mesh.vertices, bones, 内部 anchor)は local coord、transform が local → world の境界変換器。",
       replaces: "object / entity / GameObject(Unity 的概念の Block 化)",
       etymology: "pre + fabricate(あらかじめ作る)。Unity の prefab(再利用可能な game object テンプレート)から借用、ai-desk Block 思想に整合する形に再定義。",
       operation_vector: "汎用 Block → 3D / 2D asset 特化  (A5 All-as-Block を game domain で具体化)",
       axiom_ref: ["A5","A10"],
-      note: "asset js module 1 個 = 1 prefab。export で公開、state は object literal、遷移は pure function、world transform は core code 側が管理。",
+      note: "asset js module 1 個 = 1 prefab(`name.asset.js`)。export で公開、内部は local coord、外部に出す位置(transform.position, state の inter-Block 共有値)は world coord。遷移は pure function。",
     },
   },
   avoid: [

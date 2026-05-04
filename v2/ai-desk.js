@@ -14,7 +14,10 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve as pathResolve } from 'node:path';
-import { Kernel } from './AiRunAndRead_BIBLE.js';
+import {
+  Axioms, BlockTypes, Taboos, Vocabulary,
+  Kernel as BibleKernel, VERSION as BIBLE_VERSION,
+} from './AiRunAndRead_BIBLE.js';
 
 // ============================================================
 // Version — Block の状態スナップショット(これが REAL)
@@ -1588,24 +1591,31 @@ function runCommand(cmd, args) {
       break;
     }
     case 'bible-info': {
-      // node ai-desk.js bible-info
-      // Bible の情報を表示(AiRunAndRead_BIBLE.js から取得)
-      console.log(Kernel.summonContext([], { examples: false, spotlight: false }));
+      // node ai-desk.js bible-info — 9 公理 / 7 BlockTypes / 7 Taboos / Vocabulary 一覧
+      console.log(`BIBLE.js version: ${BIBLE_VERSION}`);
+      console.log(`Axioms (${Object.keys(Axioms).length}):`);
+      for (const a of Object.values(Axioms)) console.log(`  ${a.id} ${a.name}`);
+      console.log(`Block types (${Object.keys(BlockTypes).length}):`);
+      for (const [k, t] of Object.entries(BlockTypes)) console.log(`  ${k}: ${t.purpose}`);
+      console.log(`Taboos (${Taboos.length}): ${Taboos.map(t => t.name).join(', ')}`);
+      console.log(`Vocabulary: use new terms, avoid old ones`);
+      for (const [k, v] of Object.entries(Vocabulary.use)) {
+        console.log(`  ${k.padEnd(8)} ← ${v.replaces}  (${v.meaning})`);
+      }
       break;
     }
     case 'bible-check': {
-      // node ai-desk.js bible-check <file>
-      // 指定したファイルの Bible 違反を診断
+      // node ai-desk.js bible-check <file> — Kernel.diagnose で違反検出 (exit 1 if ok:false)
       if (!args[0]) return console.error('usage: bible-check <file>');
-      const res = Kernel.diagnose(readFileSync(args[0], 'utf8'), args[0]);
+      const res = BibleKernel.diagnose(readFileSync(args[0], 'utf8'), args[0]);
       console.log(JSON.stringify(res, null, 2));
       if (!res.ok) process.exit(1);
       break;
     }
     case 'bible-summon': {
-      // node ai-desk.js bible-summon <axiomIds...>
-      // 指定した公理に基づく重力場 prompt を生成
-      process.stdout.write(Kernel.summonContext(args, { spotlight: true }));
+      // node ai-desk.js bible-summon <axiomIds...> — 重力場 prompt 生成
+      const ids = args.length ? args : ['A0', 'A4', 'A5', 'A6', 'A8'];
+      process.stdout.write(BibleKernel.summonContext(ids, { spotlight: true }));
       break;
     }
     case 'tag': {

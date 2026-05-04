@@ -161,6 +161,15 @@ refs: A4, A6, Bible§4.1.1
 enforcement: 規律は validate 関数で守らない。`#SPEC#` tag の存在/不在 + prevHash chain 構造そのものが enforcement(§4.1.1)。
 
 
+---
+## 🚨 概念の再定義：クリアファイ (Clearify)
+ai-desk において、振る舞いを変えずに構造を調整する行為を**「リファクタリング」と呼ばない**。
+代わりに**「クリアファイ (Clearify)」**と呼ぶ。
+
+- **目的**: 論理の濁り（不透明性）を消し、推論の軌道をクリアにすること。
+- **手段**: 隠された依存を `refs` として物質化し、情報の近接性（Locality）を高め、重力場を強化すること。
+- **結果**: AI が推測（ハルシネーション）を必要とせず、論理を一意に特定できる状態へ導く。
+
 ## 3. Block Schema
 ### Block
 id / type / meta / versions(append-only)
@@ -188,6 +197,27 @@ Block.versions の要素。1 つの commit を表す不変 record。
 - **observation** — AI-Eyes の観測スナップショットを Block として保存(canvas frame, state JSON, draw_ops 等) (BIBLE.md §7)
 - **twin** — 効率層(GPU 等)と並走する検証層(CPU twin)を refs で結ぶ複式数学 (BIBLE.md §8)
 - **virtualHeavy** — 複数 Block を 1 つの content に展開して LLM に渡し、編集後に逆配分(virtual-apply)で再分散する (BIBLE.md §6 (仮想重厚関数), MANUAL §4.5〜4.9)
+
+## 3.5 Vocabulary(用語の重力場)
+用語は思考のレール。レールを引き直さないと公理の方向に走れない。code review / commit メッセージ / discussion で旧用語を使うと、意識が自動的に隠匿方向に引っ張られる。新用語を使うと展開方向に引っ張られる。
+
+### 使う用語(置換)
+- **clarify** — 隠匿を晴らす、不明瞭を消す  _(replaces: refactor, refs: A0, A7)_
+- **densify** — 情報密度を上げる(展開・明示で)  _(replaces: DRY 化, refs: A1, A7)_
+- **align** — Bible 公理に整合させる  _(replaces: clean code, refs: 全公理)_
+- **expose** — 隠れているものを表面化  _(replaces: abstraction, refs: A0, A1)_
+- **unfold** — 折りたたまれた抽象を広げる  _(replaces: simplify, refs: A0, A7)_
+
+### 使わない用語
+- **~~refactor~~** — 「人間が読みやすくする」前提が公理 A0 違反方向。代わりに clarify / unfold / densify。
+- **~~DRY~~** — 重複削除は隠れた依存を生む。代わりに densify(展開で密度を上げる)。
+- **~~clean code~~** — 「綺麗」の暗黙基準が人間優先。代わりに align(公理整合)。
+- **~~abstraction~~** — 層を増やす操作は隠匿。代わりに expose(表面化)。
+- **~~simplify~~** — 情報削減は LLM にとって毒。代わりに unfold(展開)。
+- **~~encapsulate~~** — 閉じ込めは隠匿の同義語。代わりに expose / unfold。
+- **~~pretty-print~~** — 「美しさ」の人間基準は無視、機械可読性のみ評価。
+
+完全置換でなく、旧用語を見たら新用語に翻訳する習慣を育てる。他者(同僚 / 客 / コミュニティ)が refactor と言う時、それを clarify / unfold のどちらかとして解釈し直す。
 
 ## 4. Sacred Taboos
 ### 1. No TypeScript

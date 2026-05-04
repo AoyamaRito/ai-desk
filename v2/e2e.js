@@ -406,10 +406,17 @@ group('CLI', () => {
     assert.ok(out.includes('Block.versions が本体'));
   });
 
-  test('bible-info shows axioms / block types / taboos from BIBLE.js', () => {
+  test('bible-info shows axioms / block types / taboos / vocabulary', () => {
     const out = run('bible-info');
-    assert.ok(out.includes('CONTEXT_GRAVITY_FIELD'));
-    assert.ok(out.includes('Physics.Gravity'));
+    assert.ok(out.includes('BIBLE.js version'));
+    assert.ok(out.includes('A0 認知非対称性'));
+    assert.ok(out.includes('A4 Event Sourcing'));
+    assert.ok(out.includes('A8 Spec-First'));
+    assert.ok(out.includes('Block types'));
+    assert.ok(out.includes('Taboos'));
+    assert.ok(out.includes('Vocabulary'));
+    assert.ok(out.includes('clarify'));
+    assert.ok(out.includes('refactor'));
   });
 
   test('bible-check on clean file → ok:true', () => {

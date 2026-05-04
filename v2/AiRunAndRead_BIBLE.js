@@ -222,6 +222,41 @@ export const BlockTypes = {
 };
 
 // ============================================================
+// 第 3.5 層: Vocabulary(用語の重力場)
+//   人間優先 vocabulary は v2 思想と衝突する。「refactor」「DRY」「clean code」
+//   等の語は暗黙に「人間に読みやすく整える」方向のベクトルを持つ — これは
+//   公理 A0 違反方向。
+//   用語は思考のレールであって、レールを引き直さないと公理の方向に走れない。
+//   v2 では旧用語を使わず、置換用語(clarify / densify / align / expose / unfold)
+//   を canonical として使う。
+// ============================================================
+export const Vocabulary = {
+  use: {
+    clarify: { meaning: "隠匿を晴らす、不明瞭を消す",      replaces: "refactor",     axiom_ref: ["A0","A7"] },
+    densify: { meaning: "情報密度を上げる(展開・明示で)", replaces: "DRY 化",       axiom_ref: ["A1","A7"] },
+    align:   { meaning: "Bible 公理に整合させる",           replaces: "clean code",   axiom_ref: ["全公理"] },
+    expose:  { meaning: "隠れているものを表面化",           replaces: "abstraction",  axiom_ref: ["A0","A1"] },
+    unfold:  { meaning: "折りたたまれた抽象を広げる",       replaces: "simplify",     axiom_ref: ["A0","A7"] },
+  },
+  avoid: [
+    { term: "refactor",     reason: "「人間が読みやすくする」前提が公理 A0 違反方向。代わりに clarify / unfold / densify。" },
+    { term: "DRY",          reason: "重複削除は隠れた依存を生む。代わりに densify(展開で密度を上げる)。" },
+    { term: "clean code",   reason: "「綺麗」の暗黙基準が人間優先。代わりに align(公理整合)。" },
+    { term: "abstraction",  reason: "層を増やす操作は隠匿。代わりに expose(表面化)。" },
+    { term: "simplify",     reason: "情報削減は LLM にとって毒。代わりに unfold(展開)。" },
+    { term: "encapsulate",  reason: "閉じ込めは隠匿の同義語。代わりに expose / unfold。" },
+    { term: "pretty-print", reason: "「美しさ」の人間基準は無視、機械可読性のみ評価。" },
+  ],
+  principle:
+    "用語は思考のレール。レールを引き直さないと公理の方向に走れない。" +
+    "code review / commit メッセージ / discussion で旧用語を使うと、" +
+    "意識が自動的に隠匿方向に引っ張られる。新用語を使うと展開方向に引っ張られる。",
+  note:
+    "完全置換でなく、旧用語を見たら新用語に翻訳する習慣を育てる。" +
+    "他者(同僚 / 客 / コミュニティ)が refactor と言う時、それを clarify / unfold のどちらかとして解釈し直す。",
+};
+
+// ============================================================
 // 第 4 層: 守護聖域(Sacred Taboos)
 //   これは declarative な禁忌の表明であり、validator ではない(公理 A8 §4.1.1)。
 //   check 関数は「構造的に何が違反か」の概念表現として提供。
@@ -373,6 +408,14 @@ export const Kernel = {
     }
     out.push('');
 
+    out.push(`---`);
+    out.push(`## 🚨 概念の再定義：クリアファイ (Clearify)`);
+    out.push(`ai-desk において、振る舞いを変えずに構造を調整する行為を**「リファクタリング」と呼ばない**。`);
+    out.push(`代わりに**「クリアファイ (Clearify)」**と呼ぶ。\n`);
+    out.push(`- **目的**: 論理の濁り（不透明性）を消し、推論の軌道をクリアにすること。`);
+    out.push(`- **手段**: 隠された依存を \`refs\` として物質化し、情報の近接性（Locality）を高め、重力場を強化すること。`);
+    out.push(`- **結果**: AI が推測（ハルシネーション）を必要とせず、論理を一意に特定できる状態へ導く。\n`);
+
     out.push(`## 3. Block Schema`);
     for (const [name, s] of Object.entries(BlockSchema)) {
       out.push(`### ${name}`);
@@ -385,6 +428,16 @@ export const Kernel = {
       out.push(`- **${name}** — ${t.purpose}${t.refSection ? ` (${t.refSection})` : ''}`);
     }
     out.push('');
+
+    out.push(`## 3.5 Vocabulary(用語の重力場)`);
+    out.push(Vocabulary.principle + '\n');
+    out.push(`### 使う用語(置換)`);
+    for (const [k, v] of Object.entries(Vocabulary.use)) {
+      out.push(`- **${k}** — ${v.meaning}  _(replaces: ${v.replaces}, refs: ${v.axiom_ref.join(', ')})_`);
+    }
+    out.push(`\n### 使わない用語`);
+    for (const a of Vocabulary.avoid) out.push(`- **~~${a.term}~~** — ${a.reason}`);
+    out.push(`\n${Vocabulary.note}\n`);
 
     out.push(`## 4. Sacred Taboos`);
     for (const t of Taboos) {
@@ -444,6 +497,9 @@ if (typeof process !== 'undefined' && /AiRunAndRead_BIBLE\.js$/.test(process.arg
     for (const [name, t] of Object.entries(BlockTypes)) {
       console.log(`  - ${name}: ${t.purpose.slice(0, 60)}`);
     }
+
+    console.log(`\n[Vocabulary]  use new terms, avoid old ones`);
+    for (const [k, v] of Object.entries(Vocabulary.use)) console.log(`  ${k.padEnd(8)} ← ${v.replaces}`);
 
     console.log(`\n[Sacred Taboos]`);
     for (const t of Taboos) console.log(`  ${t.id}. ${t.name}`);

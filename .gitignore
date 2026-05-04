@@ -36,3 +36,6 @@ v2/MANUAL.md
 v2/go-cli/ai-desk
 v2/go-cli/ai-desk-*
 v2/go-cli/ai-desk-bundle.js
+
+# aijs runtime binary(都度 build)
+v2/aijs/aijs

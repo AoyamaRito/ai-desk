@@ -618,11 +618,12 @@ function pushBlock(arr, moduleId, type, name, content, tags = []) {
 
 // content の直前コメントから v1 emblem マーカーや @tags 注釈を抽出
 function extractInlineTags(source, declStart) {
-  // 直前の行を遡る(空行 or 該当行で停止)
+  // 直前の行を遡る(空行で停止 = コメントブロックの境界)
   const tags = new Set();
-  // declStart より上の改行までの 5 行を見る
+  // declStart より上の改行から 20 行まで見る
+  // (Bible §A8 の SPEC コメントが長文になるため、5 行では取りこぼしが出る — 2026-05-04)
   let lineEnd = source.lastIndexOf('\n', declStart - 1);
-  for (let i = 0; i < 5 && lineEnd > 0; i++) {
+  for (let i = 0; i < 20 && lineEnd > 0; i++) {
     const lineStart = source.lastIndexOf('\n', lineEnd - 1) + 1;
     const line = source.slice(lineStart, lineEnd);
     if (!line.trim()) break;

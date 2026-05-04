@@ -27,6 +27,10 @@ func main() {
 		sameOpsHarness()
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "--phase3" {
+		analysisHarness()
+		return
+	}
 	cases := []testCase{
 		{
 			Name:  "empty version",

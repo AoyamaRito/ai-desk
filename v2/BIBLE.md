@@ -202,20 +202,48 @@ Block.versions の要素。1 つの commit を表す不変 record。
 用語は思考のレール。レールを引き直さないと公理の方向に走れない。code review / commit メッセージ / discussion で旧用語を使うと、意識が自動的に隠匿方向に引っ張られる。新用語を使うと展開方向に引っ張られる。
 
 ### 使う用語(置換)
-- **clarify** — 隠匿を晴らす、不明瞭を消す  _(replaces: refactor, refs: A0, A7)_
-- **densify** — 情報密度を上げる(展開・明示で)  _(replaces: DRY 化, refs: A1, A7)_
-- **align** — Bible 公理に整合させる  _(replaces: clean code, refs: 全公理)_
-- **expose** — 隠れているものを表面化  _(replaces: abstraction, refs: A0, A1)_
-- **unfold** — 折りたたまれた抽象を広げる  _(replaces: simplify, refs: A0, A7)_
+- **clarify** — 隠匿を晴らす、不明瞭を消す
+  - replaces: `refactor`  ·  vector: `隠匿 → 明示`  ·  refs: A0, A7
+  - 語源: ラテン語 clarus(明るい・透明)。「透明にする」が原義。
+- **densify** — 情報密度を上げる(展開・明示で)
+  - replaces: `DRY 化`  ·  vector: `希薄 → 濃密`  ·  refs: A1, A7
+  - 語源: ラテン語 densus(密)。「密度を上げる」が原義。
+- **align** — Bible 公理に整合させる
+  - replaces: `clean code`  ·  vector: `ズレ → 整合`  ·  refs: 全公理
+  - 語源: ラテン語 ad-+ linea(線に沿わせる)。「軸に揃える」が原義。
+- **expose** — 隠れているものを表面化
+  - replaces: `abstraction`  ·  vector: `内部 → 表面`  ·  refs: A0, A1
+  - 語源: ラテン語 ex-+ ponere(外に置く)。「外に出して見せる」が原義。
+- **unfold** — 折りたたまれた抽象を広げる
+  - replaces: `simplify`  ·  vector: `圧縮 → 展開`  ·  refs: A0, A7
+  - 語源: 古英語 un-+ fealdan(折りを開く)。「畳まれたものを広げる」が原義。
 
-### 使わない用語
+### 使わない用語(語源レベルで分解・隠匿方向)
 - **~~refactor~~** — 「人間が読みやすくする」前提が公理 A0 違反方向。代わりに clarify / unfold / densify。
+  - 語源: factor(分解する) + re-。原義「再分解する」 = 細かい単位に分け直す。
+  - 操作方向: `統合 → 分解  (= 隠匿方向、A1 違反)`
+  - 由来: Martin Fowler 'Refactoring' (1999) が業界に広めた語。当時の前提『人間が読みやすく』が AI 時代に通用しなくなった、語自体が時代遅れ。
 - **~~DRY~~** — 重複削除は隠れた依存を生む。代わりに densify(展開で密度を上げる)。
+  - 語源: Don't Repeat Yourself(Hunt & Thomas, The Pragmatic Programmer 1999)。
+  - 操作方向: `重複 → 共有関数化  (= 隠れた依存生成、A1 違反)`
 - **~~clean code~~** — 「綺麗」の暗黙基準が人間優先。代わりに align(公理整合)。
+  - 語源: 「掃除された / 汚れがない」状態を意味する英単語、人間の美的判断。
+  - 操作方向: `汚い → 美しい  (= 美的基準は LLM に対し無効)`
 - **~~abstraction~~** — 層を増やす操作は隠匿。代わりに expose(表面化)。
+  - 語源: ラテン語 abs-+ trahere(引き離す)。「実体から引き離す」 = 詳細を捨てる操作。
+  - 操作方向: `実体 → 概念  (= 詳細喪失、A0 違反)`
 - **~~simplify~~** — 情報削減は LLM にとって毒。代わりに unfold(展開)。
+  - 語源: ラテン語 simplex(単一)。「単一化する = 多様性を捨てる」。
+  - 操作方向: `多様 → 単純  (= 情報削減、A7 違反)`
 - **~~encapsulate~~** — 閉じ込めは隠匿の同義語。代わりに expose / unfold。
+  - 語源: ラテン語 capsula(小さな箱)。「小さな箱に閉じ込める」が原義。
+  - 操作方向: `見える → 閉じる  (= 隠匿そのもの)`
 - **~~pretty-print~~** — 「美しさ」の人間基準は無視、機械可読性のみ評価。
+  - 語源: 「綺麗に印字する」=人間の視覚に最適化する装飾操作。
+  - 操作方向: `機械形 → 人間形  (= LLM にとって価値ゼロ)`
+
+#### 語源的洞察
+refactor / abstraction / encapsulate / simplify は **語源レベルで分解・隠匿の操作を意味している**。慣習で広まったから不適切なのでなく、**最初から AI 時代に逆向きの語**だった。Martin Fowler 'Refactoring'(1999)以降の vocabulary は、人間の作業記憶 7±2 に最適化された時代の遺物。AI に対しては **clarify(透明化)/ unfold(展開)/ densify(濃密化)/ expose(表面化)/ align(整合)** が 操作の方向ベクトルとして正しい。
 
 完全置換でなく、旧用語を見たら新用語に翻訳する習慣を育てる。他者(同僚 / 客 / コミュニティ)が refactor と言う時、それを clarify / unfold のどちらかとして解釈し直す。
 

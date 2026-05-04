@@ -343,8 +343,7 @@ function updateVoxelCursors(handles, hit) {
     const gp = h.mesh.position;
     cursor.position.set(cx - gp.x, cy - gp.y, cz - gp.z);
     cursor.visible = true;
-    // 色を state.currentColor に追従
-    const s = h.getState();
+    // 色を state.currentColor に追従(s は上で取得済み)
     const hex = (s.currentColor ?? 'hex:ff8844').replace(/^hex:/, '#');
     h.mesh.userData.voxelCursorMat.color.set(hex);
   }

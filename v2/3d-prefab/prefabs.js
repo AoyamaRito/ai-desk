@@ -5,8 +5,9 @@
 //   transform : { position: 'world:x,y,z', rotation: [rx,ry,rz], scale: number }
 //   mesh      : { kind, args?, material?, glbPath? }
 //   state     : object(coord 値は world / ortho 等の tagged string)
-//   behaviors : behavior id 配列(transition は behavior の合成で生成)
+//   flow      : { <eventKind>: [behaviorId, ...], scheduled?: [{at, behaviors}] }
 //
+// flow は heartbeat が読む LLM-friendly な event → behavior 列の object。
 // behaviors は pure functions、(state, event) → state。順に reduce で適用。
 // → 重複 transition コードを排除、A1 ローカリティ + A7 展開・明示 + A11 構造化。
 
@@ -97,11 +98,23 @@ export function compose(behaviorIds) {
   return (state, event) => fns.reduce((s, b) => b(s, event), state);
 }
 
+// flow + event.kind から「実行する behavior 列」を取り出して 1 transition にする。
+// flow.<event.kind> が無い event は no-op(state 不変)。
+export function transitionForEvent(prefab, event) {
+  const ids = prefab.flow?.[event.kind];
+  if (!ids || ids.length === 0) return (s) => s;
+  return compose(ids);
+}
+
 // ============================================================
 // Prefab data(全 prefab をここに並べる)
 // ============================================================
 
-const standardClickResponse = ['tickAge', 'pulseDecay', 'reverseRotOnClick', 'pulseOnClick', 'recordClickPos'];
+// 共通 click flow(disabled 旧 prefab 用)
+const standardFlow = {
+  tick:  ['tickAge', 'pulseDecay'],
+  click: ['reverseRotOnClick', 'pulseOnClick', 'recordClickPos'],
+};
 
 export const prefabs = {
   cube: {
@@ -109,8 +122,8 @@ export const prefabs = {
     transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
     mesh: { kind: 'BoxGeometry', args: [1, 1, 1], material: { kind: 'MeshNormalMaterial' } },
     state: { rotSpeed: 0.01, age: 0, pulse: 0, lastClickWorldPos: null },
-    behaviorIds: standardClickResponse,
-    disabled: true,   // voxel editor focus、不要
+    flow: standardFlow,
+    disabled: true,
   },
 
   boxGlb: {
@@ -118,7 +131,7 @@ export const prefabs = {
     transform: { position: w(2.5, 0, 0), rotation: [0, 0, 0], scale: 0.8 },
     mesh: { kind: 'glb', glbPath: './assets/box.glb' },
     state: { rotSpeed: -0.012, age: 0, pulse: 0, pulseDecay: 0.04, lastClickWorldPos: null },
-    behaviorIds: standardClickResponse,
+    flow: standardFlow,
     disabled: true,
   },
 
@@ -127,7 +140,7 @@ export const prefabs = {
     transform: { position: w(0, 0, -3), rotation: [0, 0, 0], scale: 1 },
     mesh: { kind: 'glb', glbPath: './assets/koma_hu.glb' },
     state: { rotSpeed: 0.005, age: 0, pulse: 0, pulseDecay: 0.025, lastClickWorldPos: null },
-    behaviorIds: standardClickResponse,
+    flow: standardFlow,
     optional: true,
     disabled: true,
   },
@@ -137,13 +150,16 @@ export const prefabs = {
     transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
     mesh: { kind: 'voxel-canvas', cellSize: 0.5, planeSize: 8, maxVoxels: 4096 },
     state: {
-      voxels: {},                       // key="world:x,y,z" → { color: "hex:RRGGBB" }
-      cellSize: 0.5,                    // intra: scalar(coord 系外、grid pitch)
-      tool: 'add',                      // 'add' | 'remove'
-      currentColor: 'hex:ff8844',       // tagged
+      voxels: {},
+      cellSize: 0.5,
+      tool: 'add',
+      currentColor: 'hex:ff8844',
       lastEditWorldPos: null,
     },
-    behaviorIds: ['addOrRemoveVoxelOnClick'],
+    flow: {
+      click: ['addOrRemoveVoxelOnClick'],
+      // tick / hover は adapter 側で処理(syncInstances / moveCursor は副作用なので Block 層外)
+    },
   },
 
   pointer: {
@@ -157,23 +173,20 @@ export const prefabs = {
       lastSourceId: null,
       age: 0,
     },
-    behaviorIds: ['tickAge', 'recordPeerTarget', 'lerpToTarget'],
+    flow: {
+      tick: ['tickAge', 'lerpToTarget'],
+      'peer-clicked': ['recordPeerTarget'],
+    },
     disabled: true,
   },
 
-  // character: AI 生成 GLB scaffold(default disabled、glb 置いて optional:false に)
   character: {
     id: 'character',
     transform: { position: w(-2.5, 0, 0), rotation: [0, 0, 0], scale: 1 },
     mesh: { kind: 'glb', glbPath: './assets/character.glb' },
     state: { rotSpeed: 0.008, age: 0, pulse: 0, pulseDecay: 0.025, lastClickWorldPos: null },
-    behaviorIds: standardClickResponse,
+    flow: standardFlow,
     optional: true,
-    disabled: true,   // import のみ、load しない(glb 置いたら false に)
+    disabled: true,
   },
 };
-
-// 各 prefab の transition 関数を build(behaviorIds → composed function)
-export function makeTransition(prefab) {
-  return compose(prefab.behaviorIds);
-}

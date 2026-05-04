@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { prefabs, makeTransition } from './prefabs.js';
+import { prefabs, transitionForEvent } from './prefabs.js';
 import { requireDomain, parseCoord } from './coord.js';
 
 // ============================================================
@@ -174,13 +174,17 @@ async function loadPrefab(prefab, scene) {
   scene.add(mesh);
 
   let state = prefab.state ?? {};
-  const transition = makeTransition(prefab);
 
   return {
     mesh,
     id: prefab.id,
+    prefab,                          // heartbeat が flow lookup するため保持
     getState: () => state,
-    dispatch: (event) => { state = transition(state, event); },
+    dispatch: (event) => {
+      // flow.<event.kind> を 1 回 build → state 更新(behavior 列を順次適用)
+      const t = transitionForEvent(prefab, event);
+      state = t(state, event);
+    },
   };
 }
 
@@ -332,16 +336,51 @@ const handles = (await Promise.all(
   }))
 )).filter(Boolean);
 
-function router(clicked, worldPos) {
-  const sourceId = clicked.id;
-  clicked.dispatch({ kind: 'click', worldPos });
-  for (const h of handles) {
-    if (h !== clicked) h.dispatch({ kind: 'peer-clicked', worldPos, sourceId });
+// ============================================================
+// heartbeat — Single Time Pump(全 mutation はここを通る)
+// ============================================================
+//
+// 構造:
+//   eventQueue     : FIFO 外部 event(click / async resolve)、heartbeat 内で drain
+//   scheduledQueue : { ...event, fireAt } 配列、fireAt 昇順、drain 条件 fireAt <= currentTick
+//   currentTick    : 単調増加 frame index、heartbeat 1 回ごとに +1
+//
+// flow ベース dispatch(prefab.flow.<event.kind> を引いて behavior 列を順次適用)。
+
+let currentTick = 0;
+const eventQueue = [];
+const scheduledQueue = [];
+
+export function pushEvent(event) {
+  eventQueue.push(event);
+}
+
+export function schedule(event, fireAt) {
+  scheduledQueue.push({ ...event, fireAt });
+  scheduledQueue.sort((a, b) => a.fireAt - b.fireAt);
+}
+
+function routeEvent(ev) {
+  // event に targetId が指定されてれば該当 handle、無ければ全 handle に流す
+  if (ev.targetId) {
+    const target = handles.find(h => h.id === ev.targetId);
+    if (target) target.dispatch(ev);
+  } else {
+    for (const h of handles) h.dispatch(ev);
+  }
+  // click は他 handle に peer-clicked を broadcast(inter-Block 通信)
+  if (ev.kind === 'click' && ev.targetId) {
+    for (const h of handles) {
+      if (h.id === ev.targetId) continue;
+      h.dispatch({ kind: 'peer-clicked', worldPos: ev.worldPos, sourceId: ev.targetId });
+    }
   }
 }
-setupInput(canvas, camera, handles, router);
 
-let frameCount = 0;
+setupInput(canvas, camera, handles, (clickedHandle, worldPos) => {
+  // heartbeat 経由で次 tick で処理
+  pushEvent({ kind: 'click', targetId: clickedHandle.id, worldPos });
+});
 
 function reportToAiEyes() {
   if (typeof window.aiEyes?.sendStructure !== 'function') return;
@@ -350,7 +389,7 @@ function reportToAiEyes() {
     worldPos: `world:${h.mesh.position.x.toFixed(3)},${h.mesh.position.y.toFixed(3)},${h.mesh.position.z.toFixed(3)}`,
     state: pickReportable(h.getState()),
   }));
-  window.aiEyes.sendStructure({ kind: 'prefab-state', frame: frameCount, prefabs: snapshot });
+  window.aiEyes.sendStructure({ kind: 'prefab-state', tick: currentTick, prefabs: snapshot });
 }
 
 // voxel-canvas: state.voxels(tagged dict)→ InstancedMesh 同期(boundary で parse)
@@ -400,19 +439,36 @@ function updateHud() {
   const vc = handles.find(h => h.id === 'voxel-canvas');
   const vs = vc?.getState();
   const lines = [
-    `frame: ${frameCount}`,
+    `tick: ${currentTick}`,
     vs ? `tool: ${vs.tool ?? 'add'}  color: ${vs.currentColor ?? '-'}` : '',
     vs ? `voxels: ${Object.keys(vs.voxels ?? {}).length}` : '',
     vs?.lastEditWorldPos ? `last: ${vs.lastEditWorldPos}` : '',
+    `q: ${eventQueue.length}/sched: ${scheduledQueue.length}`,
   ].filter(Boolean);
   hud.setInfo(lines);
 }
 
-function tick() {
-  for (const h of handles) {
-    h.dispatch({ kind: 'tick' });
-    const s = h.getState();
+function heartbeat() {
+  currentTick++;
 
+  // 1. scheduled queue から fireAt <= currentTick の event を eventQueue に流す
+  while (scheduledQueue.length && scheduledQueue[0].fireAt <= currentTick) {
+    eventQueue.push(scheduledQueue.shift());
+  }
+
+  // 2. eventQueue を drain(順次 routeEvent、peer-clicked broadcast 含む)
+  while (eventQueue.length) {
+    routeEvent(eventQueue.shift());
+  }
+
+  // 3. 全 handle に tick event 発火(prefab.flow.tick の behavior 列が走る)
+  for (const h of handles) {
+    h.dispatch({ kind: 'tick', tick: currentTick });
+  }
+
+  // 4. adapter 副作用(mesh の位置 / 回転 / scale を state から反映)
+  for (const h of handles) {
+    const s = h.getState();
     if (h.id === 'pointer' && s.currentWorldPos) {
       const [x, y, z] = requireDomain(s.currentWorldPos, 'world');
       h.mesh.position.set(x, y, z);
@@ -421,7 +477,6 @@ function tick() {
     } else {
       h.mesh.rotation.y = (s.age ?? 0) * (s.rotSpeed ?? 0);
     }
-
     if (h.id !== 'voxel-canvas') {
       const baseScale = h.mesh.userData.baseScale ?? h.mesh.scale.x;
       h.mesh.userData.baseScale = baseScale;
@@ -431,11 +486,10 @@ function tick() {
 
   controls.update();
   renderer.render(scene, camera);
-  if (frameCount % 6 === 0) updateHud();
+  if (currentTick % 6 === 0) updateHud();
   hud.render();
 
-  frameCount++;
-  if (frameCount % 60 === 0) reportToAiEyes();
-  requestAnimationFrame(tick);
+  if (currentTick % 60 === 0) reportToAiEyes();
+  requestAnimationFrame(heartbeat);
 }
-tick();
+heartbeat();

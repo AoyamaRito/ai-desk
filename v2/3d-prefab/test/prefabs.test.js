@@ -6,8 +6,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { prefabs, behaviors, compose, makeTransition } from '../prefabs.js';
+import { prefabs, behaviors, compose, transitionForEvent } from '../prefabs.js';
 import { w, l, s, o, parseCoord, requireDomain } from '../coord.js';
+
+// 旧 makeTransition 互換ヘルパー — flow.click を 1 回 transition として返す
+function makeClickTransition(prefab) {
+  const t = transitionForEvent(prefab, { kind: 'click' });
+  return (state, event) => t(state, event);
+}
+function makeTickTransition(prefab) {
+  const t = transitionForEvent(prefab, { kind: 'tick' });
+  return (state, event) => t(state, event);
+}
+function makePeerTransition(prefab) {
+  const t = transitionForEvent(prefab, { kind: 'peer-clicked' });
+  return (state, event) => t(state, event);
+}
 
 // ============================================================
 // coord.js — A11 Domain-Tagged Coordinates
@@ -112,55 +126,57 @@ test('compose: 不明な behavior id で throw', () => {
 });
 
 // ============================================================
-// 各 prefab の統合(makeTransition)
+// 各 prefab の統合(flow.tick / flow.click を transitionForEvent で取り出す)
 // ============================================================
 
 const dataPrefabs = ['cube', 'boxGlb', 'komaHu', 'character'];
 
 for (const key of dataPrefabs) {
   const p = prefabs[key];
-  const t = makeTransition(p);
+  const tickT  = makeTickTransition(p);
+  const clickT = makeClickTransition(p);
 
   test(`${p.id}: tick で age が +1 される`, () => {
-    const out = t(p.state, { kind: 'tick' });
+    const out = tickT(p.state, { kind: 'tick' });
     assert.equal(out.age, (p.state.age ?? 0) + 1);
   });
 
   test(`${p.id}: click で rotSpeed が反転`, () => {
-    const out = t(p.state, { kind: 'click', worldPos: w(1, 2, 3) });
+    const out = clickT(p.state, { kind: 'click', worldPos: w(1, 2, 3) });
     assert.equal(out.rotSpeed, -p.state.rotSpeed);
   });
 
   test(`${p.id}: click は pulse=1 と lastClickWorldPos(world tagged)を立てる`, () => {
     const wp = w(4.5, -1, 2.25);
-    const out = t(p.state, { kind: 'click', worldPos: wp });
+    const out = clickT(p.state, { kind: 'click', worldPos: wp });
     assert.equal(out.pulse, 1);
     assert.equal(out.lastClickWorldPos, wp);
-    // domain check
     assert.equal(parseCoord(out.lastClickWorldPos).domain, 'world');
   });
 
-  test(`${p.id}: 不明 event は state 不変`, () => {
+  test(`${p.id}: 不明 event は state 不変(flow.<unknown> 無し)`, () => {
+    const t = transitionForEvent(p, { kind: 'mystery' });
     assert.deepEqual(t(p.state, { kind: 'mystery' }), p.state);
   });
 
   test(`${p.id}: pure(初期 state を mutate しない)`, () => {
     const before = JSON.stringify(p.state);
-    t(p.state, { kind: 'tick' });
-    t(p.state, { kind: 'click', worldPos: w(0, 0, 0) });
+    tickT(p.state, { kind: 'tick' });
+    clickT(p.state, { kind: 'click', worldPos: w(0, 0, 0) });
     assert.equal(JSON.stringify(p.state), before);
   });
 }
 
 // ============================================================
-// pointer の inter-Block 通信
+// pointer の inter-Block 通信(flow.peer-clicked + flow.tick)
 // ============================================================
 
 const pointer = prefabs.pointer;
-const pointerT = makeTransition(pointer);
+const pointerPeer = makePeerTransition(pointer);
+const pointerTick = makeTickTransition(pointer);
 
 test('pointer: peer-clicked で targetWorldPos と lastSourceId 更新', () => {
-  const out = pointerT(pointer.state, {
+  const out = pointerPeer(pointer.state, {
     kind: 'peer-clicked',
     worldPos: w(3.5, 0.5, -1),
     sourceId: 'cube',
@@ -171,19 +187,20 @@ test('pointer: peer-clicked で targetWorldPos と lastSourceId 更新', () => {
 
 test('pointer: tick を繰り返すと target に収束する', () => {
   let st = { ...pointer.state, currentWorldPos: w(0, 0, 0), targetWorldPos: w(10, 0, 0) };
-  for (let i = 0; i < 200; i++) st = pointerT(st, { kind: 'tick' });
+  for (let i = 0; i < 200; i++) st = pointerTick(st, { kind: 'tick' });
   const cur = requireDomain(st.currentWorldPos, 'world');
   assert.ok(Math.abs(cur[0] - 10) < 0.01, `converged: ${cur[0]}`);
 });
 
-test('pointer: 自分宛て click は handler 無いので state 不変', () => {
-  const out = pointerT(pointer.state, { kind: 'click', worldPos: w(99, 99, 99) });
+test('pointer: 自分宛て click は flow に無いので state 不変', () => {
+  const t = transitionForEvent(pointer, { kind: 'click' });
+  const out = t(pointer.state, { kind: 'click', worldPos: w(99, 99, 99) });
   assert.deepEqual(out, pointer.state);
 });
 
 test('pointer: targetWorldPos が null のとき tick は currentWorldPos 不変', () => {
   const seeded = { ...pointer.state, currentWorldPos: w(1, 2, 3), targetWorldPos: null };
-  const out = pointerT(seeded, { kind: 'tick' });
+  const out = pointerTick(seeded, { kind: 'tick' });
   assert.equal(out.currentWorldPos, w(1, 2, 3));
 });
 
@@ -210,7 +227,7 @@ test('A11: pointer.state の coord 系 field はすべて world tagged または
 // ============================================================
 
 const voxel = prefabs.voxelCanvas;
-const voxelT = makeTransition(voxel);
+const voxelT = makeClickTransition(voxel);   // voxel canvas は flow.click のみ
 
 test('voxel: addOrRemoveVoxelOnClick で cell-center snap して voxels に add', () => {
   const out = voxelT(voxel.state, { kind: 'click', worldPos: w(0.7, 0, 0.3) });
@@ -273,10 +290,12 @@ test('voxel: pure(初期 state を mutate しない)', () => {
   assert.equal(JSON.stringify(voxel.state), before);
 });
 
-test('voxel: tick / 不明 event は state 不変', () => {
-  const s1 = voxelT(voxel.state, { kind: 'tick' });
+test('voxel: tick / 不明 event は state 不変(voxel.flow に対応無し)', () => {
+  const tickT = makeTickTransition(voxel);
+  const s1 = tickT(voxel.state, { kind: 'tick' });
   assert.deepEqual(s1, voxel.state);
-  const s2 = voxelT(voxel.state, { kind: 'mystery' });
+  const mysteryT = transitionForEvent(voxel, { kind: 'mystery' });
+  const s2 = mysteryT(voxel.state, { kind: 'mystery' });
   assert.deepEqual(s2, voxel.state);
 });
 
@@ -286,4 +305,37 @@ test('voxel: 連続 add で voxel 数が増える', () => {
     s = voxelT(s, { kind: 'click', worldPos: w(i * 0.5, 0, 0) });
   }
   assert.equal(Object.keys(s.voxels).length, 10);
+});
+
+// ============================================================
+// flow object 構造 — heartbeat が読む LLM-friendly な event → behavior 列
+// ============================================================
+
+test('flow: 全 prefab に flow object が定義されている', () => {
+  for (const [, p] of Object.entries(prefabs)) {
+    assert.ok(p.flow && typeof p.flow === 'object', `${p.id}: flow missing`);
+  }
+});
+
+test('flow: 全 entry の値は behavior id 配列で、すべて behaviors dict に存在する', () => {
+  for (const [, p] of Object.entries(prefabs)) {
+    for (const [eventKind, ids] of Object.entries(p.flow)) {
+      if (eventKind === 'scheduled') continue;   // future
+      assert.ok(Array.isArray(ids), `${p.id}.flow.${eventKind} must be array`);
+      for (const id of ids) {
+        assert.ok(behaviors[id], `${p.id}.flow.${eventKind}: unknown behavior "${id}"`);
+      }
+    }
+  }
+});
+
+test('transitionForEvent: 該当 flow があれば behaviors を順次適用、無ければ no-op', () => {
+  // voxel canvas の click → addOrRemoveVoxelOnClick が走る
+  const click = transitionForEvent(prefabs.voxelCanvas, { kind: 'click' });
+  const out = click(prefabs.voxelCanvas.state, { kind: 'click', worldPos: w(0, 0, 0) });
+  assert.equal(Object.keys(out.voxels).length, 1);
+
+  // voxel canvas に flow.tick は無い → no-op
+  const tickT = transitionForEvent(prefabs.voxelCanvas, { kind: 'tick' });
+  assert.deepEqual(tickT(prefabs.voxelCanvas.state, { kind: 'tick' }), prefabs.voxelCanvas.state);
 });

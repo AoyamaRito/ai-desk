@@ -19,14 +19,15 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.170.0/build/three.module.js"
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
     }
   }
   </script>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div id="info">3d-prefab demo — cube.asset.js (A10 prefab triple, world coord scene)</div>
+  <div id="info">3d-prefab demo — cube.asset.js (inline) + box-glb.asset.js (GLB) — A10 prefab triple</div>
   <script type="module" src="./main.js"></script>
 </body>
 </html>

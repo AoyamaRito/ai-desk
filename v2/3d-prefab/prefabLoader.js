@@ -9,6 +9,7 @@
 //  - asset.state(畳込み遷移)→ 内部 state、tick 時に transition で更新
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const geometryFactories = {
   BoxGeometry:    (a) => new THREE.BoxGeometry(...a),
@@ -20,11 +21,26 @@ const geometryFactories = {
 const materialFactories = {
   MeshNormalMaterial: (p) => new THREE.MeshNormalMaterial(p || {}),
   MeshBasicMaterial:  (p) => new THREE.MeshBasicMaterial(p || {}),
+  MeshStandardMaterial: (p) => new THREE.MeshStandardMaterial(p || {}),
 };
 
-export function loadPrefab(asset, scene) {
+const _gltfLoader = new GLTFLoader();
+
+// loadPrefab は async に変更(GLB 読み込み対応)。
+// 戻り値は handle Promise: { mesh, getState, dispatch, worldPosition }
+export async function loadPrefab(asset, scene) {
   let mesh;
-  if (asset.mesh.kind && geometryFactories[asset.mesh.kind]) {
+
+  if (asset.mesh.kind === 'glb') {
+    // intra-Block: GLB 内部は asset 原点基準の local coord(GLTF node hierarchy)
+    // engine が node 内部 transform を扱う、Block 側からは asset.transform で world に乗せる
+    const gltf = await _gltfLoader.loadAsync(asset.mesh.glbPath);
+    mesh = gltf.scene;
+    // GLB に animation がある場合は mesh.userData に格納(後段で利用)
+    if (gltf.animations && gltf.animations.length) {
+      mesh.userData.animations = gltf.animations;
+    }
+  } else if (asset.mesh.kind && geometryFactories[asset.mesh.kind]) {
     const geom = geometryFactories[asset.mesh.kind](asset.mesh.args || []);
     const matKind = asset.mesh.material?.kind || 'MeshNormalMaterial';
     const matFactory = materialFactories[matKind] || materialFactories.MeshNormalMaterial;
@@ -38,7 +54,7 @@ export function loadPrefab(asset, scene) {
 
   // asset.transform(world coord)→ mesh の world placement
   applyTransform(mesh, asset.transform);
-  mesh.userData = { prefabId: asset.id };
+  mesh.userData.prefabId = asset.id;
   scene.add(mesh);
 
   // mutable per-instance state

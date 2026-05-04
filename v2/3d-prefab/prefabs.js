@@ -85,7 +85,17 @@ export const behaviors = {
     };
   },
 
-  // peer-clicked: voxel canvas 自身は他 prefab の click を無視(自分宛て click のみ)
+  // floor-shift: voxel canvas の配置基準面(floor)を上下する
+  // event = { kind: 'floor-shift', delta: +1 | -1 }
+  // floorIndex は integer の層番号、世界 y = floorIndex * cellSize で plane が配置される
+  // 0 が地面、1 が cs 上、... 負には行かない(地面の下に潜らない)
+  shiftFloor: (s, ev) => {
+    if (ev.kind !== 'floor-shift') return s;
+    const cur = s.floorIndex ?? 0;
+    const next = Math.max(0, cur + (ev.delta ?? 0));
+    if (next === cur) return s;
+    return { ...s, floorIndex: next };
+  },
 };
 
 // behavior id 配列 → 単一 transition 関数。
@@ -178,10 +188,12 @@ export const prefabs = {
       tool: 'add',
       currentColor: 'hex:ff8844',
       lastEditWorldPos: null,
+      floorIndex: 0,        // integer 層番号、plane の世界 y = floorIndex * cellSize
     },
     flow: {
       click: ['addOrRemoveVoxelOnClick'],
-      // tick / hover は adapter 側で処理(syncInstances / moveCursor は副作用なので Block 層外)
+      'floor-shift': ['shiftFloor'],
+      // tick / hover は adapter 側で処理(syncInstances / moveCursor / plane sync は Block 層外)
     },
   },
 

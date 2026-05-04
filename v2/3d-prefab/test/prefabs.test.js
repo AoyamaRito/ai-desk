@@ -308,6 +308,38 @@ test('voxel: 連続 add で voxel 数が増える', () => {
 });
 
 // ============================================================
+// floor-shift: 配置基準面の上下シフト
+// ============================================================
+
+const voxelFloor = transitionForEvent(voxel, { kind: 'floor-shift' });
+
+test('voxel: floor-shift +1 で floorIndex が +1', () => {
+  const out = voxelFloor(voxel.state, { kind: 'floor-shift', delta: +1 });
+  assert.equal(out.floorIndex, 1);
+});
+
+test('voxel: floor-shift -1 で 地面より下に行かない(0 で clamp)', () => {
+  const out = voxelFloor(voxel.state, { kind: 'floor-shift', delta: -1 });
+  assert.equal(out.floorIndex, 0);   // 既に 0、変わらない
+  assert.deepEqual(out, voxel.state); // state も完全不変
+});
+
+test('voxel: floor-shift で連続シフト累積', () => {
+  let s = voxel.state;
+  for (let i = 0; i < 5; i++) s = voxelFloor(s, { kind: 'floor-shift', delta: +1 });
+  assert.equal(s.floorIndex, 5);
+  for (let i = 0; i < 3; i++) s = voxelFloor(s, { kind: 'floor-shift', delta: -1 });
+  assert.equal(s.floorIndex, 2);
+});
+
+test('voxel: floor-shift は pure(初期 state を mutate しない)', () => {
+  const before = JSON.stringify(voxel.state);
+  voxelFloor(voxel.state, { kind: 'floor-shift', delta: +1 });
+  voxelFloor(voxel.state, { kind: 'floor-shift', delta: -1 });
+  assert.equal(JSON.stringify(voxel.state), before);
+});
+
+// ============================================================
 // flow object 構造 — heartbeat が読む LLM-friendly な event → behavior 列
 // ============================================================
 

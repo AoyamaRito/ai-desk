@@ -131,6 +131,8 @@ function buildVoxelCanvas(meshSpec) {
   group.userData.voxelLastSig = null;
   group.userData.voxelCursor = cursorMesh;
   group.userData.voxelCursorMat = cursorMat;
+  group.userData.voxelPlane = plane;          // floor を shift する時に位置同期する対象
+  group.userData.voxelGrid = grid;            // 同上
 
   return group;
 }
@@ -245,6 +247,22 @@ function setupInput(canvas, camera, handles, router) {
     const hit = pickAt(ev);
     canvas.style.cursor = hit ? 'pointer' : 'default';
     updateVoxelCursors(handles, hit);
+  });
+
+  // キーボード: voxel canvas の floor を上下シフト([ / ] / PageUp / PageDown)
+  // adapter 境界 — DOM KeyboardEvent を world tagged event に翻訳して queue に流す
+  window.addEventListener('keydown', (ev) => {
+    let delta = 0;
+    if (ev.key === 'PageUp' || ev.key === ']') delta = +1;
+    else if (ev.key === 'PageDown' || ev.key === '[') delta = -1;
+    if (!delta) return;
+    // voxel canvas に floor-shift event を発火
+    for (const h of handles) {
+      if (h.id === 'voxel-canvas') {
+        pushEvent({ kind: 'floor-shift', targetId: h.id, delta });
+      }
+    }
+    ev.preventDefault();
   });
 }
 
@@ -412,6 +430,17 @@ function reportToAiEyes() {
   window.aiEyes.sendStructure({ kind: 'prefab-state', tick: currentTick, prefabs: snapshot });
 }
 
+// voxel-canvas: state.floorIndex を plane / grid の世界 y に反映
+function syncVoxelFloor(group, state) {
+  const cs = group.userData.voxelCellSize;
+  const floor = state.floorIndex ?? 0;
+  const targetY = floor * cs;
+  const plane = group.userData.voxelPlane;
+  const grid = group.userData.voxelGrid;
+  if (plane) plane.position.y = targetY - 0.001;   // grid との z-fighting 回避
+  if (grid)  grid.position.y  = targetY;
+}
+
 // voxel-canvas: state.voxels(tagged dict)→ InstancedMesh 同期(boundary で parse)
 const _voxelMatrix = new THREE.Matrix4();
 const _voxelColor = new THREE.Color();
@@ -461,9 +490,9 @@ function updateHud() {
   const lines = [
     `tick: ${currentTick}`,
     vs ? `tool: ${vs.tool ?? 'add'}  color: ${vs.currentColor ?? '-'}` : '',
+    vs ? `floor: ${vs.floorIndex ?? 0}  ([ / ] or PageUp/Down)` : '',
     vs ? `voxels: ${Object.keys(vs.voxels ?? {}).length}` : '',
     vs?.lastEditWorldPos ? `last: ${vs.lastEditWorldPos}` : '',
-    `q: ${eventQueue.length}/sched: ${scheduledQueue.length}`,
   ].filter(Boolean);
   hud.setInfo(lines);
 }
@@ -501,6 +530,7 @@ function heartbeat() {
       h.mesh.position.set(x, y, z);
     } else if (h.id === 'voxel-canvas') {
       syncVoxelInstances(h.mesh, s);
+      syncVoxelFloor(h.mesh, s);
     } else {
       h.mesh.rotation.y = (s.age ?? 0) * (s.rotSpeed ?? 0);
     }

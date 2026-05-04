@@ -136,43 +136,20 @@ function buildVoxelCanvas(meshSpec) {
   handleDown.position.set(cornerX, 0.15, cornerZ);
   group.add(handleDown);
 
-  // 手前 row に [brush, erase, gap, 8 色 swatch] を一列配置(MagicaVoxel 風 palette)
+  // 手前 row に色 swatch を一列配置(8 色)— tool は HUD 側の 2D UI に移動
   const cuteColors = [
     0xffb6c1, 0xc8a2c8, 0x98d8c8, 0xffd7be,
     0x87ceeb, 0xfff3a3, 0xff8c8c, 0xb8a9ff,
   ];
-  const buttonY = 0.4;
-  const buttonZ = halfP + 0.32;
-  const spacing = 0.32;
-  const items = 10;                              // brush + erase + 8 swatch
-  const startX = -((items - 1) * spacing) / 2;
-
-  // [0] brush(オレンジ、目立つ)
-  const brushBtn = makeToolButton('tool-brush', 0xff8844, 'add');
-  brushBtn.position.set(startX + 0 * spacing, buttonY, buttonZ);
-  group.add(brushBtn);
-
-  // [1] eraser(白、消しゴムらしい色)
-  const eraseBtn = makeToolButton('tool-erase', 0xf5f5f5, 'remove');
-  eraseBtn.position.set(startX + 1 * spacing, buttonY, buttonZ);
-  group.add(eraseBtn);
-
-  // [2..9] 色 swatches
+  const swatchY = 0.4;
+  const swatchZ = halfP + 0.32;
+  const swatchSpacing = 0.32;
+  const swatchStartX = -((cuteColors.length - 1) * swatchSpacing) / 2;
   for (let i = 0; i < cuteColors.length; i++) {
     const sw = makeColorSwatch(cuteColors[i]);
-    sw.position.set(startX + (2 + i) * spacing, buttonY, buttonZ);
+    sw.position.set(swatchStartX + i * swatchSpacing, swatchY, swatchZ);
     group.add(sw);
   }
-
-  // tool indicator(現在 tool の上に置く白い球)
-  const toolIndicatorGeom = new THREE.SphereGeometry(0.05, 8, 6);
-  const toolIndicatorMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
-  const toolIndicator = new THREE.Mesh(toolIndicatorGeom, toolIndicatorMat);
-  toolIndicator.raycast = () => {};
-  group.add(toolIndicator);
-  group.userData.voxelToolBrush = brushBtn;
-  group.userData.voxelToolErase = eraseBtn;
-  group.userData.voxelToolIndicator = toolIndicator;
 
 
   // sync 状態用の cache
@@ -298,7 +275,7 @@ async function loadPrefab(prefab, scene) {
 // input adapter(A10 境界: PointerEvent → world ray → tagged worldPos)
 // ============================================================
 
-function setupInput(canvas, camera, handles, router) {
+function setupInput(canvas, camera, handles, router, hud) {
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
 
@@ -330,6 +307,17 @@ function setupInput(canvas, camera, handles, router) {
   }
 
   canvas.addEventListener('pointerdown', (ev) => {
+    // 1) HUD ortho の tool button を最優先で hit 判定(2D UI、A10 整合)
+    if (hud) {
+      const hudHit = hud.pickButton(ev);
+      if (hudHit?.tool) {
+        // voxel-canvas に set-tool event を流す
+        const vc = handles.find(h => h.id === 'voxel-canvas');
+        if (vc) pushEvent({ kind: 'set-tool', targetId: vc.id, tool: hudHit.tool });
+        return;
+      }
+    }
+
     const hit = pickAt(ev);
     if (!hit) return;
     // floor handle 識別: ヒットしてたら floor-shift event を queue に流して終了
@@ -349,13 +337,7 @@ function setupInput(canvas, camera, handles, router) {
       if (color) pushEvent({ kind: 'set-color', targetId: hit.handle.id, color });
       return;
     }
-    if (role === 'tool-brush' || role === 'tool-erase') {
-      let walk = hit.raw;
-      while (walk && !walk.userData?.handleTool) walk = walk.parent;
-      const tool = walk?.userData?.handleTool;
-      if (tool) pushEvent({ kind: 'set-tool', targetId: hit.handle.id, tool });
-      return;
-    }
+    // tool は HUD 2D UI 側に移動済(上で hud.pickButton が処理する)
     // それ以外 → 通常の click(voxel 配置等)、world coord は A11 tagged で
     const wp = `world:${hit.point.x},${hit.point.y},${hit.point.z}`;
     if (router) router(hit.handle, wp);
@@ -363,8 +345,10 @@ function setupInput(canvas, camera, handles, router) {
   });
 
   canvas.addEventListener('pointermove', (ev) => {
+    // hud button の hover 判定も含めて cursor を pointer 化
+    const hudHover = hud?.pickButton(ev);
     const hit = pickAt(ev);
-    canvas.style.cursor = hit ? 'pointer' : 'default';
+    canvas.style.cursor = (hit || hudHover) ? 'pointer' : 'default';
     updateVoxelCursors(handles, hit);
   });
 
@@ -431,15 +415,6 @@ function updateVoxelCursors(handles, hit) {
   }
 }
 
-// 現在の tool に応じて indicator 球を brush / erase ボタンの上に置く
-function syncToolIndicator(group, state) {
-  const ind = group.userData.voxelToolIndicator;
-  const brush = group.userData.voxelToolBrush;
-  const erase = group.userData.voxelToolErase;
-  if (!ind || !brush || !erase) return;
-  const target = state.tool === 'remove' ? erase : brush;
-  ind.position.set(target.position.x, target.position.y + 0.18, target.position.z);
-}
 
 // ============================================================
 // HUD layer(ortho camera world、OffscreenCanvas → CanvasTexture)
@@ -450,14 +425,37 @@ function createHud(renderer) {
   const hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 100);
   hudCamera.position.z = 1;
 
+  // info text(右上)
   const off = new OffscreenCanvas(512, 160);
   const ctx = off.getContext('2d');
   const tex = new THREE.CanvasTexture(off);
   tex.minFilter = THREE.LinearFilter;
-  const geom = new THREE.PlaneGeometry(0.5, 0.16);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-  const infoMesh = new THREE.Mesh(geom, mat);
+  const infoGeom = new THREE.PlaneGeometry(0.5, 0.16);
+  const infoMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  const infoMesh = new THREE.Mesh(infoGeom, infoMat);
   hudScene.add(infoMesh);
+
+  // tool buttons(2D UI、左上)
+  // ortho world は (-aspect, -1) - (+aspect, +1)、左上 = (-aspect+offset, +1-offset)
+  function makeHudButton(role, colorInt, toolName) {
+    const g = new THREE.PlaneGeometry(0.12, 0.12);
+    const m = new THREE.MeshBasicMaterial({ color: colorInt, transparent: true, opacity: 0.95 });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.userData.handleRole = role;
+    mesh.userData.handleTool = toolName;
+    return mesh;
+  }
+  const toolBrush = makeHudButton('tool-brush', 0xff8844, 'add');
+  const toolErase = makeHudButton('tool-erase', 0xf5f5f5, 'remove');
+  hudScene.add(toolBrush);
+  hudScene.add(toolErase);
+
+  // 選択中 indicator(枠 ring)
+  const ringGeom = new THREE.RingGeometry(0.078, 0.092, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeom, ringMat);
+  ring.raycast = () => {};
+  hudScene.add(ring);
 
   const onResize = () => {
     const c = renderer.domElement;
@@ -466,11 +464,21 @@ function createHud(renderer) {
     hudCamera.right = aspect;
     hudCamera.updateProjectionMatrix();
     infoMesh.position.set(aspect - 0.3, 0.85, 0);
+    toolBrush.position.set(-aspect + 0.12, 0.85, 0);
+    toolErase.position.set(-aspect + 0.27, 0.85, 0);
+    // indicator は syncToolIndicator が tool に応じて再配置するので初期は brush 上
+    ring.position.set(toolBrush.position.x, toolBrush.position.y, 0.001);
   };
   window.addEventListener('resize', onResize);
   onResize();
 
+  // hud-side raycaster(マウス → ortho NDC → button hit 判定)
+  const hudRaycaster = new THREE.Raycaster();
+  const hudNdc = new THREE.Vector2();
+
   return {
+    hudScene,
+    hudCamera,
     setInfo(lines) {
       ctx.clearRect(0, 0, 512, 160);
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -480,6 +488,25 @@ function createHud(renderer) {
       let y = 28;
       for (const ln of lines) { ctx.fillText(ln, 12, y); y += 26; }
       tex.needsUpdate = true;
+    },
+    syncToolIndicator(state) {
+      const target = state.tool === 'remove' ? toolErase : toolBrush;
+      ring.position.set(target.position.x, target.position.y, 0.001);
+    },
+    // mouse 位置 ev から HUD button の handleRole / handleTool を返す(無ければ null)
+    pickButton(ev) {
+      const c = renderer.domElement;
+      const rect = c.getBoundingClientRect();
+      const xCss = ev.clientX - rect.left;
+      const yCss = ev.clientY - rect.top;
+      hudNdc.set((xCss / rect.width) * 2 - 1, -((yCss / rect.height) * 2 - 1));
+      hudRaycaster.setFromCamera(hudNdc, hudCamera);
+      const hits = hudRaycaster.intersectObjects([toolBrush, toolErase], false);
+      if (!hits.length) return null;
+      return {
+        role: hits[0].object.userData.handleRole,
+        tool: hits[0].object.userData.handleTool,
+      };
     },
     render() {
       renderer.autoClear = false;
@@ -568,7 +595,7 @@ function routeEvent(ev) {
 setupInput(canvas, camera, handles, (clickedHandle, worldPos) => {
   // heartbeat 経由で次 tick で処理
   pushEvent({ kind: 'click', targetId: clickedHandle.id, worldPos });
-});
+}, hud);
 
 function reportToAiEyes() {
   if (typeof window.aiEyes?.sendStructure !== 'function') return;
@@ -685,7 +712,7 @@ function heartbeat() {
     } else if (h.id === 'voxel-canvas') {
       syncVoxelInstances(h.mesh, s);
       syncVoxelFloor(h.mesh, s);
-      syncToolIndicator(h.mesh, s);
+      hud.syncToolIndicator(s);
     } else {
       h.mesh.rotation.y = (s.age ?? 0) * (s.rotSpeed ?? 0);
     }

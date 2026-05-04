@@ -11,7 +11,9 @@
 
 import * as THREE from 'three';
 
-export function setupInput(canvas, camera, handles) {
+// router(clickedHandle, worldPos) を渡せば inter-Block routing を委譲できる。
+// 省略時は clickedHandle に直接 click event を dispatch するだけ。
+export function setupInput(canvas, camera, handles, router = null) {
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
 
@@ -44,11 +46,12 @@ export function setupInput(canvas, camera, handles) {
   canvas.addEventListener('pointerdown', (ev) => {
     const hit = pickAt(ev);
     if (!hit) return;
-    // dispatch 境界: world coord 値だけ渡す(A10 / Taboo 14)
-    hit.handle.dispatch({
-      kind: 'click',
-      worldPos: hit.point.toArray(),
-    });
+    const wp = hit.point.toArray();
+    if (router) {
+      router(hit.handle, wp);
+    } else {
+      hit.handle.dispatch({ kind: 'click', worldPos: wp });
+    }
   });
 
   // hover 時のカーソル変化(視覚フィードバック、screen-coord は内部の adapter 操作のみ)

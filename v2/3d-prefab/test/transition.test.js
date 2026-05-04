@@ -12,10 +12,12 @@ import assert from 'node:assert/strict';
 
 import * as cube from '../assets/cube.asset.js';
 import * as boxGlb from '../assets/box-glb.asset.js';
+import * as character from '../assets/character.asset.js';
 
 const prefabs = [
   { name: 'cube', mod: cube },
   { name: 'box-glb', mod: boxGlb },
+  { name: 'character', mod: character },
 ];
 
 for (const { name, mod } of prefabs) {

@@ -517,7 +517,9 @@ export const Taboos = [
   },
   {
     id: 15, name: "No DOM overlay UI in world Block",
-    rule: "world Block 側で document.createElement / innerHTML で UI overlay を生成しない。HUD は ortho camera が見る world geometry として実装、または OS resource(text input 等)は modal dialog で値返却する形に統一。",
+    rule:
+      "world Block 側で document.createElement / innerHTML で UI overlay を生成しない。HUD は ortho camera が見る world geometry として実装、または OS resource(text input 等)は modal dialog で値返却する形に統一。" +
+      "**例外**: OffscreenCanvas + CanvasTexture は texture source として許可(DOM tree に乗らない、最終 render は WebGL 上の world geometry の texture として scene に住む)。",
     declarative: true,
     check: (content) => !/\b(document\.createElement|\.innerHTML\s*=|\.style\.position\s*=\s*['"]absolute)/.test(content),
     refsAxiom: "A10",

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "ai-desk.js",
   "scripts": {
-    "test": "node e2e.js && node --test 3d-prefab/test/prefabs.test.js && echo '\\n=== summary: e2e 112 + 3d-prefab 65 = 177 tests, all green ==='",
+    "test": "node e2e.js && node --test 3d-prefab/test/prefabs.test.js && echo '\\n=== summary: e2e 112 + 3d-prefab 68 = 180 tests, all green ==='",
     "test:e2e": "node e2e.js",
     "test:prefab": "node --test 3d-prefab/test/prefabs.test.js",
     "self": "node ai-desk.js self"

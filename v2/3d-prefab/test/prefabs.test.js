@@ -388,6 +388,35 @@ test('voxel: set-color に color 無しで no-op', () => {
 });
 
 // ============================================================
+// set-tool: tool('add' | 'remove')切り替え
+// ============================================================
+
+const voxelToolT = transitionForEvent(voxel, { kind: 'set-tool' });
+
+test('voxel: set-tool で tool が remove に切り替わる', () => {
+  const out = voxelToolT(voxel.state, { kind: 'set-tool', tool: 'remove' });
+  assert.equal(out.tool, 'remove');
+});
+
+test('voxel: set-tool で同じ tool を指定しても state 不変', () => {
+  const out = voxelToolT(voxel.state, { kind: 'set-tool', tool: voxel.state.tool });
+  assert.equal(out, voxel.state);
+});
+
+test('voxel: tool=remove で click すると voxel が消える', () => {
+  // 1) add で voxel 1 個置く
+  let s = seedCs05();
+  s = voxelT(s, { kind: 'click', worldPos: w(0.7, 0, 0.3) });
+  assert.equal(Object.keys(s.voxels).length, 1);
+  // 2) tool を remove に切り替え
+  s = voxelToolT(s, { kind: 'set-tool', tool: 'remove' });
+  assert.equal(s.tool, 'remove');
+  // 3) 同じ位置を click → 消える
+  s = voxelT(s, { kind: 'click', worldPos: w(0.7, 0, 0.3) });
+  assert.equal(Object.keys(s.voxels).length, 0);
+});
+
+// ============================================================
 // flow object 構造 — heartbeat が読む LLM-friendly な event → behavior 列
 // ============================================================
 

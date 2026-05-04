@@ -96,6 +96,14 @@ export const behaviors = {
     return { ...s, currentColor: ev.color };
   },
 
+  // set-tool: tool('add' | 'remove')を切り替え
+  // event = { kind: 'set-tool', tool: 'add' | 'remove' }
+  setTool: (s, ev) => {
+    if (ev.kind !== 'set-tool' || !ev.tool) return s;
+    if (s.tool === ev.tool) return s;
+    return { ...s, tool: ev.tool };
+  },
+
   // floor-shift: voxel canvas の配置基準面(floor)を上下する
   // event = { kind: 'floor-shift', delta: +1 | -1 }
   // floorIndex は integer の層番号、世界 y = floorIndex * cellSize で plane が配置される
@@ -192,7 +200,7 @@ export const prefabs = {
   voxelCanvas: {
     id: 'voxel-canvas',
     transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
-    mesh: { kind: 'voxel-canvas', cellSize: 0.125, planeSize: 4, maxVoxels: 16384 },
+    mesh: { kind: 'voxel-canvas', cellSize: 0.125, planeSize: 2, maxVoxels: 16384 },
     state: {
       voxels: {},
       cellSize: 0.125,           // 1/4 サイズ、64x64 cells per layer
@@ -205,6 +213,7 @@ export const prefabs = {
       click: ['addOrRemoveVoxelOnClick'],
       'floor-shift': ['shiftFloor'],
       'set-color': ['setCurrentColor'],
+      'set-tool': ['setTool'],
     },
   },
 

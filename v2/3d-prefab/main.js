@@ -137,27 +137,40 @@ function buildVoxelCanvas(meshSpec) {
   group.add(handleDown);
 
   // 色 swatch(8 色のかわいい palette、plane の手前外側に並べる)
-  // 世界 y = 0.5 固定(floor とは独立、UI として常時アクセス可)
   const cuteColors = [
-    0xffb6c1,  // light pink
-    0xc8a2c8,  // lilac
-    0x98d8c8,  // mint
-    0xffd7be,  // peach
-    0x87ceeb,  // sky blue
-    0xfff3a3,  // butter
-    0xff8c8c,  // coral
-    0xb8a9ff,  // periwinkle
+    0xffb6c1, 0xc8a2c8, 0x98d8c8, 0xffd7be,
+    0x87ceeb, 0xfff3a3, 0xff8c8c, 0xb8a9ff,
   ];
-  const swatchY = 0.45;
-  const swatchZ = halfP + 0.4;
-  const swatchSpacing = 0.4;
+  const swatchY = 0.4;
+  const swatchZ = halfP + 0.32;
+  const swatchSpacing = 0.32;
   const swatchStartX = -((cuteColors.length - 1) * swatchSpacing) / 2;
   for (let i = 0; i < cuteColors.length; i++) {
-    const c = cuteColors[i];
-    const sw = makeColorSwatch(c);
+    const sw = makeColorSwatch(cuteColors[i]);
     sw.position.set(swatchStartX + i * swatchSpacing, swatchY, swatchZ);
     group.add(sw);
   }
+
+  // tool buttons(MagicaVoxel 風: 左側に縦並び)
+  // 'B' = brush(add)、'E' = eraser(remove)
+  const toolX = -halfP - 0.32;
+  const brushBtn = makeToolButton('tool-brush', 0xff8844, 'add');
+  brushBtn.position.set(toolX, 0.4, -0.18);
+  group.add(brushBtn);
+
+  const eraseBtn = makeToolButton('tool-erase', 0x444444, 'remove');
+  eraseBtn.position.set(toolX, 0.4, 0.18);
+  group.add(eraseBtn);
+
+  // 現在 tool の indicator(brush or erase の上に小さい cube が乗る、tick で sync)
+  const toolIndicatorGeom = new THREE.SphereGeometry(0.05, 8, 6);
+  const toolIndicatorMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const toolIndicator = new THREE.Mesh(toolIndicatorGeom, toolIndicatorMat);
+  toolIndicator.raycast = () => {};
+  group.add(toolIndicator);
+  group.userData.voxelToolBrush = brushBtn;
+  group.userData.voxelToolErase = eraseBtn;
+  group.userData.voxelToolIndicator = toolIndicator;
 
 
   // sync 状態用の cache
@@ -187,12 +200,22 @@ function makeFloorHandle(role, color, dirY) {
 
 // color swatch(現在色を選ぶ UI、click で 'set-color' event 発火)
 function makeColorSwatch(colorInt) {
-  const geom = new THREE.BoxGeometry(0.26, 0.26, 0.26);
+  const geom = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   const mat = new THREE.MeshStandardMaterial({ color: colorInt, roughness: 0.5 });
   const mesh = new THREE.Mesh(geom, mat);
   const hex = 'hex:' + colorInt.toString(16).padStart(6, '0');
   mesh.userData.handleRole = 'color-pick';
   mesh.userData.handleColor = hex;
+  return mesh;
+}
+
+// tool button(brush / eraser、click で 'set-tool' event 発火)
+function makeToolButton(role, colorInt, toolName) {
+  const geom = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+  const mat = new THREE.MeshStandardMaterial({ color: colorInt, roughness: 0.5 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.userData.handleRole = role;
+  mesh.userData.handleTool = toolName;
   return mesh;
 }
 
@@ -318,11 +341,17 @@ function setupInput(canvas, camera, handles, router) {
       return;
     }
     if (role === 'color-pick') {
-      // raw mesh から userData.handleColor を取り出して set-color event 発火
       let walk = hit.raw;
       while (walk && !walk.userData?.handleColor) walk = walk.parent;
       const color = walk?.userData?.handleColor;
       if (color) pushEvent({ kind: 'set-color', targetId: hit.handle.id, color });
+      return;
+    }
+    if (role === 'tool-brush' || role === 'tool-erase') {
+      let walk = hit.raw;
+      while (walk && !walk.userData?.handleTool) walk = walk.parent;
+      const tool = walk?.userData?.handleTool;
+      if (tool) pushEvent({ kind: 'set-tool', targetId: hit.handle.id, tool });
       return;
     }
     // それ以外 → 通常の click(voxel 配置等)、world coord は A11 tagged で
@@ -337,20 +366,25 @@ function setupInput(canvas, camera, handles, router) {
     updateVoxelCursors(handles, hit);
   });
 
-  // キーボード: voxel canvas の floor を上下シフト([ / ] / PageUp / PageDown)
+  // キーボード: voxel canvas の操作
   // adapter 境界 — DOM KeyboardEvent を world tagged event に翻訳して queue に流す
   window.addEventListener('keydown', (ev) => {
-    let delta = 0;
-    if (ev.key === 'PageUp' || ev.key === ']') delta = +1;
-    else if (ev.key === 'PageDown' || ev.key === '[') delta = -1;
-    if (!delta) return;
-    // voxel canvas に floor-shift event を発火
-    for (const h of handles) {
-      if (h.id === 'voxel-canvas') {
-        pushEvent({ kind: 'floor-shift', targetId: h.id, delta });
-      }
+    const vc = handles.find(h => h.id === 'voxel-canvas');
+    if (!vc) return;
+    // floor up/down
+    if (ev.key === 'PageUp' || ev.key === ']') {
+      pushEvent({ kind: 'floor-shift', targetId: vc.id, delta: +1 }); ev.preventDefault(); return;
     }
-    ev.preventDefault();
+    if (ev.key === 'PageDown' || ev.key === '[') {
+      pushEvent({ kind: 'floor-shift', targetId: vc.id, delta: -1 }); ev.preventDefault(); return;
+    }
+    // tool: B = brush(add)、E = erase(remove)
+    if (ev.key === 'b' || ev.key === 'B') {
+      pushEvent({ kind: 'set-tool', targetId: vc.id, tool: 'add' }); return;
+    }
+    if (ev.key === 'e' || ev.key === 'E') {
+      pushEvent({ kind: 'set-tool', targetId: vc.id, tool: 'remove' }); return;
+    }
   });
 }
 
@@ -385,10 +419,24 @@ function updateVoxelCursors(handles, hit) {
     const gp = h.mesh.position;
     cursor.position.set(cx - gp.x, cy - gp.y, cz - gp.z);
     cursor.visible = true;
-    // 色を state.currentColor に追従(s は上で取得済み)
-    const hex = (s.currentColor ?? 'hex:ff8844').replace(/^hex:/, '#');
-    h.mesh.userData.voxelCursorMat.color.set(hex);
+    // 色: tool='remove' なら赤、'add' なら currentColor
+    if (s.tool === 'remove') {
+      h.mesh.userData.voxelCursorMat.color.set(0xff3333);
+    } else {
+      const hex = (s.currentColor ?? 'hex:ff8844').replace(/^hex:/, '#');
+      h.mesh.userData.voxelCursorMat.color.set(hex);
+    }
   }
+}
+
+// 現在の tool に応じて indicator 球を brush / erase ボタンの上に置く
+function syncToolIndicator(group, state) {
+  const ind = group.userData.voxelToolIndicator;
+  const brush = group.userData.voxelToolBrush;
+  const erase = group.userData.voxelToolErase;
+  if (!ind || !brush || !erase) return;
+  const target = state.tool === 'remove' ? erase : brush;
+  ind.position.set(target.position.x, target.position.y + 0.18, target.position.z);
 }
 
 // ============================================================
@@ -593,7 +641,7 @@ function updateHud() {
   const vs = vc?.getState();
   const lines = [
     `tick: ${currentTick}`,
-    vs ? `tool: ${vs.tool ?? 'add'}  color: ${vs.currentColor ?? '-'}` : '',
+    vs ? `tool: ${vs.tool ?? 'add'} (B=brush E=erase)  color: ${vs.currentColor ?? '-'}` : '',
     vs ? `floor: ${vs.floorIndex ?? 0}  ([ / ] or PageUp/Down)` : '',
     vs ? `voxels: ${Object.keys(vs.voxels ?? {}).length}` : '',
     vs?.lastEditWorldPos ? `last: ${vs.lastEditWorldPos}` : '',
@@ -635,6 +683,7 @@ function heartbeat() {
     } else if (h.id === 'voxel-canvas') {
       syncVoxelInstances(h.mesh, s);
       syncVoxelFloor(h.mesh, s);
+      syncToolIndicator(h.mesh, s);
     } else {
       h.mesh.rotation.y = (s.age ?? 0) * (s.rotSpeed ?? 0);
     }

@@ -174,16 +174,36 @@ async function loadPrefab(prefab, scene) {
   scene.add(mesh);
 
   let state = prefab.state ?? {};
+  // Shadow_for_Flow + frame deltas(heartbeat が frame 単位で setup / commit)
+  let shadowForFlow = state;
+  let frameMerged = null;     // null なら frame 内変化なし
 
   return {
     mesh,
     id: prefab.id,
-    prefab,                          // heartbeat が flow lookup するため保持
+    prefab,
     getState: () => state,
+    // heartbeat が frame 頭で呼ぶ: REAL → 凍結 shadow を作る
+    beginFrame: () => {
+      shadowForFlow = Object.freeze({ ...state });
+      frameMerged = null;
+    },
+    // dispatch は shadow を読んで delta を frameMerged に accumulate
+    // 同 frame 内の 2 回目以降 dispatch も同 shadow を読む(順序非依存 across events)
     dispatch: (event) => {
-      // flow.<event.kind> を 1 回 build → state 更新(behavior 列を順次適用)
       const t = transitionForEvent(prefab, event);
-      state = t(state, event);
+      const next = t(shadowForFlow, event);
+      if (next === shadowForFlow) return;   // 変化なし
+      if (frameMerged === null) frameMerged = { ...shadowForFlow };
+      for (const k of Object.keys(next)) {
+        if (next[k] !== shadowForFlow[k]) {
+          frameMerged[k] = next[k];
+        }
+      }
+    },
+    // heartbeat が frame 末に呼ぶ: 累積 delta を REAL に commit
+    endFrame: () => {
+      if (frameMerged !== null) state = frameMerged;
     },
   };
 }
@@ -451,6 +471,10 @@ function updateHud() {
 function heartbeat() {
   currentTick++;
 
+  // 0. Frame begin: 全 handle の REAL state を Shadow_for_Flow に snapshot(凍結)。
+  //    frame 中の全 dispatch はこの shadow を読む = 順序非依存 across events。
+  for (const h of handles) h.beginFrame();
+
   // 1. scheduled queue から fireAt <= currentTick の event を eventQueue に流す
   while (scheduledQueue.length && scheduledQueue[0].fireAt <= currentTick) {
     eventQueue.push(scheduledQueue.shift());
@@ -461,10 +485,13 @@ function heartbeat() {
     routeEvent(eventQueue.shift());
   }
 
-  // 3. 全 handle に tick event 発火(prefab.flow.tick の behavior 列が走る)
+  // 3. 全 handle に tick event 発火
   for (const h of handles) {
     h.dispatch({ kind: 'tick', tick: currentTick });
   }
+
+  // 3.5 Frame end: 累積 delta を REAL に commit
+  for (const h of handles) h.endFrame();
 
   // 4. adapter 副作用(mesh の位置 / 回転 / scale を state から反映)
   for (const h of handles) {

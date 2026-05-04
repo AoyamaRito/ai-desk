@@ -88,14 +88,37 @@ export const behaviors = {
   // peer-clicked: voxel canvas 自身は他 prefab の click を無視(自分宛て click のみ)
 };
 
-// behavior id 配列 → 単一 transition 関数(reduce で順次適用)
+// behavior id 配列 → 単一 transition 関数。
+//
+// Shadow_for_Flow 方式(A3 REAL/SHADOW を frame / event 単位に拡張):
+//   - 入力 state を「shadow」として全 behavior が同じ値を読む(順序非依存)
+//   - 各 behavior は shadow を読んで full state を返す(現 signature 維持)
+//   - compose は per-field diff を取って merged state を作る
+//     → 同 field を 2 つの behavior が触れた場合は **配列内で後の方が勝つ**(last-write-wins)
+//   - 結果として behavior 配列の **並べ替えは触る field が直交してれば常に同結果**
+//
+// これにより flow.<eventKind>: [...] の暗黙の順序依存が消える。
 export function compose(behaviorIds) {
   const fns = behaviorIds.map(id => {
     const fn = behaviors[id];
     if (!fn) throw new Error(`unknown behavior: "${id}"`);
     return fn;
   });
-  return (state, event) => fns.reduce((s, b) => b(s, event), state);
+  return (shadow, event) => {
+    let merged = shadow;
+    for (const fn of fns) {
+      const next = fn(shadow, event);   // 各 behavior は元 shadow を読む(merged を読まない)
+      if (next === shadow) continue;
+      // per-field diff を merged に反映
+      for (const k of Object.keys(next)) {
+        if (next[k] !== shadow[k]) {
+          if (merged === shadow) merged = { ...shadow };
+          merged[k] = next[k];
+        }
+      }
+    }
+    return merged;
+  };
 }
 
 // flow + event.kind から「実行する behavior 列」を取り出して 1 transition にする。

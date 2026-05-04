@@ -339,6 +339,33 @@ test('voxel: floor-shift は pure(初期 state を mutate しない)', () => {
   assert.equal(JSON.stringify(voxel.state), before);
 });
 
+test('voxel: floor>0 で click すると floor の上に voxel が配置される', () => {
+  const s = { ...voxel.state, floorIndex: 2 };       // floor world y = 1.0
+  const out = voxelT(s, { kind: 'click', worldPos: w(0, 1.0, 0) });
+  const key = Object.keys(out.voxels)[0];
+  const [, y] = parseCoord(key).values;
+  // floor=2 → minCy = 1.25、cy = 1.25
+  assert.equal(y, 1.25);
+});
+
+test('voxel: hit.y が floor 下でも floor の上に clamp される', () => {
+  const s = { ...voxel.state, floorIndex: 3 };       // floor world y = 1.5
+  // 地面 y=0 を click(plane が floor=3 の y=1.5 にあるが、何らかの古い hit が来る想定)
+  const out = voxelT(s, { kind: 'click', worldPos: w(0, 0, 0) });
+  const key = Object.keys(out.voxels)[0];
+  const [, y] = parseCoord(key).values;
+  assert.equal(y, 1.75);   // 3*0.5 + 0.25 = 1.75(floor 上に clamp)
+});
+
+test('voxel: floor>0 で voxel 上面 click は次の段に積む', () => {
+  let s = { ...voxel.state, floorIndex: 1 };          // floor world y = 0.5
+  s = voxelT(s, { kind: 'click', worldPos: w(0, 0.5, 0) });   // floor の上に 1 個 (cy=0.75)
+  // top of voxel at y=0.75+0.25=1.0、そこを click
+  s = voxelT(s, { kind: 'click', worldPos: w(0, 1.0, 0) });
+  const ys = Object.keys(s.voxels).map(k => parseCoord(k).values[1]).sort();
+  assert.deepEqual(ys, [0.75, 1.25]);   // 第 1 段 + 第 2 段
+});
+
 // ============================================================
 // flow object 構造 — heartbeat が読む LLM-friendly な event → behavior 列
 // ============================================================

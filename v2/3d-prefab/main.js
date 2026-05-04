@@ -332,10 +332,13 @@ function updateVoxelCursors(handles, hit) {
       cursor.visible = false;
       continue;
     }
-    // hit.point は world、prefab の挙動と同じ cell-center snap で local 配置に変換
+    // hit.point は world、prefab の挙動と同じ floor-aware cell-center snap で local 配置に変換
     const cs = h.mesh.userData.voxelCellSize;
+    const s = h.getState();
+    const floor = s.floorIndex ?? 0;
+    const minCy = floor * cs + cs / 2;
     const cx = Math.floor(hit.point.x / cs) * cs + cs / 2;
-    const cy = Math.max(cs / 2, Math.floor(hit.point.y / cs) * cs + cs / 2);
+    const cy = Math.max(minCy, Math.floor(hit.point.y / cs) * cs + cs / 2);
     const cz = Math.floor(hit.point.z / cs) * cs + cs / 2;
     const gp = h.mesh.position;
     cursor.position.set(cx - gp.x, cy - gp.y, cz - gp.z);

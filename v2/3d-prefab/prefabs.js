@@ -65,9 +65,12 @@ export const behaviors = {
     if (ev.kind !== 'click') return s;
     const [x, y, z] = requireDomain(ev.worldPos, 'world');
     const cs = s.cellSize ?? 0.5;
+    const floor = s.floorIndex ?? 0;
+    const floorY = floor * cs;
+    const minCy = floorY + cs / 2;       // 配置 y の最小は「現在の floor の上に半セル分」
     const cx = Math.floor(x / cs) * cs + cs / 2;
-    // y は最低 cs/2(地面の上)、それより上は cell-center snap
-    const cy = Math.max(cs / 2, Math.floor(y / cs) * cs + cs / 2);
+    // y: hit.y から cell-center snap、ただし現 floor の下には行かせない
+    const cy = Math.max(minCy, Math.floor(y / cs) * cs + cs / 2);
     const cz = Math.floor(z / cs) * cs + cs / 2;
     const key = w(cx, cy, cz);
     const tool = s.tool ?? 'add';

@@ -27,10 +27,13 @@ tmp/
 snapshots/
 eyes.port
 
-# AI-target auto-gen SHADOW(BIBLE.md だけ残し、他は ./AiRunAndRead_*.js export-md で都度生成)
-v2/AI_ONBOARDING.md
-v2/CLAUDE.md
-v2/MANUAL.md
+# AI-target auto-gen SHADOW: canonical は AiRunAndRead_*.js、.md は派生 SHADOW。
+# GitHub から README リンクで飛ぶ外部 reader 向けに **両建て**(canonical .js + commit 済 .md)。
+# 再生成手順: v2/README.md「SHADOW .md の再生成」セクション参照。
+# (2026-05-04: blind-test feedback で link 切れ判明 → ignore 解除して commit する方針に)
+# v2/AI_ONBOARDING.md
+# v2/CLAUDE.md
+# v2/MANUAL.md
 
 # Go CLI artifacts(都度 build)
 v2/go-cli/ai-desk

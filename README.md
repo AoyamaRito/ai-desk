@@ -163,8 +163,12 @@ BIBLE を読まずに評価すると、ほぼ確実に**人間最適化バイア
 
 **v1**(このリポの旧本体):
 - v1 本体: [`ai-desk-old-v1.js`](ai-desk-old-v1.js)(旧 `ai-desk.js` から改名)
-- v1 ドキュメント(`AI_NATIVE_MASTER_BIBLE.md` 等): リポルートに**固定された過去**として保持
+- v1 ドキュメント(`AI_NATIVE_MASTER_BIBLE.md` / `AI_ONBOARDING.md` / `BIBLE_SHADOW.md` / `CONSTRAINT_FOLDING_MASTER.md` / `AI_UNDERSTANDING_MANIFESTO.md` 等): リポルートに**固定された過去**として保持
 - v1 のファイルは**触りません**。v2 が現在の正典です。
+- ルート [`ai-desk.js`](ai-desk.js) は v2 への redirect(`node ai-desk.js` で v2 の CLI が起動)
+
+**ホスティング**:
+- [`index.html`](index.html) は GitHub Pages の landing(`https://aoyamarito.github.io/ai-desk/`)。リポ機能ではなく公開サイト。
 
 ---
 

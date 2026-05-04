@@ -58,6 +58,47 @@ export function transition(state, event) {
 | `state.rotSpeed`(internal scalar) | coord 外 | rad/tick |
 | canvas pixel / screen coord | 不可侵 | render output 境界のみ |
 
+## 二段構成 — Node テスト + ブラウザ + ai-eyes
+
+prefab triple は **state + transition が pure function** なので、Block の論理は
+ブラウザ不要で Node 単独で検証できる。render + input は adapter layer なので
+ブラウザに任せ、AI 観測は ai-eyes 経由にする:
+
+| layer | 場所 | 検証 |
+|---|---|---|
+| `state` + `transition()` | `assets/*.asset.js`(pure) | `node --test` で単体テスト |
+| `mesh` 構造 / GLB load | prefabLoader(adapter) | ブラウザで描画確認 |
+| input(ray cast / pointer) | input.js(adapter 境界) | ブラウザ + ai-eyes remote eval |
+| 視覚結果 | three.js scene render | ai-eyes /snapshot + structures/ |
+
+### Node 単体テストの実行
+
+```bash
+cd v2
+node --test 3d-prefab/test/transition.test.js
+```
+
+15 件: tick / click / 純粋性 / 可逆性 / A10 整合(state.lastClickWorldPos が world coord 配列)。
+
+### ai-eyes 起動 + ブラウザ AI 観測
+
+```bash
+cd v2
+PORT=3000 LOG_FILE=/tmp/ai-eyes-3dprefab.log SNAPSHOT_DIR=/tmp/ai-eyes-snapshots \
+  node /Users/AoyamaRito/PJs/ai-eyes/ai-eyes.js
+# →  http://localhost:3000/3d-prefab/
+
+# AI 側観測:
+# - エラー: tail /tmp/ai-eyes-3dprefab.log
+# - 60 frame ごとの prefab state: ls /tmp/ai-eyes-snapshots/structures/
+# - HTML snapshot: ls /tmp/ai-eyes-snapshots/*.html
+# - 任意 eval: curl -X POST -d '{"action":"eval","code":"..."}' localhost:3000/input
+```
+
+これで「人間がブラウザを目視 → AI に報告」往復が原理的に消える。
+
+---
+
 ## 次の段
 
 - [x] BoxGeometry inline で prefab 動作確認

@@ -1,0 +1,74 @@
+=== Milestone: JS-as-doc Paradigm Established (2026-05-04) ===
+
+このコミットは v2 のドキュメント層を **JS canonical / .md SHADOW** に再構築する
+切り替え点。code のみを Block 化していた v2 が、ドキュメントも Block 化対象として
+取り込み、All-as-Block の射程をさらに広げた瞬間。
+
+== 何が決まったか ==
+
+1. 「ドキュメントの REAL は .js、.md は派生 SHADOW」が公理として確定。
+   - BIBLE.js が prose 容器の限界を超えた構造化情報を保持(各公理に
+     {summary, why, examples, violations, refs, enforcementNote})
+   - .md は Kernel.exportMarkdown() でいつでも再生成可能(SHADOW)
+
+2. ファイル名 prefix `AiRunAndRead_` を導入。
+   - 拡張子 .js が「機械向け実行コード」と読まれる人間反射を、
+     ファイル名レベルで上書きする instruction(「実行 or import せよ」)。
+   - 人間の常識を fail-fast に裏切る、ai-desk 全体の moat と整合。
+   - 規約として水平展開可能: AiRead_ / AiRun_ / AiImport_ 等の派生形が
+     将来生まれる規範化基盤も同時に成立。
+
+3. parseJS の extractInlineTags を 5 行 → 20 行 遡及に拡張。
+   長い SPEC コメントを取りこぼさず tags に反映できるようになった。
+   これは enkai 開発を通じて surface した v1 の弱点 → ai-desk 本体改善の
+   dogfood ループの最初の実例。
+
+== 完了した整理 ==
+
+- BIBLE.js → AiRunAndRead_BIBLE.js (v2.6、9 公理 + BlockSchema +
+  BlockTypes(constraint/observation/twin/virtualHeavy)+ 7 Taboos +
+  18 Rituals + Kernel)
+- AI_ONBOARDING.md → AiRunAndRead_ONBOARDING.js (構造化された Forbidden /
+  BlockOps / GraphOps / Compass)
+- CLAUDE.md → AiRunAndRead_CLAUDE.js (ReadingOrder / Premise)
+- MANUAL.md → AiRunAndRead_MANUAL.js (Workflow / VirtualHeavy Apply 規律 /
+  24 CLI commands / 8 Lint kinds — §4.5〜4.9 の Apply discipline 完全保持)
+- REFERENCE.md は BIBLE.js Rituals に吸収して廃止
+- HANDOFF.md は /PJs/memo/2026-05-04_handoff.md に退避(session ephemeral)
+
+== 残した形式の判断 ==
+
+- README.md は人間入口として .md 維持
+- BIBLE.md は auto-gen SHADOW として残置(human fallback)
+- v1 legacy(AI_NATIVE_MASTER_BIBLE.md 等)は固定された過去として不変
+- CHANGELOG.md / 各 README.* は人間向けで .md 適切
+判断軸: 「JS が prose より豊かな容器」になる文書(公理・規律・workflow・コマンド・
+spec)のみを JS 化。「人間の入口 / 履歴記録 / manifesto」は .md のまま。
+
+== 戦略的意義 ==
+
+- 2 日後の阪下氏との MTG で、ai-desk の document layer 全体が JS-as-doc を
+  体現してる状態を見せられる。BIBLE.js だけが JS でなく、4 つの主要 doc が
+  揃ってる方が「思想」でなく「方法論」として伝わる。
+- 規範化の基盤が揃ったので、qr-auth の CONVENTIONS.md / enkai の CONCEPT.md
+  の JS 化も後から段階的に可能(ただし急がない、形式統一の強制でなく
+  「JS が効く文書だけ JS 化」という pragmatic 姿勢を維持)。
+
+== 残された / 次の射程 ==
+
+- 第 2 領域: ゲームアセットの JS 化(Unity Prefab 相当の AI-Native 再構築)
+  → /PJs/memo/2026-05-04_js-prefab-game-asset.md に 4 補記で詳細記録済。
+  着手は enkai daily driver 化 + 6 日 MTG 終了後の週末。
+- enkai を ai-desk operational discipline で dogfood:
+  既に SPEC tag 27 関数 + e2e 19 件適用済。次は virtual-apply で実際の
+  refactor を回す段階。
+- BIBLE.js の Kernel.summonContext を enkai の auto-inject 戦略に活用可能
+  (現在 BIBLE.md 全文 inject、token 重い。summonContext で必要 axiom のみ
+  抽出する切替で 1/30 token 化が射程)。
+
+== テスト状態 ==
+
+- v2 ai-desk core: 105/105 ✓
+- v2/3dplus: 81/81 ✓
+- enkai e2e: 19/19 ✓
+- 合計 205 tests all green。

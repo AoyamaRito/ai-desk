@@ -31,3 +31,8 @@ eyes.port
 v2/AI_ONBOARDING.md
 v2/CLAUDE.md
 v2/MANUAL.md
+
+# Go CLI artifacts(都度 build)
+v2/go-cli/ai-desk
+v2/go-cli/ai-desk-*
+v2/go-cli/ai-desk-bundle.js

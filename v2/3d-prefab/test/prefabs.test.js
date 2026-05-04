@@ -204,3 +204,86 @@ test('A11: pointer.state の coord 系 field はすべて world tagged または
     if (v != null) assert.equal(parseCoord(v).domain, 'world', `${k} must be world tagged`);
   }
 });
+
+// ============================================================
+// voxel-canvas — A11 voxel grid editor
+// ============================================================
+
+const voxel = prefabs.voxelCanvas;
+const voxelT = makeTransition(voxel);
+
+test('voxel: addOrRemoveVoxelOnClick で cell-center snap して voxels に add', () => {
+  const out = voxelT(voxel.state, { kind: 'click', worldPos: w(0.7, 0, 0.3) });
+  // cellSize 0.5、cell-center snap:
+  //   x=0.7 → cell [0.5, 1.0]、center 0.75
+  //   z=0.3 → cell [0,   0.5]、center 0.25
+  //   y=0   → 地面、cy = max(0.25, -0.25) = 0.25
+  assert.equal(Object.keys(out.voxels).length, 1);
+  const key = Object.keys(out.voxels)[0];
+  assert.equal(parseCoord(key).domain, 'world');
+  const [x, y, z] = parseCoord(key).values;
+  assert.equal(x, 0.75);
+  assert.equal(z, 0.25);
+  assert.equal(y, 0.25);
+});
+
+test('voxel: 同じ位置への click は上書き(色変更)', () => {
+  let s = voxel.state;
+  s = voxelT(s, { kind: 'click', worldPos: w(0, 0, 0) });
+  s = { ...s, currentColor: 'hex:00ff00' };
+  s = voxelT(s, { kind: 'click', worldPos: w(0, 0, 0) });
+  assert.equal(Object.keys(s.voxels).length, 1);
+  const key = Object.keys(s.voxels)[0];
+  assert.equal(s.voxels[key].color, 'hex:00ff00');
+});
+
+test('voxel: tool=remove で voxel を削除、無い場合は no-op', () => {
+  let s = voxel.state;
+  s = voxelT(s, { kind: 'click', worldPos: w(1, 0, 1) });
+  assert.equal(Object.keys(s.voxels).length, 1);
+  s = { ...s, tool: 'remove' };
+  s = voxelT(s, { kind: 'click', worldPos: w(1, 0, 1) });
+  assert.equal(Object.keys(s.voxels).length, 0);
+  // 無い voxel を remove しても state 不変
+  const before = JSON.stringify(s);
+  s = voxelT(s, { kind: 'click', worldPos: w(99, 99, 99) });
+  assert.equal(JSON.stringify(s), before);
+});
+
+test('voxel: lastEditWorldPos が world tagged で記録される', () => {
+  const out = voxelT(voxel.state, { kind: 'click', worldPos: w(2, 0, 2) });
+  assert.ok(out.lastEditWorldPos);
+  assert.equal(parseCoord(out.lastEditWorldPos).domain, 'world');
+});
+
+test('voxel: voxels dict の key はすべて world tagged', () => {
+  let s = voxel.state;
+  for (const [x, z] of [[0,0],[0.5,0],[1,1],[-1,2]]) {
+    s = voxelT(s, { kind: 'click', worldPos: w(x, 0, z) });
+  }
+  for (const key of Object.keys(s.voxels)) {
+    assert.equal(parseCoord(key).domain, 'world');
+  }
+});
+
+test('voxel: pure(初期 state を mutate しない)', () => {
+  const before = JSON.stringify(voxel.state);
+  voxelT(voxel.state, { kind: 'click', worldPos: w(0, 0, 0) });
+  voxelT(voxel.state, { kind: 'click', worldPos: w(1, 0, 1) });
+  assert.equal(JSON.stringify(voxel.state), before);
+});
+
+test('voxel: tick / 不明 event は state 不変', () => {
+  const s1 = voxelT(voxel.state, { kind: 'tick' });
+  assert.deepEqual(s1, voxel.state);
+  const s2 = voxelT(voxel.state, { kind: 'mystery' });
+  assert.deepEqual(s2, voxel.state);
+});
+
+test('voxel: 連続 add で voxel 数が増える', () => {
+  let s = voxel.state;
+  for (let i = 0; i < 10; i++) {
+    s = voxelT(s, { kind: 'click', worldPos: w(i * 0.5, 0, 0) });
+  }
+  assert.equal(Object.keys(s.voxels).length, 10);
+});

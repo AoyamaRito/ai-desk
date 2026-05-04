@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { prefabs, makeTransition } from './prefabs.js';
 import { requireDomain, parseCoord } from './coord.js';
 
@@ -77,6 +78,63 @@ async function probeExists(url) {
   } catch { return false; }
 }
 
+// voxel-canvas: base plane(click receiver) + GridHelper + InstancedMesh + cursor preview を Group で
+function buildVoxelCanvas(meshSpec) {
+  const cs = meshSpec.cellSize ?? 0.5;
+  const planeSize = meshSpec.planeSize ?? 6;
+  const max = meshSpec.maxVoxels ?? 4096;
+
+  const group = new THREE.Group();
+
+  // base plane: 半透明、click receiver
+  const planeGeom = new THREE.PlaneGeometry(planeSize, planeSize);
+  const planeMat = new THREE.MeshBasicMaterial({
+    color: 0x445566, side: THREE.DoubleSide, transparent: true, opacity: 0.45,
+  });
+  const plane = new THREE.Mesh(planeGeom, planeMat);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = -0.001;
+  plane.userData.voxelCanvasRole = 'plane';
+  group.add(plane);
+
+  // grid lines(視認用、raycast は plane 側で受ける)
+  const grid = new THREE.GridHelper(planeSize, planeSize / cs, 0xaaccff, 0x556677);
+  grid.userData.voxelCanvasRole = 'grid';
+  grid.raycast = () => {};
+  group.add(grid);
+
+  // voxel InstancedMesh
+  const vGeom = new THREE.BoxGeometry(cs, cs, cs);
+  const vMat = new THREE.MeshStandardMaterial({ vertexColors: false });
+  const inst = new THREE.InstancedMesh(vGeom, vMat, max);
+  inst.count = 0;
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  inst.userData.voxelCanvasRole = 'instance';
+  group.add(inst);
+
+  // cursor preview: 1 cell の edge だけを光らせる(fill 無し)
+  const cursorEdgesGeom = new THREE.EdgesGeometry(new THREE.BoxGeometry(cs, cs, cs));
+  const cursorMat = new THREE.LineBasicMaterial({
+    color: 0xff8844, transparent: true, opacity: 0.95, depthTest: true,
+  });
+  const cursorMesh = new THREE.LineSegments(cursorEdgesGeom, cursorMat);
+  cursorMesh.visible = false;
+  cursorMesh.userData.voxelCanvasRole = 'cursor';
+  cursorMesh.raycast = () => {};
+  group.add(cursorMesh);
+
+
+  // sync 状態用の cache
+  group.userData.voxelInst = inst;
+  group.userData.voxelCellSize = cs;
+  group.userData.voxelMaxCount = max;
+  group.userData.voxelLastSig = null;
+  group.userData.voxelCursor = cursorMesh;
+  group.userData.voxelCursorMat = cursorMat;
+
+  return group;
+}
+
 async function loadPrefab(prefab, scene) {
   if (prefab.disabled) return null;
   if (prefab.optional && prefab.mesh.kind === 'glb') {
@@ -91,6 +149,8 @@ async function loadPrefab(prefab, scene) {
     const gltf = await _gltfLoader.loadAsync(prefab.mesh.glbPath);
     mesh = gltf.scene;
     if (gltf.animations?.length) mesh.userData.animations = gltf.animations;
+  } else if (prefab.mesh.kind === 'voxel-canvas') {
+    mesh = buildVoxelCanvas(prefab.mesh);
   } else if (geometryFactories[prefab.mesh.kind]) {
     const geom = geometryFactories[prefab.mesh.kind](prefab.mesh.args || []);
     const matKind = prefab.mesh.material?.kind || 'MeshNormalMaterial';
@@ -158,8 +218,35 @@ function setupInput(canvas, camera, handles, router) {
   });
 
   canvas.addEventListener('pointermove', (ev) => {
-    canvas.style.cursor = pickAt(ev) ? 'pointer' : 'default';
+    const hit = pickAt(ev);
+    canvas.style.cursor = hit ? 'pointer' : 'default';
+    updateVoxelCursors(handles, hit);
   });
+}
+
+// hover 中の voxel-canvas に cursor preview を表示。snap 位置に置く + 色を state.currentColor 反映。
+function updateVoxelCursors(handles, hit) {
+  for (const h of handles) {
+    if (h.id !== 'voxel-canvas') continue;
+    const cursor = h.mesh.userData.voxelCursor;
+    if (!cursor) continue;
+    if (!hit || hit.handle !== h) {
+      cursor.visible = false;
+      continue;
+    }
+    // hit.point は world、prefab の挙動と同じ cell-center snap で local 配置に変換
+    const cs = h.mesh.userData.voxelCellSize;
+    const cx = Math.floor(hit.point.x / cs) * cs + cs / 2;
+    const cy = Math.max(cs / 2, Math.floor(hit.point.y / cs) * cs + cs / 2);
+    const cz = Math.floor(hit.point.z / cs) * cs + cs / 2;
+    const gp = h.mesh.position;
+    cursor.position.set(cx - gp.x, cy - gp.y, cz - gp.z);
+    cursor.visible = true;
+    // 色を state.currentColor に追従
+    const s = h.getState();
+    const hex = (s.currentColor ?? 'hex:ff8844').replace(/^hex:/, '#');
+    h.mesh.userData.voxelCursorMat.color.set(hex);
+  }
 }
 
 // ============================================================
@@ -216,8 +303,27 @@ function createHud(renderer) {
 // ============================================================
 
 const canvas = document.getElementById('canvas');
-const { renderer, scene, camera } = createScene(canvas);
+const { renderer, scene, camera } = createScene(canvas, {
+  cameraPosition: [4, 4, 5],
+  cameraLookAt: [0, 0.25, 0],
+});
 const hud = createHud(renderer);
+
+// OrbitControls: 右ドラッグ=回転、中ドラッグ=パン、ホイール=ズーム、左クリックは voxel placement に残す
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.25, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1.5;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.95;   // 真下まで行かせない(地面の裏に行かない)
+controls.mouseButtons = {
+  LEFT: null,                       // 左は voxel placement 用に解放
+  MIDDLE: THREE.MOUSE.DOLLY,        // 中ドラッグ = ズーム
+  RIGHT: THREE.MOUSE.ROTATE,        // 右ドラッグ = 回転
+};
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+controls.update();
 
 const handles = (await Promise.all(
   Object.values(prefabs).map(p => loadPrefab(p, scene).catch(err => {
@@ -247,6 +353,38 @@ function reportToAiEyes() {
   window.aiEyes.sendStructure({ kind: 'prefab-state', frame: frameCount, prefabs: snapshot });
 }
 
+// voxel-canvas: state.voxels(tagged dict)→ InstancedMesh 同期(boundary で parse)
+const _voxelMatrix = new THREE.Matrix4();
+const _voxelColor = new THREE.Color();
+function syncVoxelInstances(group, state) {
+  const inst = group.userData.voxelInst;
+  if (!inst) return;
+  const voxels = state.voxels ?? {};
+  const keys = Object.keys(voxels);
+  // signature で skip(無駄な GPU 更新避ける)
+  const sig = keys.length + ':' + (keys[0] ?? '') + ':' + (keys[keys.length - 1] ?? '');
+  if (sig === group.userData.voxelLastSig) return;
+  group.userData.voxelLastSig = sig;
+
+  const max = group.userData.voxelMaxCount;
+  const count = Math.min(keys.length, max);
+  inst.count = count;
+  // group.position が world (-3, 0, 2) など、key は world coord、Three.js の InstancedMesh は parent 座標系(group local)で配置
+  // group の world 位置を引いて instance の local position に
+  const gp = group.position;
+  for (let i = 0; i < count; i++) {
+    const [x, y, z] = requireDomain(keys[i], 'world');
+    _voxelMatrix.makeTranslation(x - gp.x, y - gp.y, z - gp.z);
+    inst.setMatrixAt(i, _voxelMatrix);
+    const v = voxels[keys[i]];
+    const hexStr = (v?.color ?? 'hex:ff8844').replace(/^hex:/, '#');
+    _voxelColor.set(hexStr);
+    if (inst.setColorAt) inst.setColorAt(i, _voxelColor);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+}
+
 function pickReportable(s) {
   const out = {};
   for (const k of Object.keys(s)) {
@@ -259,13 +397,13 @@ function pickReportable(s) {
 }
 
 function updateHud() {
-  const ptr = handles.find(h => h.id === 'pointer');
-  const ps = ptr?.getState();
+  const vc = handles.find(h => h.id === 'voxel-canvas');
+  const vs = vc?.getState();
   const lines = [
     `frame: ${frameCount}`,
-    `prefabs: ${handles.length}`,
-    `last click: ${ps?.lastSourceId ?? '(none)'}`,
-    ps?.targetWorldPos ?? '',
+    vs ? `tool: ${vs.tool ?? 'add'}  color: ${vs.currentColor ?? '-'}` : '',
+    vs ? `voxels: ${Object.keys(vs.voxels ?? {}).length}` : '',
+    vs?.lastEditWorldPos ? `last: ${vs.lastEditWorldPos}` : '',
   ].filter(Boolean);
   hud.setInfo(lines);
 }
@@ -278,15 +416,20 @@ function tick() {
     if (h.id === 'pointer' && s.currentWorldPos) {
       const [x, y, z] = requireDomain(s.currentWorldPos, 'world');
       h.mesh.position.set(x, y, z);
+    } else if (h.id === 'voxel-canvas') {
+      syncVoxelInstances(h.mesh, s);
     } else {
       h.mesh.rotation.y = (s.age ?? 0) * (s.rotSpeed ?? 0);
     }
 
-    const baseScale = h.mesh.userData.baseScale ?? h.mesh.scale.x;
-    h.mesh.userData.baseScale = baseScale;
-    h.mesh.scale.setScalar(baseScale * (1 + (s.pulse ?? 0) * 0.3));
+    if (h.id !== 'voxel-canvas') {
+      const baseScale = h.mesh.userData.baseScale ?? h.mesh.scale.x;
+      h.mesh.userData.baseScale = baseScale;
+      h.mesh.scale.setScalar(baseScale * (1 + (s.pulse ?? 0) * 0.3));
+    }
   }
 
+  controls.update();
   renderer.render(scene, camera);
   if (frameCount % 6 === 0) updateHud();
   hud.render();

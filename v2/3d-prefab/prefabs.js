@@ -55,6 +55,36 @@ export const behaviors = {
     const next = cur.map((v, i) => v + (tgt[i] - v) * r);
     return { ...s, currentWorldPos: w(...next) };
   },
+
+  // click: voxel を cell-center snap して add / remove(state.tool で切替)
+  // ev.worldPos = "world:x,y,z" raw click hit、cellSize の cell に snap して voxel key を作る。
+  // 各 cell の中心 = floor(coord / cs) * cs + cs/2(Minecraft 流、格子の交点ではなく cell 内に配置)
+  // state.voxels = { "world:0.25,0.25,0.25": { color: "hex:ff8844" }, ... }
+  addOrRemoveVoxelOnClick: (s, ev) => {
+    if (ev.kind !== 'click') return s;
+    const [x, y, z] = requireDomain(ev.worldPos, 'world');
+    const cs = s.cellSize ?? 0.5;
+    const cx = Math.floor(x / cs) * cs + cs / 2;
+    // y は最低 cs/2(地面の上)、それより上は cell-center snap
+    const cy = Math.max(cs / 2, Math.floor(y / cs) * cs + cs / 2);
+    const cz = Math.floor(z / cs) * cs + cs / 2;
+    const key = w(cx, cy, cz);
+    const tool = s.tool ?? 'add';
+    if (tool === 'remove') {
+      if (!s.voxels[key]) return s;
+      const voxels = { ...s.voxels };
+      delete voxels[key];
+      return { ...s, voxels, lastEditWorldPos: key };
+    }
+    // add(default、既存上書き)
+    return {
+      ...s,
+      voxels: { ...s.voxels, [key]: { color: s.currentColor ?? 'hex:ff8844' } },
+      lastEditWorldPos: key,
+    };
+  },
+
+  // peer-clicked: voxel canvas 自身は他 prefab の click を無視(自分宛て click のみ)
 };
 
 // behavior id 配列 → 単一 transition 関数(reduce で順次適用)
@@ -80,6 +110,7 @@ export const prefabs = {
     mesh: { kind: 'BoxGeometry', args: [1, 1, 1], material: { kind: 'MeshNormalMaterial' } },
     state: { rotSpeed: 0.01, age: 0, pulse: 0, lastClickWorldPos: null },
     behaviorIds: standardClickResponse,
+    disabled: true,   // voxel editor focus、不要
   },
 
   boxGlb: {
@@ -88,6 +119,7 @@ export const prefabs = {
     mesh: { kind: 'glb', glbPath: './assets/box.glb' },
     state: { rotSpeed: -0.012, age: 0, pulse: 0, pulseDecay: 0.04, lastClickWorldPos: null },
     behaviorIds: standardClickResponse,
+    disabled: true,
   },
 
   komaHu: {
@@ -96,7 +128,22 @@ export const prefabs = {
     mesh: { kind: 'glb', glbPath: './assets/koma_hu.glb' },
     state: { rotSpeed: 0.005, age: 0, pulse: 0, pulseDecay: 0.025, lastClickWorldPos: null },
     behaviorIds: standardClickResponse,
-    optional: true,   // GLB 不在時は HEAD probe で skip
+    optional: true,
+    disabled: true,
+  },
+
+  voxelCanvas: {
+    id: 'voxel-canvas',
+    transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
+    mesh: { kind: 'voxel-canvas', cellSize: 0.5, planeSize: 8, maxVoxels: 4096 },
+    state: {
+      voxels: {},                       // key="world:x,y,z" → { color: "hex:RRGGBB" }
+      cellSize: 0.5,                    // intra: scalar(coord 系外、grid pitch)
+      tool: 'add',                      // 'add' | 'remove'
+      currentColor: 'hex:ff8844',       // tagged
+      lastEditWorldPos: null,
+    },
+    behaviorIds: ['addOrRemoveVoxelOnClick'],
   },
 
   pointer: {
@@ -111,6 +158,7 @@ export const prefabs = {
       age: 0,
     },
     behaviorIds: ['tickAge', 'recordPeerTarget', 'lerpToTarget'],
+    disabled: true,
   },
 
   // character: AI 生成 GLB scaffold(default disabled、glb 置いて optional:false に)

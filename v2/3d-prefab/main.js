@@ -136,35 +136,37 @@ function buildVoxelCanvas(meshSpec) {
   handleDown.position.set(cornerX, 0.15, cornerZ);
   group.add(handleDown);
 
-  // 色 swatch(8 色のかわいい palette、plane の手前外側に並べる)
+  // 手前 row に [brush, erase, gap, 8 色 swatch] を一列配置(MagicaVoxel 風 palette)
   const cuteColors = [
     0xffb6c1, 0xc8a2c8, 0x98d8c8, 0xffd7be,
     0x87ceeb, 0xfff3a3, 0xff8c8c, 0xb8a9ff,
   ];
-  const swatchY = 0.4;
-  const swatchZ = halfP + 0.32;
-  const swatchSpacing = 0.32;
-  const swatchStartX = -((cuteColors.length - 1) * swatchSpacing) / 2;
+  const buttonY = 0.4;
+  const buttonZ = halfP + 0.32;
+  const spacing = 0.32;
+  const items = 10;                              // brush + erase + 8 swatch
+  const startX = -((items - 1) * spacing) / 2;
+
+  // [0] brush(オレンジ、目立つ)
+  const brushBtn = makeToolButton('tool-brush', 0xff8844, 'add');
+  brushBtn.position.set(startX + 0 * spacing, buttonY, buttonZ);
+  group.add(brushBtn);
+
+  // [1] eraser(白、消しゴムらしい色)
+  const eraseBtn = makeToolButton('tool-erase', 0xf5f5f5, 'remove');
+  eraseBtn.position.set(startX + 1 * spacing, buttonY, buttonZ);
+  group.add(eraseBtn);
+
+  // [2..9] 色 swatches
   for (let i = 0; i < cuteColors.length; i++) {
     const sw = makeColorSwatch(cuteColors[i]);
-    sw.position.set(swatchStartX + i * swatchSpacing, swatchY, swatchZ);
+    sw.position.set(startX + (2 + i) * spacing, buttonY, buttonZ);
     group.add(sw);
   }
 
-  // tool buttons(MagicaVoxel 風: 左側に縦並び)
-  // 'B' = brush(add)、'E' = eraser(remove)
-  const toolX = -halfP - 0.32;
-  const brushBtn = makeToolButton('tool-brush', 0xff8844, 'add');
-  brushBtn.position.set(toolX, 0.4, -0.18);
-  group.add(brushBtn);
-
-  const eraseBtn = makeToolButton('tool-erase', 0x444444, 'remove');
-  eraseBtn.position.set(toolX, 0.4, 0.18);
-  group.add(eraseBtn);
-
-  // 現在 tool の indicator(brush or erase の上に小さい cube が乗る、tick で sync)
+  // tool indicator(現在 tool の上に置く白い球)
   const toolIndicatorGeom = new THREE.SphereGeometry(0.05, 8, 6);
-  const toolIndicatorMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const toolIndicatorMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
   const toolIndicator = new THREE.Mesh(toolIndicatorGeom, toolIndicatorMat);
   toolIndicator.raycast = () => {};
   group.add(toolIndicator);

@@ -403,10 +403,18 @@ group('CLI', () => {
     return execSync(`node ai-desk.js ${args}`, { encoding: 'utf8' });
   }
 
-  test('self-test 実行', () => {
+  test('default help 実行(BIBLE 案内 + コマンドグループ表示)', () => {
     const out = run('');
-    assert.ok(out.includes('self-test'));
     assert.ok(out.includes('Block.versions が本体'));
+    assert.ok(out.includes('bible-info'), 'help should advertise bible-info');
+    assert.ok(out.includes('first-time?'), 'help should have first-time guidance');
+  });
+
+  test('demo 実行(in-memory Block / Graph)', () => {
+    const out = run('demo');
+    assert.ok(out.includes('demo (in-memory'));
+    assert.ok(out.includes('graph size: 2'));
+    assert.ok(out.includes('verify'));
   });
 
   test('bible-info shows axioms / block types / taboos / vocabulary', () => {

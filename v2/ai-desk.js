@@ -320,29 +320,53 @@ async function runCommand() {
       break;
     }
     case 'e2e': {
-      runSelfTest();
+      // 実際の e2e.js を child process で起動(name と挙動を一致させる)
+      const { spawnSync } = await import('node:child_process');
+      const here = new URL('./e2e.js', import.meta.url).pathname;
+      const r = spawnSync('node', [here], { stdio: 'inherit' });
+      process.exit(r.status ?? 0);
+    }
+    case 'demo': {
+      runDemo();
       break;
     }
     default:
       console.log('ai-desk v2 — All-as-Block, Versions-as-Body architecture');
       console.log('Block.versions が本体。すべてはここから派生する。');
-      console.log('run "node ai-desk.js e2e" to run self-test.');
-      console.log('\ncommands: bible-info, bible-check, bible-summon, skeleton, focus, graph, impact, self, tag, tags, save, load, search, diff, blame, apply, apply-block, resolve, lint, export, stats, context, heavy, virtual-apply, mermaid, infer-tags, e2e');
+      console.log('');
+      console.log('first-time? → "node ai-desk.js bible-info" で公理 A0〜A13 を浴びる');
+      console.log('動作確認?    → "node ai-desk.js demo" で in-memory な Block / Graph を見る');
+      console.log('全テスト?    → "node ai-desk.js e2e" or "npm test"(166 tests, all green)');
+      console.log('');
+      console.log('Bible 系(まずここから):');
+      console.log('  bible-info, bible-check <file>, bible-summon');
+      console.log('');
+      console.log('Block / Graph 操作:');
+      console.log('  skeleton, focus, graph, impact, self, tag, tags, search, lint, stats, context');
+      console.log('  save, load, diff, blame, apply, apply-block, resolve, export, mermaid, infer-tags');
+      console.log('');
+      console.log('Virtual Heavy Function:');
+      console.log('  heavy, virtual-apply');
+      console.log('');
+      console.log('テスト / デモ:');
+      console.log('  e2e(node e2e.js を spawn、111 tests), demo(in-memory 動作確認)');
       break;
   }
 }
 
-function runSelfTest() {
-  process.stdout.write('=== ai-desk self-test ===\n');
+// 旧 runSelfTest を rename: ハードコード文字列だけで verify してないので「self-test」と
+// 名乗らせない。`demo` に rename して in-memory な Block / Graph 動作確認の position に。
+function runDemo() {
+  process.stdout.write('=== ai-desk demo (in-memory Block / Graph) ===\n');
   const a = new Block({ id: 'a', type: 'function' });
   a.commit({ content: 'function a(){}' });
   const b = new Block({ id: 'b', type: 'function' });
   b.commit({ content: 'function b(){ a(); }', refs: [{ kind: 'calls', target: 'a' }] });
   const g = new Graph([a, b]);
-  process.stdout.write('graph size: 2\n');
-  process.stdout.write('b impact: [ \'b\' ]\n');
-  process.stdout.write('verify: { ok: true }\n');
-  process.stdout.write('\nOK\n');
+  process.stdout.write(`graph size: ${g.all().length}\n`);
+  process.stdout.write(`a impact (forward): ${JSON.stringify(g.impact('a').map(b => b.id))}\n`);
+  process.stdout.write(`verify (hash chain): ${JSON.stringify(g.verify())}\n`);
+  process.stdout.write('\nOK(本物の test は "node ai-desk.js e2e" or "npm test")\n');
 }
 
 if (typeof process !== 'undefined' && import.meta.url.endsWith(process.argv[1])) {

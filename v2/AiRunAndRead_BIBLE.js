@@ -132,6 +132,25 @@ export const Axioms = {
     refs: ["A4", "A6", "Bible§4.1.1"],
     enforcementNote: "規律は validate 関数で守らない。`#SPEC#` tag の存在/不在 + prevHash chain 構造そのものが enforcement(§4.1.1)。",
   },
+  A9: {
+    id: "A9", name: "Crystallization Compliance",
+    summary: "Block.content は crystallize 可能(JS → Go transpile → native 化)でなければならない。crystallize 不能なコードは Block でなく Adapter として扱う。",
+    why: "crystallize 失敗 = 動的 dispatch / eval / Proxy / prototype trick 等の隠匿パターン使用 = 4 視点(transpile / JIT / AI 推論 / Bible)全てから『正しくない』と判定されるコード。同じパターンが 4 視点で同時に問題を起こすのは偶然でなく、『明示的・静的・展開された』という単一の質が v2 の正解だから。",
+    examples: [
+      "crystallize OK: 純粋関数 / class + methods / immutable Map/Set 操作 / template literal",
+      "crystallize NG: eval / new Function / Object.prototype 改変 / Proxy / Reflect.construct / with 文",
+    ],
+    violations: [
+      "Block.content に eval / new Function を使う",
+      "prototype を runtime で改変",
+      "Proxy で動的 property 介入",
+      "with 文で scope を曖昧に",
+    ],
+    refs: ["A0","A5","A6","§3","Vocabulary.crystallize"],
+    enforcementNote:
+      "crystallize tool 自体が Bible-compliance compiler。build 失敗 = Bible 違反、別途 lint 不要(§4.1.1 の極致)。" +
+      "2 階層アーキテクチャ: Block(pure logic、crystallize 必須) vs Adapter(platform I/O、crystallize 不問)で分離。",
+  },
 };
 
 // ============================================================
@@ -267,6 +286,14 @@ export const Vocabulary = {
       operation_vector: "圧縮 → 展開",
       axiom_ref: ["A0","A7"],
     },
+    crystallize: {
+      meaning: "論理を別言語の強力なインフラに引っ越しさせる(JS Block → Go transpile 等)",
+      replaces: "compile / port / migrate / rewrite",
+      etymology: "ラテン語 crystallum(澄んだ氷・透明な結晶構造)。「不定形が定形に固体化する」が原義。",
+      operation_vector: "動的・流動 → 静的・固体  (JS の動的性 → Go の static structure)",
+      axiom_ref: ["A3","A5","A6","§3"],
+      note: "5 段フロー: REAL(JS) → TRANSCRIPTION(AI 翻訳) → SHADOW(Go source) → COMPILE(go build) → CRYSTAL(native binary)。AI が中間段の翻訳者。JIT が「泥道を走りながらアスファルト敷く」のに対し、結晶化は「隣に最高級高速道路を建設」する事前 AOT。",
+    },
   },
   avoid: [
     {
@@ -376,6 +403,42 @@ export const Taboos = [
     rule: "「人間にとっての見やすさ」で判断しない。LLM の情報密度で判断する。",
     declarative: true,
     refsAxiom: "A0, A7",
+  },
+  // ─── Crystallization-blocking patterns(公理 A9 系列、Block 内では禁忌)───
+  {
+    id: 8, name: "No eval / new Function",
+    rule: "Block.content で eval(...) や new Function(...) を使わない。runtime コード生成は crystallize 不能 + AI 静的推論不能 + 公理 A0 違反。",
+    declarative: true,
+    check: (content) => !/\b(eval|new\s+Function)\s*\(/.test(content),
+    refsAxiom: "A9",
+  },
+  {
+    id: 9, name: "No prototype mutation",
+    rule: "Object.prototype.X = ... / __proto__ 改変を Block.content でやらない。global state 汚染 + crystallize 不能。",
+    declarative: true,
+    check: (content) => !/(\.prototype\.[\w$]+\s*=|\b__proto__\b\s*=)/.test(content),
+    refsAxiom: "A9",
+  },
+  {
+    id: 10, name: "No Proxy / Reflect.construct",
+    rule: "Proxy / Reflect.construct で動的 property 介入しない。Go の static 型システムに乗らない、crystallize 不能。",
+    declarative: true,
+    check: (content) => !/\b(new\s+Proxy|Reflect\.(construct|apply|get|set|has|deleteProperty|defineProperty))\s*\(/.test(content),
+    refsAxiom: "A9",
+  },
+  {
+    id: 11, name: "No with statement",
+    rule: "with(obj){...} を使わない。scope 曖昧化、AI も Go も追跡不能。",
+    declarative: true,
+    check: (content) => !/^\s*with\s*\(/m.test(content),
+    refsAxiom: "A9",
+  },
+  {
+    id: 12, name: "No arguments object",
+    rule: "function 内で arguments を参照しない。rest params (...args) で代替。arguments は dynamic semantics、crystallize 不能。",
+    declarative: true,
+    check: (content) => !/\barguments\b\s*[\.\[]/.test(content),
+    refsAxiom: "A9",
   },
 ];
 

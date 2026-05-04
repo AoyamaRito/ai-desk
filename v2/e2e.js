@@ -5,17 +5,20 @@ import { strict as assert } from 'node:assert';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import {
-  Block, Graph, parseJS, loadProject,
-  saveGraph, loadGraph, buildAndSave,
-  applyPatch, resolveImports,
+  Block, Graph, parseJS,
+  applyPatch,
   applyToBlock, applyBlockSmart,
-  exportModule, exportToFile,
+  exportModule,
   graphStats,
   blockContext, formatContextForLLM,
   parseMD, exportMermaid, inferTags,
   virtualHeavy, expandVirtualHeavy, virtualApply,
   constraintBlock, evalConstraint,
   observationBlock,
+} from './ai-desk-core.js';
+import {
+  loadProject, saveGraph, loadGraph, buildAndSave,
+  exportToFile, resolveImports
 } from './ai-desk.js';
 
 const TMP = './e2e-tmp';
@@ -1257,7 +1260,7 @@ function c(){ return b() + 999; }
 // ============================================================
 group('Self-parse', () => {
   test('自分自身を Block に分解できる', () => {
-    const src = readFileSync('./ai-desk.js', 'utf8');
+    const src = readFileSync('./ai-desk-core.js', 'utf8');
     const blocks = parseJS(src, 'self');
     const g = new Graph(blocks);
     assert.ok(g.byType('function').length > 5);

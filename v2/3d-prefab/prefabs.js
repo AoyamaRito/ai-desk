@@ -192,7 +192,7 @@ export const prefabs = {
   voxelCanvas: {
     id: 'voxel-canvas',
     transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
-    mesh: { kind: 'voxel-canvas', cellSize: 0.125, planeSize: 8, maxVoxels: 16384 },
+    mesh: { kind: 'voxel-canvas', cellSize: 0.125, planeSize: 4, maxVoxels: 16384 },
     state: {
       voxels: {},
       cellSize: 0.125,           // 1/4 サイズ、64x64 cells per layer

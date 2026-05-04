@@ -149,8 +149,8 @@ function buildVoxelCanvas(meshSpec) {
     0xb8a9ff,  // periwinkle
   ];
   const swatchY = 0.45;
-  const swatchZ = halfP + 0.45;
-  const swatchSpacing = 0.5;
+  const swatchZ = halfP + 0.4;
+  const swatchSpacing = 0.4;
   const swatchStartX = -((cuteColors.length - 1) * swatchSpacing) / 2;
   for (let i = 0; i < cuteColors.length; i++) {
     const c = cuteColors[i];
@@ -187,7 +187,7 @@ function makeFloorHandle(role, color, dirY) {
 
 // color swatch(現在色を選ぶ UI、click で 'set-color' event 発火)
 function makeColorSwatch(colorInt) {
-  const geom = new THREE.BoxGeometry(0.32, 0.32, 0.32);
+  const geom = new THREE.BoxGeometry(0.26, 0.26, 0.26);
   const mat = new THREE.MeshStandardMaterial({ color: colorInt, roughness: 0.5 });
   const mesh = new THREE.Mesh(geom, mat);
   const hex = 'hex:' + colorInt.toString(16).padStart(6, '0');
@@ -446,7 +446,7 @@ function createHud(renderer) {
 
 const canvas = document.getElementById('canvas');
 const { renderer, scene, camera } = createScene(canvas, {
-  cameraPosition: [4, 4, 5],
+  cameraPosition: [2.5, 2.5, 3.2],
   cameraLookAt: [0, 0.25, 0],
 });
 const hud = createHud(renderer);
@@ -456,8 +456,8 @@ const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 0.25, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 1.5;
-controls.maxDistance = 30;
+controls.minDistance = 0.8;
+controls.maxDistance = 20;
 controls.maxPolarAngle = Math.PI * 0.95;   // 真下まで行かせない(地面の裏に行かない)
 controls.mouseButtons = {
   LEFT: null,                       // 左は voxel placement 用に解放

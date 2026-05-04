@@ -18,7 +18,7 @@
 // 他 v2 ツールから:
 //   `import { Kernel, Axioms, BlockSchema } from './AiRunAndRead_BIBLE.js'`
 
-export const VERSION = "2.9";
+export const VERSION = "2.10";
 export const DATE = "2026-05-04";
 export const AUTHOR = "沖井広行(蒼山りと)";
 
@@ -50,6 +50,35 @@ export const Physics = {
     law: "ファイル移動と分割は AI にとって物理的重労働である。コンテキストを統合し、移動を最小化せよ。",
     status: "axiomatic",
     related: "公理 A1(ローカリティ極大化)",
+  },
+  LLMTyping: {
+    law:
+      "LLM の type system は **値そのもの**である。LLM が token を読む時点で型が見えなければ、" +
+      "LLM は context window を遡って型を再構築しようとし、推論 step が増え、間違える確率が線形に上がる。" +
+      "従って『REAL な値(state / event payload / refs payload / Block 間通信値)』は、" +
+      "**値の中に型が埋まった self-describing 形式**で持つこと(例: \"world:5,0,2\" / \"usd:9.99\" / \"time:1234567890\")。",
+    detail:
+      "**LLM-First Typing** — 普通の typing は compile time に人間が型を書きコンパイラが catch する仕組み。" +
+      "それは『機械(コンパイラ)が見る型』。LLM 時代では LLM 自身が推論 step ごとに『直前の token から型情報を取得』する必要があり、" +
+      "**LLM が見る場所(値そのもの)に型が埋まっている**ことが推論精度を最大化する。" +
+      "命名規則(`worldPos`, `screenX`)に型を載せる従来手法は LLM の context window 外で崩壊する — " +
+      "tagged value は context 不要で常に正解。" +
+      "これは **crystallize の双対**: " +
+      "  - crystallize: JS Block → Go の static type system に翻訳(machine の型に compile)" +
+      "  - tagged value: 値 → LLM の視野に型を埋め込む(LLM の型に compile)" +
+      "両者とも『型を必要とする機械(machine compiler / LLM inference)が見る場所に型を埋める』操作。",
+    status: "axiomatic",
+    addedIn: "2.10",
+    related: "公理 A0 認知非対称性、A7 展開・明示、A9 crystallize、A11 Domain-Tagged Values",
+    benefits: [
+      "LLM 認知コスト最小化(token 単位で型確定、context 遡及不要)",
+      "推論ステップ削減 → mistake 確率の線形低下",
+      "命名規則・コメント・schema 不要(値が self-describing)",
+      "context window 外でも常に正解(値だけで型確定)",
+      "AI 同士の transfer でも型情報が値に張り付いて移動",
+      "crystallize 整合(Go 側でも string → struct で 1:1 受け、translation contract 単純化)",
+    ],
+    formula: "「型は LLM が見る場所(値そのもの)に置け」",
   },
 };
 
@@ -197,53 +226,91 @@ export const Axioms = {
       "A11(Domain-Tagged Coordinates)が runtime nominal typing でこれを構造強制する。",
   },
   A11: {
-    id: "A11", name: "Domain-Tagged Coordinates",
+    id: "A11", name: "Domain-Tagged Values",
     summary:
-      "すべての coord 値は **domain 接頭辞付き string** で表現する: `\"world:5,0,2\"` / `\"local:0,1,0\"` / `\"screen:300,200\"` / `\"ortho:0.7,0.85\"`。" +
-      "Three.js 等の engine API に渡すときは boundary で parse、Block 内 / event payload / state / refs payload はすべて tagged string で持つ。",
+      "すべての **REAL な値**(Block の state / event payload / refs payload / Block 間通信値)は、" +
+      "**型/単位/domain 接頭辞付き string** で表現する: `\"world:5,0,2\"` / `\"usd:9.99\"` / `\"time:1234567890\"` / " +
+      "`\"hash:deadbeef\"` / `\"id:user-42\"` / `\"kg:0.5\"`。" +
+      "型情報を **LLM が読む値そのものの中に** 埋め込み、推論時の型混同を構造的に消す。",
     why:
-      "A10 を「規則 + bible-check で守る」から「**混ぜたら型が合わない**」構造強制に格上げする。" +
-      "JS は動的型なので [x,y,z] という素の数値配列だと world / local / screen が同形 → 取り違えが compile 時に検出できない。" +
-      "domain 接頭辞付き string にすると、`screen:` を期待する関数に `world:` を渡した瞬間に runtime で死ぬ(or 静的に検出可能)。Bible §4.1.1『規律 = 構造』の極致 — validate 関数を書かず、データ形そのものが enforcer になる。" +
-      "crystallize 整合: Go 側でも同じ string 表現をそのまま受けて parse、translation contract が単純化(string ↔ struct で 1:1)。" +
-      "LLM 視認性: prompt で `[5,0,2]` を見ても何 coord か判らないが、`\"world:5,0,2\"` は一目で domain がわかる(A0 認知非対称性 + A7 展開・明示 に直接効く)。" +
-      "計算コスト: 60fps 数十 prefab で microsecond 級、無視できる範囲。数千 particle でホットパス化なら局所的に tuple/object へ退避可。",
+      "Physics.LLMTyping(LLM-First Typing 法則)の axiom 化。" +
+      "JS は動的型、人間は変数名(`worldPos`, `usdAmount`)で型を補完するが、LLM は context window 外でこの慣習を再構築できない。" +
+      "命名・コメント・schema 抜きで **値だけ見て型が確定する** 形にすると、LLM 推論 step が 1 つ減る = mistake 確率が線形に下がる。" +
+      "**crystallize の双対**: " +
+      "crystallize は JS Block を Go の静的型に compile する(machine の型に翻訳)。" +
+      "tagged value は値を LLM の視野に compile する(LLM の型に翻訳)。" +
+      "両方とも『型を必要とする機械が見る場所に型を埋める』操作。" +
+      "Bible §4.1.1『規律 = 構造』の極致 — validate 関数を書かず、データ形そのものが enforcer になる。" +
+      "voxel 失敗(2026-05-03)で coord 取り違えが特定された結果から発見、coord に閉じない一般原則として正典化。",
+    scope: {
+      "REAL(tag 必須)": [
+        "Block state の field(永続化される、inter-Block 通信される)",
+        "event payload(dispatch / refs / message)",
+        "Graph 上の値(refs payload、children payload)",
+        "Block 間で渡される全ての値",
+      ],
+      "scratch(tag 不要)": [
+        "関数内ローカル変数(boundary で parse 済み)",
+        "tick 内一時計算(ホットパス保護のため)",
+        "engine API 内部値(Three.js Vector3 等、boundary 越え後)",
+      ],
+    },
     domains: {
+      // ─── coord 系(A10 ↔ A11 の交点) ───
       world:  "scene graph / Block 間 / 入力 ray hit / refs payload で使う絶対座標。例: \"world:5,0,2\"",
       local:  "asset.js 内部の mesh.vertices / bones / 内部 anchor で使う asset 原点基準。例: \"local:0,1,0\"",
       screen: "render output / input adapter 境界でのみ存在する pixel 座標。Block state には侵入させない(Taboo 14)。例: \"screen:300,200\"",
-      ortho:  "HUD ortho camera が見る world 領域の coord。NDC-like (-1..1) range。例: \"ortho:0.7,0.85\"",
+      ortho:  "HUD ortho camera が見る world 領域。NDC-like (-1..1) range。例: \"ortho:0.7,0.85\"",
+      // ─── 通貨 / 単位 ───
+      usd:    "米ドル金額。例: \"usd:9.99\"",
+      jpy:    "日本円金額。例: \"jpy:980\"",
+      kg:     "質量(キログラム)。例: \"kg:0.5\"",
+      "duration-s": "継続時間(秒)。例: \"duration-s:5.5\"",
+      "duration-ms": "継続時間(ミリ秒)。例: \"duration-ms:1500\"",
+      // ─── 時刻 / バージョン / 識別子 ───
+      time:    "Unix timestamp(秒)。例: \"time:1234567890\"",
+      "time-ms": "Unix timestamp(ミリ秒)。例: \"time-ms:1234567890123\"",
+      iso:     "ISO 8601 datetime。例: \"iso:2026-05-04T17:00:00+09:00\"",
+      version: "semver / 内部 version。例: \"version:2.10\"",
+      hash:    "hash 値(hex)。例: \"hash:deadbeef\"",
+      id:      "識別子(namespaced)。例: \"id:user-42\" / \"id:block:cube\"",
+      // ─── 拡張 ───
+      "{domain}": "新規 domain は自由に追加(英小文字 + ハイフン、`:` で本体と区切る)",
     },
     format: {
-      separator: ": と , (ASCII、parse 容易)",
-      numeric: "JS Number.toString() 互換(整数 / float / 負数 / 指数表記すべて OK)",
-      examples: ["world:5,0,2", "world:1.5,-0.5,3.14", "local:0,1,0", "screen:300,200", "ortho:0.7,0.85"],
+      grammar: "<domain>:<body>(domain は ASCII 英小文字 + ハイフン + 数字、body は domain ごとに自由)",
+      coord_body: "x,y[,z] (number、JS Number.toString 互換、負数 / 小数 / 指数表記 OK)",
+      scalar_body: "single number / string / structured (domain ごとに parser を持つ)",
+      examples: ["world:5,0,2", "usd:9.99", "time:1234567890", "id:user-42", "hash:deadbeef", "iso:2026-05-04T17:00:00+09:00"],
     },
     api: {
-      // 実装は coord.js helper module で提供
-      builders: ["w(x,y,z) → 'world:x,y,z'", "l(x,y,z) → 'local:x,y,z'", "s(x,y) → 'screen:x,y'", "o(x,y) → 'ortho:x,y'"],
-      parsers:  ["parseCoord(str) → {domain, values}", "requireDomain(str, expected) → number[](domain 不一致で throw)"],
-      converters: ["toThreeVec3(str, expectedDomain) → THREE.Vector3 (boundary)"],
+      // 座標系(coord.js):
+      coord_builders: ["w(x,y,z) / l(x,y,z) / s(x,y) / o(x,y) → 'domain:x,y[,z]' string"],
+      coord_parsers:  ["parseCoord(str) → {domain, values}", "requireDomain(str, expected) → number[](不一致で throw)"],
+      // 一般値(将来 typed.js 等で提供):
+      builders:       ["tagged(domain, body) → 'domain:body'", "usd(amount) / jpy(amount) / kg(mass)"],
+      parsers:        ["parseTagged(str) → {domain, body}", "requireTag(str, expected) → body(不一致で throw)"],
     },
     examples: [
-      "OK: export const transform = { position: 'world:5,0,2', rotation: 'world:0,0,0', scale: 1 }",
-      "OK: state.lastClickWorldPos = 'world:1.5,0.5,-1.2'(inter-Block 共有値)",
-      "OK: prefabLoader 内: const [x,y,z] = requireDomain(asset.transform.position, 'world')",
-      "NG: position: [5,0,2](domain 不明、A11 違反)",
-      "NG: state.lastClickWorldPos = [1.5, 0.5, -1.2](裸の数値配列)",
-      "NG: requireDomain('screen:300,200', 'world')(domain 不一致 → throw)",
+      "OK: state = { hp: 100, mood: 'neutral', lastSeen: 'time:1234567890' }",
+      "OK: state.amount = 'usd:9.99'(scratch 計算は const a = 9.99、boundary で format)",
+      "OK: refs: [{ kind: 'paid-by', target: 'id:user-42', amount: 'usd:9.99' }]",
+      "NG: state.lastSeen = 1234567890(裸の数値、unix 秒?ミリ秒?判別不能)",
+      "NG: state.amount = 9.99(USD?JPY?判別不能、LLM が間違える)",
+      "NG: refs に `target: 'user-42'`(prefix 無し → name か id か判別不能)",
     ],
     violations: [
-      "Block / state / event payload に domain 接頭辞無しの裸の数値配列を coord として持つ",
-      "engine API への渡しで boundary parse を経由せず、tagged string 文字列のまま投入",
+      "REAL 値(state / event / refs / Block 間)に裸の数値 / string を持つ(domain 不明)",
+      "boundary を経由せず tagged string を直接 engine API に投入",
       "domain 不一致を runtime check 無しで mix する",
+      "命名規則・コメントだけで型を表す(値が self-describing でない)",
     ],
-    refs: ["A0","A7","A9","A10","Vocabulary.world-coord","Vocabulary.prefab"],
+    refs: ["A0","A7","A9","A10","Physics.LLMTyping","Vocabulary.world-coord","Vocabulary.domain-tag","Vocabulary.prefab"],
     enforcementNote:
-      "A10 が『混ぜるな』の宣言、A11 は『**混ぜれない**』の構造実装。 " +
-      "voxel 失敗を二重に防ぐ + crystallize の意味論厳密化 + LLM 認知可視化を同時達成。 " +
-      "実装は coord.js(builders / parsers / converters)、各 prefab / input / HUD / loader が利用する。 " +
-      "段階的移行可能 — 既存 [x,y,z] 配列は残置 OK、新規記述から tagged string、boundary で parse。",
+      "A10 が「混ぜるな」の宣言、A11 は『**混ぜれない**』の構造実装、すべての REAL 値に拡張。" +
+      "Physics.LLMTyping『型は LLM が見る場所(値そのもの)に置け』を data layer に降ろした実装。" +
+      "**LLM 認知コスト最小** + **mistake 線形低下** + **crystallize 整合** + **A0/A7 同時強化** を一手で達成。" +
+      "段階的移行可能 — REAL 値だけ tagged 化、scratch / hot path は裸でも可、boundary で format/parse。",
   },
 };
 
@@ -397,12 +464,28 @@ export const Vocabulary = {
       note: "WebGL / three.js / WebGPU の scene graph 中心実装に強制収束。CSS 3D / DOM transform は永久封印。HUD は ortho camera が見る world 領域として実装。",
     },
     "domain-tag": {
-      meaning: "coord 値の domain 接頭辞(\"world:\" / \"local:\" / \"screen:\" / \"ortho:\")。runtime nominal typing で coord 取り違えを構造的に防ぐ。",
-      replaces: "裸の [x,y,z] 配列で coord を表現すること",
-      etymology: "domain(領域)+ tag(印)。型のない JS で nominal typing を string prefix で emulate する技法。",
-      operation_vector: "暗黙の coord 系 → 明示的な domain 同定可能性  (A0 認知非対称性 + A7 展開・明示)",
-      axiom_ref: ["A11","A10","A0","A7"],
-      note: "format は \"<domain>:x,y[,z]\"。coord.js helper(w/l/s/o builder + requireDomain parser)で操作。boundary(Three.js 等の engine API)で parse、それ以外はすべて tagged string で持ち回す。",
+      meaning: "REAL 値の domain / 型 / 単位接頭辞(\"world:\" / \"usd:\" / \"time:\" / \"id:\" / \"hash:\" 等)。runtime nominal typing で値の取り違えを構造的に防ぐ。",
+      replaces: "裸の数値 / 文字列で REAL 値を表現すること",
+      etymology: "domain(領域)+ tag(印)。型のない JS で nominal typing を string prefix で emulate する技法。値そのものに型を埋める LLM-First Typing の実装手段。",
+      operation_vector: "暗黙の型 → 値そのものに型が埋まる  (A0 認知非対称性 + A7 展開・明示 を同時に強化)",
+      axiom_ref: ["A11","A10","A0","A7","Physics.LLMTyping"],
+      note: "format は \"<domain>:<body>\"。coord 系は coord.js(w/l/s/o + requireDomain)、汎用は tagged/parseTagged/requireTag(typed.js を将来追加)。boundary で parse、それ以外はすべて tagged string で持ち回す。",
+    },
+    "tagged-value": {
+      meaning: "Domain-Tagged Value — 型 / 単位 / domain を値の中に prefix string で埋め込んだ self-describing な REAL 値。",
+      replaces: "命名規則やコメントで型を表現すること(LLM 視点で context window 外に弱い手法)",
+      etymology: "tag(印)+ value(値)。LLM-First Typing の実装。crystallize の双対(machine の型 vs LLM の型)。",
+      operation_vector: "型情報の場所: 命名規則 → 値そのもの  (LLM 推論 step 削減 = mistake 確率の線形低下)",
+      axiom_ref: ["A11","Physics.LLMTyping","A0","A7"],
+      note: "REAL 値(state / event / refs / Block 間通信)は tagged 必須、scratch / hot path は裸で OK、boundary で format/parse。",
+    },
+    "LLM-typing": {
+      meaning: "LLM-First Typing — 型を LLM が読む場所(値そのもの)に埋め込む型システム。値が token として読まれる時点で型が確定するように設計する。",
+      replaces: "compile-time typing(人間が型を書きコンパイラが catch する従来手法)",
+      etymology: "LLM(Large Language Model)+ typing(型付け)。crystallize が machine type への compile なら、これは LLM type への compile。",
+      operation_vector: "型は人間 / コンパイラの世界 → 型は LLM の世界  (型の住む場所のパラダイム変化)",
+      axiom_ref: ["Physics.LLMTyping","A11","A0","A7","A9"],
+      note: "実装は tagged-value(domain prefix string)。crystallize と双対関係 — どちらも『型を必要とする機械が見る場所に型を埋める』。MYY 哲学『LLM が走るための道』の core 実装。",
     },
     prefab: {
       meaning: "Block の game asset 形態 — world transform + state + 畳込み遷移関数の triple。内部(mesh.vertices, bones, 内部 anchor)は local coord、transform が local → world の境界変換器。",

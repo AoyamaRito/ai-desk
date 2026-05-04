@@ -229,8 +229,11 @@ test('A11: pointer.state の coord 系 field はすべて world tagged または
 const voxel = prefabs.voxelCanvas;
 const voxelT = makeClickTransition(voxel);   // voxel canvas は flow.click のみ
 
+// snap math 検証の test では計算しやすい cs=0.5 に override(production は 0.125)
+const seedCs05 = (extra = {}) => ({ ...voxel.state, cellSize: 0.5, ...extra });
+
 test('voxel: addOrRemoveVoxelOnClick で cell-center snap して voxels に add', () => {
-  const out = voxelT(voxel.state, { kind: 'click', worldPos: w(0.7, 0, 0.3) });
+  const out = voxelT(seedCs05(), { kind: 'click', worldPos: w(0.7, 0, 0.3) });
   // cellSize 0.5、cell-center snap:
   //   x=0.7 → cell [0.5, 1.0]、center 0.75
   //   z=0.3 → cell [0,   0.5]、center 0.25
@@ -340,30 +343,48 @@ test('voxel: floor-shift は pure(初期 state を mutate しない)', () => {
 });
 
 test('voxel: floor>0 で click すると floor の上に voxel が配置される', () => {
-  const s = { ...voxel.state, floorIndex: 2 };       // floor world y = 1.0
+  const s = seedCs05({ floorIndex: 2 });             // cs=0.5、floor world y = 1.0
   const out = voxelT(s, { kind: 'click', worldPos: w(0, 1.0, 0) });
   const key = Object.keys(out.voxels)[0];
   const [, y] = parseCoord(key).values;
-  // floor=2 → minCy = 1.25、cy = 1.25
   assert.equal(y, 1.25);
 });
 
 test('voxel: hit.y が floor 下でも floor の上に clamp される', () => {
-  const s = { ...voxel.state, floorIndex: 3 };       // floor world y = 1.5
-  // 地面 y=0 を click(plane が floor=3 の y=1.5 にあるが、何らかの古い hit が来る想定)
+  const s = seedCs05({ floorIndex: 3 });             // cs=0.5、floor world y = 1.5
   const out = voxelT(s, { kind: 'click', worldPos: w(0, 0, 0) });
   const key = Object.keys(out.voxels)[0];
   const [, y] = parseCoord(key).values;
-  assert.equal(y, 1.75);   // 3*0.5 + 0.25 = 1.75(floor 上に clamp)
+  assert.equal(y, 1.75);
 });
 
 test('voxel: floor>0 で voxel 上面 click は次の段に積む', () => {
-  let s = { ...voxel.state, floorIndex: 1 };          // floor world y = 0.5
-  s = voxelT(s, { kind: 'click', worldPos: w(0, 0.5, 0) });   // floor の上に 1 個 (cy=0.75)
-  // top of voxel at y=0.75+0.25=1.0、そこを click
+  let s = seedCs05({ floorIndex: 1 });               // cs=0.5、floor world y = 0.5
+  s = voxelT(s, { kind: 'click', worldPos: w(0, 0.5, 0) });
   s = voxelT(s, { kind: 'click', worldPos: w(0, 1.0, 0) });
   const ys = Object.keys(s.voxels).map(k => parseCoord(k).values[1]).sort();
-  assert.deepEqual(ys, [0.75, 1.25]);   // 第 1 段 + 第 2 段
+  assert.deepEqual(ys, [0.75, 1.25]);
+});
+
+// ============================================================
+// set-color: 選択色変更
+// ============================================================
+
+const voxelColorT = transitionForEvent(voxel, { kind: 'set-color' });
+
+test('voxel: set-color で currentColor が変わる', () => {
+  const out = voxelColorT(voxel.state, { kind: 'set-color', color: 'hex:00ff00' });
+  assert.equal(out.currentColor, 'hex:00ff00');
+});
+
+test('voxel: 同じ色を set-color しても state 不変', () => {
+  const out = voxelColorT(voxel.state, { kind: 'set-color', color: voxel.state.currentColor });
+  assert.equal(out, voxel.state);
+});
+
+test('voxel: set-color に color 無しで no-op', () => {
+  const out = voxelColorT(voxel.state, { kind: 'set-color' });
+  assert.equal(out, voxel.state);
 });
 
 // ============================================================

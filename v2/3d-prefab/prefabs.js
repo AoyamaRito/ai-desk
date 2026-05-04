@@ -88,6 +88,14 @@ export const behaviors = {
     };
   },
 
+  // set-color: 選択色を変更(swatch click から呼ばれる)
+  // event = { kind: 'set-color', color: 'hex:RRGGBB' }
+  setCurrentColor: (s, ev) => {
+    if (ev.kind !== 'set-color' || !ev.color) return s;
+    if (s.currentColor === ev.color) return s;
+    return { ...s, currentColor: ev.color };
+  },
+
   // floor-shift: voxel canvas の配置基準面(floor)を上下する
   // event = { kind: 'floor-shift', delta: +1 | -1 }
   // floorIndex は integer の層番号、世界 y = floorIndex * cellSize で plane が配置される
@@ -184,19 +192,19 @@ export const prefabs = {
   voxelCanvas: {
     id: 'voxel-canvas',
     transform: { position: w(0, 0, 0), rotation: [0, 0, 0], scale: 1 },
-    mesh: { kind: 'voxel-canvas', cellSize: 0.5, planeSize: 8, maxVoxels: 4096 },
+    mesh: { kind: 'voxel-canvas', cellSize: 0.125, planeSize: 8, maxVoxels: 16384 },
     state: {
       voxels: {},
-      cellSize: 0.5,
+      cellSize: 0.125,           // 1/4 サイズ、64x64 cells per layer
       tool: 'add',
-      currentColor: 'hex:ff8844',
+      currentColor: 'hex:ffb6c1',
       lastEditWorldPos: null,
-      floorIndex: 0,        // integer 層番号、plane の世界 y = floorIndex * cellSize
+      floorIndex: 0,
     },
     flow: {
       click: ['addOrRemoveVoxelOnClick'],
       'floor-shift': ['shiftFloor'],
-      // tick / hover は adapter 側で処理(syncInstances / moveCursor / plane sync は Block 層外)
+      'set-color': ['setCurrentColor'],
     },
   },
 

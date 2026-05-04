@@ -136,6 +136,29 @@ function buildVoxelCanvas(meshSpec) {
   handleDown.position.set(cornerX, 0.15, cornerZ);
   group.add(handleDown);
 
+  // 色 swatch(8 色のかわいい palette、plane の手前外側に並べる)
+  // 世界 y = 0.5 固定(floor とは独立、UI として常時アクセス可)
+  const cuteColors = [
+    0xffb6c1,  // light pink
+    0xc8a2c8,  // lilac
+    0x98d8c8,  // mint
+    0xffd7be,  // peach
+    0x87ceeb,  // sky blue
+    0xfff3a3,  // butter
+    0xff8c8c,  // coral
+    0xb8a9ff,  // periwinkle
+  ];
+  const swatchY = 0.45;
+  const swatchZ = halfP + 0.45;
+  const swatchSpacing = 0.5;
+  const swatchStartX = -((cuteColors.length - 1) * swatchSpacing) / 2;
+  for (let i = 0; i < cuteColors.length; i++) {
+    const c = cuteColors[i];
+    const sw = makeColorSwatch(c);
+    sw.position.set(swatchStartX + i * swatchSpacing, swatchY, swatchZ);
+    group.add(sw);
+  }
+
 
   // sync 状態用の cache
   group.userData.voxelInst = inst;
@@ -159,6 +182,17 @@ function makeFloorHandle(role, color, dirY) {
   const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92 });
   const mesh = new THREE.Mesh(geom, mat);
   mesh.userData.handleRole = role;
+  return mesh;
+}
+
+// color swatch(現在色を選ぶ UI、click で 'set-color' event 発火)
+function makeColorSwatch(colorInt) {
+  const geom = new THREE.BoxGeometry(0.32, 0.32, 0.32);
+  const mat = new THREE.MeshStandardMaterial({ color: colorInt, roughness: 0.5 });
+  const mesh = new THREE.Mesh(geom, mat);
+  const hex = 'hex:' + colorInt.toString(16).padStart(6, '0');
+  mesh.userData.handleRole = 'color-pick';
+  mesh.userData.handleColor = hex;
   return mesh;
 }
 
@@ -281,6 +315,14 @@ function setupInput(canvas, camera, handles, router) {
     }
     if (role === 'floor-down') {
       pushEvent({ kind: 'floor-shift', targetId: hit.handle.id, delta: -1 });
+      return;
+    }
+    if (role === 'color-pick') {
+      // raw mesh から userData.handleColor を取り出して set-color event 発火
+      let walk = hit.raw;
+      while (walk && !walk.userData?.handleColor) walk = walk.parent;
+      const color = walk?.userData?.handleColor;
+      if (color) pushEvent({ kind: 'set-color', targetId: hit.handle.id, color });
       return;
     }
     // それ以外 → 通常の click(voxel 配置等)、world coord は A11 tagged で

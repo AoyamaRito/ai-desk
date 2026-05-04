@@ -1,120 +1,108 @@
-# 3d-prefab — A10 prefab triple の最小実装
+# 3d-prefab — A10 + A11 統合 prefab demo
 
-A10 Single Coordinate Domain に従う 3D 描画の最初の例。
-`name.asset.js`(prefab)= world transform + mesh(local coord)+ state + transition の triple。
+Bible 公理 A10(Single Coordinate Domain) + A11(Domain-Tagged Coordinates)に
+従う 3D 描画の実装。Block 層と Adapter 層を 2 つのファイルに集約。
 
-## 起動
-
-ローカル http server で起動(ESM + importmap が file:// で動かないため):
-
-```bash
-# v2 直下から
-python3 -m http.server 8080
-# →  http://localhost:8080/3d-prefab/
-```
-
-回転する cube が見えれば OK。
-
-## 構造
+## 構造(3 ファイル + test 1 + assets)
 
 ```
 3d-prefab/
-├── index.html              importmap で three@0.170.0 を pin
-├── main.js                 entry: scene 作って prefab 配置 → tick loop
-├── scene.js                three.js の scene/camera/renderer setup(world coord)
-├── prefabLoader.js         asset.js → THREE.Mesh の境界 layer
+├── coord.js              A11 helpers — w/l/s/o builders + parseCoord/requireDomain
+├── prefabs.js            Block 層: 全 prefab data + behaviors + compose(crystallize 整合)
+├── main.js               Adapter 層: scene + loader + input + hud + entry(Three.js / DOM)
+├── index.html            importmap で three@0.170.0 を pin
+├── test/
+│   └── prefabs.test.js   41 cases、ブラウザ不要、~90ms
 └── assets/
-    └── cube.asset.js       最初の prefab(inline BoxGeometry、GLB なし)
+    ├── box.glb           Khronos Sample (Apache 2.0)
+    └── koma_hu.glb       (将棋 歩、~32MB)
 ```
 
-## prefab (`name.asset.js`) の規約 — A10 の prefab triple
+## A11 — domain-tagged coord(全部 string)
+
+すべての coord 値は `"<domain>:x,y[,z]"` で表現する:
 
 ```js
-export const id = 'cube';
+import { w } from './coord.js';
 
-// inter-Block 境界: world coord
-export const transform = { position:[0,0,0], rotation:[0,0,0], scale:1 };
+transform: {
+  position: w(5, 0, 2),     // → "world:5,0,2"
+  rotation: [0, 0, 0],       // Euler radians、coord ではないので tag なし
+  scale: 1,
+}
 
-// intra-Block: local coord OK(asset 原点基準)
-export const mesh = { kind: 'BoxGeometry', args:[1,1,1], material:{ kind:'MeshNormalMaterial' } };
-
-// Block state(畳込み遷移の対象)
-export const state = { rotSpeed: 0.01, age: 0 };
-
-// 畳込み遷移: pure function、(state, event) → newState
-export function transition(state, event) {
-  if (event.kind === 'tick') return { ...state, age: state.age + 1 };
-  return state;
+state: {
+  lastClickWorldPos: w(1.5, 0.5, -1.2),   // inter-Block 共有値
+  // raw 配列 [1.5, 0.5, -1.2] は A11 違反
 }
 ```
 
-### A10 整合チェック
+domain 4 種:
+- `world:` — scene graph / inter-Block / refs payload(絶対座標)
+- `local:` — asset.js 内部の mesh.vertices / bones(asset 原点基準)
+- `screen:` — render output / input adapter 境界のみ(Block 内禁止)
+- `ortho:` — HUD ortho camera world 領域
 
-| 場所 | coord | 例 |
-|---|---|---|
-| `transform.position` | world | `[5, 0, 0]` |
-| `mesh.args` (vertex 系) | local | `BoxGeometry(1,1,1)` は asset 原点基準 |
-| `state.lastWorldPos`(他 asset 共有) | world | inter-Block 通信用 |
-| `state.rotSpeed`(internal scalar) | coord 外 | rad/tick |
-| canvas pixel / screen coord | 不可侵 | render output 境界のみ |
+## prefabs.js — Block 層
 
-## 二段構成 — Node テスト + ブラウザ + ai-eyes
+各 prefab は data + behavior id 配列で表現、共通 transition は behavior 合成で生成:
 
-prefab triple は **state + transition が pure function** なので、Block の論理は
-ブラウザ不要で Node 単独で検証できる。render + input は adapter layer なので
-ブラウザに任せ、AI 観測は ai-eyes 経由にする:
+```js
+const standardClickResponse = ['tickAge', 'pulseDecay', 'reverseRotOnClick', 'pulseOnClick', 'recordClickPos'];
+
+export const prefabs = {
+  cube: {
+    id: 'cube',
+    transform: { position: w(0, 0, 0), rotation: [0,0,0], scale: 1 },
+    mesh: { kind: 'BoxGeometry', args: [1,1,1], material: { kind: 'MeshNormalMaterial' } },
+    state: { rotSpeed: 0.01, age: 0, pulse: 0, lastClickWorldPos: null },
+    behaviorIds: standardClickResponse,
+  },
+  // 他 prefab(boxGlb / komaHu / pointer / character)も同様、~10 行/個
+};
+```
+
+旧 5 個の `*.asset.js` 別ファイルは `/PJs/trash/3d-prefab-pre-A11-2026-05-04/` に退避。
+
+## main.js — Adapter 層
+
+scene / loader / input / hud / 起動 ループを 1 ファイルに集約。各 boundary で
+A11 tagged string を Three.js Vector3 に parse(`requireDomain`)。
+
+## 二段検証
 
 | layer | 場所 | 検証 |
 |---|---|---|
-| `state` + `transition()` | `assets/*.asset.js`(pure) | `node --test` で単体テスト |
-| `mesh` 構造 / GLB load | prefabLoader(adapter) | ブラウザで描画確認 |
-| input(ray cast / pointer) | input.js(adapter 境界) | ブラウザ + ai-eyes remote eval |
-| 視覚結果 | three.js scene render | ai-eyes /snapshot + structures/ |
+| Block(prefabs.js) | pure transition + tagged coord | `npm run test:prefab`(Node、~90ms、41/41) |
+| Adapter(main.js) | Three.js / DOM / pointer | ブラウザ + ai-eyes 観測 |
 
-### Node 単体テストの実行
+## 起動
 
 ```bash
+# Block 層検証
 cd v2
-node --test 3d-prefab/test/transition.test.js
-```
+npm run test:prefab
 
-15 件: tick / click / 純粋性 / 可逆性 / A10 整合(state.lastClickWorldPos が world coord 配列)。
-
-### ai-eyes 起動 + ブラウザ AI 観測
-
-```bash
-cd v2
+# Adapter 込みで動作確認(ai-eyes 経由で AI 観測可能)
 PORT=3000 LOG_FILE=/tmp/ai-eyes-3dprefab.log SNAPSHOT_DIR=/tmp/ai-eyes-snapshots \
   node /Users/AoyamaRito/PJs/ai-eyes/ai-eyes.js
 # →  http://localhost:3000/3d-prefab/
-
-# AI 側観測:
-# - エラー: tail /tmp/ai-eyes-3dprefab.log
-# - 60 frame ごとの prefab state: ls /tmp/ai-eyes-snapshots/structures/
-# - HTML snapshot: ls /tmp/ai-eyes-snapshots/*.html
-# - 任意 eval: curl -X POST -d '{"action":"eval","code":"..."}' localhost:3000/input
 ```
 
-これで「人間がブラウザを目視 → AI に報告」往復が原理的に消える。
+## 公理整合表(bible-check 自動検証対象)
 
----
+| Axiom / Taboo | 強制方法 |
+|---|---|
+| A10 Single Coord Domain | screen coord は input adapter 境界のみ、Block / event payload に侵入禁止 |
+| A11 Domain-Tagged Coord | すべての coord は string、boundary で parse、不一致は runtime throw |
+| A9 Crystallization | tagged string は Go の string で 1:1 受け、translation contract 単純化 |
+| Taboo 13 No CSS 3D | three.js (WebGL) 強制、CSS transform 禁止 |
+| Taboo 14 No screen coord in state | state は world tagged、event は world tagged |
+| Taboo 15 No DOM overlay | HUD は ortho camera world、UI は OffscreenCanvas + CanvasTexture |
 
-## 次の段
+## 学んだこと
 
-- [x] BoxGeometry inline で prefab 動作確認
-- [ ] GLTFLoader 統合 → `mesh: { kind:'glb', glbPath:'./character.glb' }` 形式追加
-- [ ] AI 生成 GLB(Meshy / Tripo / Rodin 等)を 1 個読み込んで描画
-- [ ] 入力 adapter(mouse → ray cast → world hit → prefab.dispatch)
-- [ ] HUD layer(camera-following ortho camera、screen-fixed UI を world で表現)
-- [ ] 複数 prefab + 他 prefab 参照(world coord で位置共有)
-
-## Bible 整合(自動チェック対象)
-
-```bash
-node ../ai-desk.js bible-check 3d-prefab/main.js
-node ../ai-desk.js bible-check 3d-prefab/scene.js
-node ../ai-desk.js bible-check 3d-prefab/prefabLoader.js
-node ../ai-desk.js bible-check 3d-prefab/assets/cube.asset.js
-```
-
-A10 / Taboo 13-15(CSS 3D / screen-coord / DOM overlay)違反がないことを確認。
+- A11(tagged string)を入れると **prefab data が完全 self-describing** になり、ファイル分割の必要が薄れる
+- 共通 transition を behavior 合成にすると、5 prefab で同じ pattern を 5 回コピペしていたのが消える(A1 + A7 + Vocabulary `densify`)
+- Block 層と Adapter 層の分離は維持(crystallize 可能性 vs Three.js 依存)
+- voxel 失敗の原因「coord 系混入」は A10 + A11 で原理的に消えた

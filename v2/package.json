@@ -5,9 +5,9 @@
   "type": "module",
   "main": "ai-desk.js",
   "scripts": {
-    "test": "node e2e.js && node --test 3d-prefab/test/transition.test.js 3d-prefab/test/inter-block.test.js",
+    "test": "node e2e.js && node --test 3d-prefab/test/prefabs.test.js",
     "test:e2e": "node e2e.js",
-    "test:prefab": "node --test 3d-prefab/test/transition.test.js 3d-prefab/test/inter-block.test.js",
+    "test:prefab": "node --test 3d-prefab/test/prefabs.test.js",
     "self": "node ai-desk.js self"
   },
   "license": "MIT",

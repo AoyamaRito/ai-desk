@@ -485,7 +485,7 @@ function pushBlock(arr, moduleId, type, name, content, tags = []) {
   arr.push(b);
 }
 
-function extractInlineTags(source, declStart) {
+export function extractInlineTags(source, declStart) {
   const tags = new Set();
   let lineEnd = source.lastIndexOf('\n', declStart - 1);
   for (let i = 0; i < 20 && lineEnd > 0; i++) {
@@ -501,10 +501,10 @@ function extractInlineTags(source, declStart) {
   return Array.from(tags);
 }
 
-function matchBrace(source, openIdx) { return matchPair(source, openIdx, '{', '}'); }
-function matchParen(source, openIdx) { return matchPair(source, openIdx, '(', ')'); }
+export function matchBrace(source, openIdx) { return matchPair(source, openIdx, '{', '}'); }
+export function matchParen(source, openIdx) { return matchPair(source, openIdx, '(', ')'); }
 
-function matchPair(source, openIdx, openCh, closeCh) {
+export function matchPair(source, openIdx, openCh, closeCh) {
   let depth = 0, inString = null, escape = false, inTemplate = 0;
   for (let i = openIdx; i < source.length; i++) {
     const c = source[i];
@@ -563,7 +563,7 @@ function skipRegex(source, startIdx) {
   return source.length - 1;
 }
 
-function findFunctionBody(source, declStart) {
+export function findFunctionBody(source, declStart) {
   const argStart = source.indexOf('(', declStart);
   if (argStart < 0) return -1;
   const argEnd = matchParen(source, argStart);

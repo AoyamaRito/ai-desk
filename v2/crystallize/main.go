@@ -31,6 +31,10 @@ func main() {
 		analysisHarness()
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "--phase4" {
+		parseHelperHarness()
+		return
+	}
 	cases := []testCase{
 		{
 			Name:  "empty version",

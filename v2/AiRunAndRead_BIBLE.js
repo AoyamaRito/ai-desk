@@ -18,7 +18,7 @@
 // 他 v2 ツールから:
 //   `import { Kernel, Axioms, BlockSchema } from './AiRunAndRead_BIBLE.js'`
 
-export const VERSION = "2.10";
+export const VERSION = "2.11";
 export const DATE = "2026-05-04";
 export const AUTHOR = "沖井広行(蒼山りと)";
 
@@ -207,8 +207,11 @@ export const Axioms = {
       "OK: HUD は camera-following ortho camera が見る world 領域(右上 HP バー = ortho world (0.95, 0.95))",
       "OK: マウス入力 → ray cast → world hit → Block state へ渡す",
       "OK: text input が必要な場面は modal dialog → string 返却 → world に戻る",
+      "OK: 画面端の DOM sidebar / panel(3D scene と構造的に分離、native form 要素 / a11y / IME 利点)",
+      "OK: <input type='color'> / <button> / <input type='range'> 等の native UI 要素(sidebar 内)",
       "NG: CSS 3D で transform を parent-relative に書く(world-coord 統一不能)",
       "NG: screen pixel 座標を Block state に持ち込む(asset 内 / 間 共に不可)",
+      "NG: world coord を screen に project して DOM の位置を毎 frame 更新する(world tracking overlay)",
       "NG: 他 asset 参照を local coord で書く(world coord 必須)",
     ],
     violations: [
@@ -673,13 +676,17 @@ export const Taboos = [
     refsAxiom: "A10",
   },
   {
-    id: 15, name: "No DOM overlay UI in world Block",
+    id: 15, name: "No world-tracking DOM overlay",
     rule:
-      "world Block 側で document.createElement / innerHTML で UI overlay を生成しない。HUD は ortho camera が見る world geometry として実装、または OS resource(text input 等)は modal dialog で値返却する形に統一。" +
-      "**例外**: OffscreenCanvas + CanvasTexture は texture source として許可(DOM tree に乗らない、最終 render は WebGL 上の world geometry の texture として scene に住む)。",
+      "**禁止**: world coord を screen に project して位置づけする DOM 要素(voxel に追従する label、3D 物体の上に float する tooltip、CSS transform で 3D を再現する pseudo-3D)。これは A10 の coord 統一を崩す。" +
+      "**許可**: 画面端の **sidebar / panel**(3D scene と構造的に分離)、native form 要素(`<input>` `<button>` `<select>` `<input type='color'>`)、modal dialog(OS resource boundary)、OffscreenCanvas + CanvasTexture(DOM tree 外、texture source)。" +
+      "判断基準: 「world coord を読んで DOM に位置を反映するか」 — する=禁止、しない=許可。",
     declarative: true,
-    check: (content) => !/\b(document\.createElement|\.innerHTML\s*=|\.style\.position\s*=\s*['"]absolute)/.test(content),
     refsAxiom: "A10",
+    note:
+      "voxel 失敗(CSS 3D の parent-relative transform で coord 混在)起点で禁止された経緯あり、" +
+      "ただし全 DOM UI 排除は厳しすぎ。sidebar / panel / modal は a11y / IME / native form 要素の利点が大きく、" +
+      "world と coord 衝突しないので許可するのが正しい(2026-05-04 refine)。",
   },
 ];
 

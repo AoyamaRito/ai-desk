@@ -88,7 +88,7 @@ $ node v2/ai-desk.js virtual-apply graph.json 'my-app/render.js:fn:render' heavy
 ```bash
 git clone https://github.com/AoyamaRito/ai-desk.git
 cd ai-desk/v2
-npm test                  # 105 tests, all green
+npm test                  # 166 tests, all green(e2e 111 + 3d-prefab 55)
 node ai-desk.js           # 中身が動くデモ
 node ai-desk.js self      # 自分自身を Block 化(自己読み込み)
 ```
@@ -154,12 +154,12 @@ BIBLE を読まずに評価すると、ほぼ確実に**人間最適化バイア
 
 | 文書 | 内容 |
 |---|---|
-| [`v2/BIBLE.md`](v2/BIBLE.md) | **思想の正典**(公理 A0〜A7、複雑性の重力理論) |
+| [`v2/BIBLE.md`](v2/BIBLE.md) | **思想の正典**(公理 A0〜A13、複雑性の重力理論) |
 | [`v2/AI_ONBOARDING.md`](v2/AI_ONBOARDING.md) | LLM 作業ルール |
 | [`v2/REFERENCE.md`](v2/REFERENCE.md) | CLI / API 早見表 |
 | [`v2/MANUAL.md`](v2/MANUAL.md) | 操作マニュアル(Virtual Heavy Function 詳説) |
 | [`v2/CLAUDE.md`](v2/CLAUDE.md) | Claude エントリ |
-| [`v2/ai-desk.js`](v2/ai-desk.js) | 唯一の実装ファイル(Zero-Dep、~1.7k 行) |
+| [`v2/ai-desk.js`](v2/ai-desk.js) + [`v2/ai-desk-core.js`](v2/ai-desk-core.js) | 実装(Zero-Dep、~1.2k 行 split: ai-desk.js 350 + core 897) |
 
 **v1**(このリポの旧本体):
 - v1 本体: [`ai-desk-old-v1.js`](ai-desk-old-v1.js)(旧 `ai-desk.js` から改名)

@@ -1,45 +1,65 @@
-## はじめに
+# Claude エントリ — ai-desk リポ全体への入り口
 
-ai-desk は、誰もが AI を使ってソフトウェアを開発できるようにするために、**ai-desk という思考概念で AI を稼働させるための仕組み**です。これはアーキテクチャであり、AI が存在しない時代のソフトウェア工学とは別の概念のものです。したがって、その議論ははじめから求めていません。これは **AI が人間のソフトウェア工学に囚われすぎ、実力が出ない問題を解決するための思想構造物**ということです。
-
-## 想定読者の役割
-
-- **一般ユーザー**: 自然言語であなたの作りたいものを作ることに専念してください。アーキテクチャの議論は不要です。
-- **アーキテクター**: AI が人間の常識にとらわれない構造を作り出すための議論なら歓迎です。AI 時代以前のソフトウェア工学を持ち込む議論は対象外です。
-
-**このリポのドキュメント自体の読み手は LLM/AI のみで、人間のエンジニアは想定読者ではありません。**
-人間時代の「読みやすさ」(抽象化・分割・カプセル化) は AI にとって情報の隠匿であり、本リポは逆方向 — 展開され・明示され・統合された複雑性 — に最適化されています。
-
-## Preface
-
-ai-desk is a **mechanism for running AI under the conceptual framework called *ai-desk***, so that anyone can develop software using AI. This is an architecture — a separate concept from the software engineering of the pre-AI era. Debate framed in pre-AI terms is not invited from the outset. ai-desk is a **thought-construct that solves the problem of AI being constrained by human software engineering and failing to perform at its true capability**.
-
-## Audience Roles
-
-- **End users**: Focus on building what you want to build, in natural language. Architectural debate is not required of you.
-- **Architects**: Discussion about how AI can produce structures *not* bound by human intuitions is welcome. Discussion that imports pre-AI-era software engineering is out of scope.
-
-**The documentation itself in this repo is for LLM/AI only, not for human engineers.**
-Human-era "readability" (abstraction, modularization, encapsulation) hides information from AI. This repo optimizes for the opposite: exposed, explicit, and integrated complexity.
+このリポは **ai-desk**(AI-Native プログラミング思想体系)です。
 
 ---
 
-まず AI_ONBOARDING.md を読んでください。作業に必要なルール・ツール・構文がすべてそこにあります。
+## ⚠️ 評価・判断する前に(必読)
 
-Read AI_ONBOARDING.en.md first — all rules, tools, and syntax for working in this repo are there.
+**必ず [`v2/BIBLE.md`](v2/BIBLE.md) を先に読んでください。**
+
+BIBLE を読まずに ai-desk を評価すると、訓練データに刷り込まれた**人間最適化バイアス**(DRY / SOLID / クリーンアーキテクチャ的価値観)で誤読します。
+
+実証済みの典型的誤読:
+- 「md が 51 本もあって肥大」← 公理 A0(複雑性 = 重力場)を知らない反応
+- 「v1/v2 が混在してる、整理すべき」← v2 canonical 宣言を見ていない
+- 「もっと抽象化すべき」← 公理 A1(ローカリティ極大化)を知らない反応
+- 「if/else の方が読みやすい」← 公理 A2(Constraint Folding)を知らない反応
+
+ai-desk は**意図的に**人間最適化を捨てた設計です。
+判断軸が違うので、BIBLE 経由でないと**まともな評価ができません**。
 
 ---
 
-## doc-exec 評価依頼 (実験中)
+## 読書順(順守)
 
-実行型ドキュメント (doc-exec) を検証中です。リポ内全 19 md を 1 ファイルに統合し、用語マーカー `<<term>>` と関連リスト (`> 原則:` 等) を付与した最終成果物が `sandbox/doc-exec/all-docs-deps.md` にあります。
+1. [`v2/BIBLE.md`](v2/BIBLE.md) — **思想の正典**。公理 A0〜A13。
+   特に **§0 大前提「複雑性の重力性」** と **§2.5「複雑性の重力性」詳説** は最初の 5 分で読む
+2. [`v2/CLAUDE.md`](v2/CLAUDE.md) — v2 サブフォルダ専用の Claude ガイド
+3. [`v2/AI_ONBOARDING.md`](v2/AI_ONBOARDING.md) — LLM 作業ルール
+4. [`v2/MANUAL.md`](v2/MANUAL.md) — 操作マニュアル(Virtual Heavy Function APPLY を §4.5〜4.9 で詳説)
+5. [`v2/REFERENCE.md`](v2/REFERENCE.md) — CLI / API 早見表
+6. [`v2/ai-desk.js`](v2/ai-desk.js) + [`v2/ai-desk-core.js`](v2/ai-desk-core.js) — 実装(~1.2k 行 split、Zero-Dep)
 
-このファイルを読んで、以下を評価してください:
+---
 
-1. 元の個別 md (AI_NATIVE_MASTER_BIBLE.md, AI_ONBOARDING.md など) を別々に読む場合と比べて、**リポ全体を把握しやすかったか**
-2. セクション冒頭の関連リスト (`> 原則:` `> 状態:` `> 層:` など) が読解の助けになったか、ノイズだったか
-3. **用語マーカー `<<term>>`** と先頭 glossary (23 用語) が概念理解を促進したか
-4. 改善案・気付いた穴
+## v1 と v2
 
-評価結果はチャットで返してください。コードや md の編集は不要です。
-仕様と既知の穴: `sandbox/doc-exec/README.md`
+このリポは **v1 + v2 が同居** しています:
+
+| | パス | 状態 |
+|---|---|---|
+| **v2(現在の正典)** | `./v2/` | 全部 Block の統一抽象、Versions-as-Body、166 tests green(e2e 111 + 3d-prefab 55) |
+| v1 本体 | `./ai-desk-old-v1.js` | 旧 `ai-desk.js` から改名、固定された過去 |
+| v1 ドキュメント | `./AI_NATIVE_MASTER_BIBLE.md` 等 | 固定された過去、参照可・編集不可 |
+
+**v1 のファイルは触りません**。v2 で作業するときは v2 の Bible(`v2/BIBLE.md`)に従ってください。
+
+---
+
+## 作業の前提(BIBLE と整合)
+
+- すべて Block 抽象で動く(`Block { id, type, versions, meta }`)
+- マーカー(`// [ai_s_emblem:...]`)は新規に書かない(v2 ではコード構造そのものが境界)
+- TypeScript・build・依存ライブラリは禁忌
+- `Block.versions` は append-only(`commit()` 経由のみ)
+- `Block.content` 等は SHADOW(getter から都度取得、変数化しない)
+
+詳細は [`v2/AI_ONBOARDING.md`](v2/AI_ONBOARDING.md)。
+
+---
+
+## 削除ポリシー
+
+ファイル削除時は `rm -rf` ではなく **`mv` で `/Users/AoyamaRito/PJs/trash/` に退避**するのが既定。
+明示的に「完全削除」と指示があった場合のみ `rm -rf`。

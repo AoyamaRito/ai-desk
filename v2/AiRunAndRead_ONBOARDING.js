@@ -7,7 +7,7 @@
 //   ⛔ .js ソースを prose として linear に読むな
 //
 // **canonical form**: this file (.js) ← REAL
-// **正典**: AiRunAndRead_BIBLE.js(公理 A0〜A8)を補完する運用マニュアル
+// **正典**: AiRunAndRead_BIBLE.js(公理 A0〜A13)を補完する運用マニュアル
 // **対象読者**: LLM(Claude / GPT / Gemini)。人間向けではない。
 
 import { Axioms } from './AiRunAndRead_BIBLE.js';
@@ -20,9 +20,10 @@ export const DATE = "2026-05-04";
 // ============================================================
 export const StartHere = {
   files: [
-    { path: 'AiRunAndRead_BIBLE.js', purpose: '思想の正典(公理 A0〜A8)' },
-    { path: 'ai-desk.js', purpose: '唯一の実装ファイル(コア + CLI)。Block / Graph / parseJS が定義' },
-    { path: 'e2e.js', purpose: '111 テストケース。新機能追加時にここに 1 件以上追加' },
+    { path: 'AiRunAndRead_BIBLE.js', purpose: '思想の正典(公理 A0〜A13)' },
+    { path: 'ai-desk.js + ai-desk-core.js', purpose: '実装 split。core = pure logic(Block/Graph/parseJS)、ai-desk = CLI shell。Zero-Dep ~1.2k 行' },
+    { path: 'e2e.js', purpose: '111 e2e テスト。新機能追加時にここに 1 件以上追加' },
+    { path: '3d-prefab/', purpose: 'A10/A11 + heartbeat/flow/Shadow_for_Flow の voxel editor demo(55 tests)' },
     { path: 'package.json', purpose: '`npm test` で e2e、type:"module"(ESM)' },
     { path: '3dplus/', purpose: 'CPU 3D Twin(81 tests, CommonJS)。3D / WebGL コードを扱う際は突合層として参照' },
     { path: 'eyes/', purpose: 'AI-Eyes 観測ハーネス(in-memory virtual canvas、draw_op log)' },

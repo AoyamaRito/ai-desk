@@ -83,7 +83,7 @@ export const Physics = {
 };
 
 // ============================================================
-// 第 2 層: 公理体系(Core Axioms A0〜A8)
+// 第 2 層: 公理体系(Core Axioms A0〜A13)
 //   各公理は {id, name, summary, why, examples, violations, refs} を持つ
 //   prose ではなく構造化データとして — JS が容器の真価を発揮する層
 // ============================================================
@@ -311,6 +311,22 @@ export const Axioms = {
       "Physics.LLMTyping『型は LLM が見る場所(値そのもの)に置け』を data layer に降ろした実装。" +
       "**LLM 認知コスト最小** + **mistake 線形低下** + **crystallize 整合** + **A0/A7 同時強化** を一手で達成。" +
       "段階的移行可能 — REAL 値だけ tagged 化、scratch / hot path は裸でも可、boundary で format/parse。",
+  },
+  A12: {
+    id: "A12", name: "Universal Literalism (万物文字化)",
+    summary: "すべての REAL な状態(Block.versions に残るもの)は、意味のある「文字列リテラル」として永続化せよ。生の数値、ビットフラグ、ポインタ、匿名オブジェクトの永続化を禁止する。",
+    why: "コンピュータの効率のための『濁り(数値・バイナリ)』を排し、AI のための『透明な論理(文字)』へ回帰する。すべてが文字であれば、AI は世界の全状態を『誤字脱字』レベルの精度で検証・修正できる。",
+    examples: ["hp:100 → \"hp:full\" または \"hp:100/100\"", "Vector(1,0,0) → \"dir:east\" または \"vec:1,0,0\""],
+    violations: ["Block state に生の数値を保存", "不透明な連番 ID の使用", "AI の Attention を迷わせる匿名データ構造"],
+    refs: ["A0", "A7", "A10", "A11"],
+  },
+  A13: {
+    id: "A13", name: "Shadow Projection (影への投影と還元)",
+    summary: "演算が必要な時のみ、文字(REAL)を数値(SHADOW)へ投影(LIFT)し、演算終了直後に再び文字(REAL)へ還元(SETTLE)せよ。数値状態を 1 フレーム(または 1 関数)を超えて保持することを禁止する。",
+    why: "数値は演算(力)には向くが、記憶(真実)には向かない。計算のたびに文字へ還元し続けることで、AI による常時監視と、完全な再現性(Time Travel)を保証する。複式プログラミングの核心。",
+    examples: ["文字 \"world:9,9,9\" → 数値 [9,9,9] へ LIFT → 演算 [10,9,9] → \"world:10,9,9\" へ SETTLE して還元"],
+    violations: ["数値状態の永続化(1 フレーム以上の保持)", "計算用変数の外部リーク", "還元ステップの省略によるブラックボックス化"],
+    refs: ["A3", "A12"],
   },
 };
 

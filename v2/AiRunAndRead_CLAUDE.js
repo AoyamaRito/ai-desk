@@ -23,11 +23,11 @@ export const Folder = {
 // 読書順序(優先度順、上から読む)
 // ============================================================
 export const ReadingOrder = [
-  { rank: 1, file: 'AiRunAndRead_BIBLE.js',      purpose: '思想の正典(公理 A0〜A8 + Physics + BlockSchema + Taboos + Rituals)' },
+  { rank: 1, file: 'AiRunAndRead_BIBLE.js',      purpose: '思想の正典(公理 A0〜A13 + Physics(LLMTyping 含む)+ BlockSchema + Taboos 15 + Vocabulary + Rituals)' },
   { rank: 2, file: 'AiRunAndRead_ONBOARDING.js', purpose: 'LLM の作業ルール集(禁忌 / Block ops / Graph ops / Constraint / Observation)' },
   { rank: 3, file: 'AiRunAndRead_MANUAL.js',     purpose: '操作マニュアル(workflow / Virtual Heavy Function APPLY)' },
-  { rank: 4, file: 'ai-desk.js',                  purpose: '唯一の実装ファイル(Zero-Dep、~2k 行、AiRunAndRead_BIBLE.js を import)' },
-  { rank: 5, file: 'e2e.js',                      purpose: '111 テスト(bible-* CLI 4 件含む)' },
+  { rank: 4, file: 'ai-desk.js + ai-desk-core.js',purpose: '実装 split(Zero-Dep、~1.2k 行、core が pure logic、ai-desk が CLI shell)' },
+  { rank: 5, file: 'e2e.js',                      purpose: '111 e2e tests(bible-* CLI 4 件含む)+ 3d-prefab/test/ 55 tests = 計 166 全 green' },
 ];
 
 // ============================================================

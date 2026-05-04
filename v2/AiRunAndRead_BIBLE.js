@@ -445,7 +445,7 @@ export const Taboos = [
     id: 4, name: "Zero-Dependency",
     rule: "Web 標準 + Node 標準のみ。Eternal Compatibility の確保。",
     declarative: true,
-    note: "node:fs / node:path 等の node 標準は許可。CommonJS の require は局所許可(3dplus 等)。",
+    note: "node:fs / node:path 等の node 標準は許可。CommonJS の require は局所許可(3dplus 等)。3D engine は **three.js のみ局所許可**(A10 で WebGL/three.js/WebGPU に強制収束済み、revision pin で Eternal Compat 確保)。",
   },
   {
     id: 5, name: "No direct mutation of Block.versions",

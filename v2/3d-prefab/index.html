@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>3d-prefab demo — A10 prefab triple</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #1a1a1a; color: #ccc; font-family: monospace; }
+    #canvas { display: block; width: 100vw; height: 100vh; }
+    #info {
+      position: fixed; top: 8px; left: 8px;
+      padding: 6px 10px; background: rgba(0,0,0,0.5);
+      font-size: 11px; pointer-events: none;
+    }
+  </style>
+  <!--
+    importmap: three.js を revision pin で読み込む(Eternal Compat)
+    Bible Taboo 4 の局所許可枠(3D engine = three.js のみ)
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="info">3d-prefab demo — cube.asset.js (A10 prefab triple, world coord scene)</div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

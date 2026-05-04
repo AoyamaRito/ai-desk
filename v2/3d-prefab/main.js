@@ -123,6 +123,19 @@ function buildVoxelCanvas(meshSpec) {
   cursorMesh.raycast = () => {};
   group.add(cursorMesh);
 
+  // floor 上下シフト用の handle(円錐、world で住む UI、A10 整合)
+  const halfP = planeSize / 2;
+  const cornerX = halfP - 0.3;
+  const cornerZ = -halfP + 0.3;
+
+  const handleUp = makeFloorHandle('floor-up', 0x44ff66, +1);
+  handleUp.position.set(cornerX, 0.55, cornerZ);
+  group.add(handleUp);
+
+  const handleDown = makeFloorHandle('floor-down', 0xff4466, -1);
+  handleDown.position.set(cornerX, 0.15, cornerZ);
+  group.add(handleDown);
+
 
   // sync 状態用の cache
   group.userData.voxelInst = inst;
@@ -133,8 +146,20 @@ function buildVoxelCanvas(meshSpec) {
   group.userData.voxelCursorMat = cursorMat;
   group.userData.voxelPlane = plane;          // floor を shift する時に位置同期する対象
   group.userData.voxelGrid = grid;            // 同上
+  group.userData.voxelHandleUp = handleUp;
+  group.userData.voxelHandleDown = handleDown;
 
   return group;
+}
+
+// floor 上下 handle(円錐 mesh、role を userData に埋めて pickAt 経由で識別)
+function makeFloorHandle(role, color, dirY) {
+  const geom = new THREE.ConeGeometry(0.18, 0.32, 16);
+  if (dirY < 0) geom.rotateX(Math.PI);   // 下向きに反転
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.userData.handleRole = role;
+  return mesh;
 }
 
 async function loadPrefab(prefab, scene) {
@@ -226,18 +251,39 @@ function setupInput(canvas, camera, handles, router) {
     raycaster.setFromCamera(ndc, camera);
     const hits = raycaster.intersectObjects(handles.map(h => h.mesh), true);
     if (!hits.length) return null;
-    let target = hits[0].object;
+    const raw = hits[0].object;   // handleRole 検出のため保持
+    let target = raw;
     while (target && !target.userData?.prefabId) target = target.parent;
     if (!target) return null;
     const handle = handles.find(h => h.mesh === target);
     if (!handle) return null;
-    return { handle, point: hits[0].point };
+    return { handle, point: hits[0].point, raw };
+  }
+
+  // raw 起点で handleRole を上方向に探す(floor-up / floor-down 等の UI handle 識別)
+  function findHandleRole(raw, prefabRootMesh) {
+    let h = raw;
+    while (h && h !== prefabRootMesh) {
+      if (h.userData?.handleRole) return h.userData.handleRole;
+      h = h.parent;
+    }
+    return null;
   }
 
   canvas.addEventListener('pointerdown', (ev) => {
     const hit = pickAt(ev);
     if (!hit) return;
-    // world coord として A11 tagged で渡す
+    // floor handle 識別: ヒットしてたら floor-shift event を queue に流して終了
+    const role = findHandleRole(hit.raw, hit.handle.mesh);
+    if (role === 'floor-up') {
+      pushEvent({ kind: 'floor-shift', targetId: hit.handle.id, delta: +1 });
+      return;
+    }
+    if (role === 'floor-down') {
+      pushEvent({ kind: 'floor-shift', targetId: hit.handle.id, delta: -1 });
+      return;
+    }
+    // それ以外 → 通常の click(voxel 配置等)、world coord は A11 tagged で
     const wp = `world:${hit.point.x},${hit.point.y},${hit.point.z}`;
     if (router) router(hit.handle, wp);
     else hit.handle.dispatch({ kind: 'click', worldPos: wp });
@@ -267,12 +313,22 @@ function setupInput(canvas, camera, handles, router) {
 }
 
 // hover 中の voxel-canvas に cursor preview を表示。snap 位置に置く + 色を state.currentColor 反映。
+// floor handle hover 時は cursor を隠す(handle と voxel preview が重なって紛らわしいため)。
 function updateVoxelCursors(handles, hit) {
   for (const h of handles) {
     if (h.id !== 'voxel-canvas') continue;
     const cursor = h.mesh.userData.voxelCursor;
     if (!cursor) continue;
-    if (!hit || hit.handle !== h) {
+    // hit が handle なら cursor を隠す
+    let isHandle = false;
+    if (hit?.raw) {
+      let walk = hit.raw;
+      while (walk && walk !== h.mesh) {
+        if (walk.userData?.handleRole) { isHandle = true; break; }
+        walk = walk.parent;
+      }
+    }
+    if (!hit || hit.handle !== h || isHandle) {
       cursor.visible = false;
       continue;
     }
@@ -430,15 +486,19 @@ function reportToAiEyes() {
   window.aiEyes.sendStructure({ kind: 'prefab-state', tick: currentTick, prefabs: snapshot });
 }
 
-// voxel-canvas: state.floorIndex を plane / grid の世界 y に反映
+// voxel-canvas: state.floorIndex を plane / grid / handles の世界 y に反映
 function syncVoxelFloor(group, state) {
   const cs = group.userData.voxelCellSize;
   const floor = state.floorIndex ?? 0;
   const targetY = floor * cs;
   const plane = group.userData.voxelPlane;
   const grid = group.userData.voxelGrid;
+  const hUp = group.userData.voxelHandleUp;
+  const hDown = group.userData.voxelHandleDown;
   if (plane) plane.position.y = targetY - 0.001;   // grid との z-fighting 回避
   if (grid)  grid.position.y  = targetY;
+  if (hUp)   hUp.position.y   = targetY + 0.55;
+  if (hDown) hDown.position.y = targetY + 0.15;
 }
 
 // voxel-canvas: state.voxels(tagged dict)→ InstancedMesh 同期(boundary で parse)

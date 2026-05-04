@@ -293,7 +293,24 @@ function setupInput(canvas, camera, handles, router, hud) {
     if (!target) return null;
     const handle = handles.find(h => h.mesh === target);
     if (!handle) return null;
-    return { handle, point: hits[0].point, raw };
+    return { handle, point: hits[0].point, raw, face: hits[0].face };
+  }
+
+  // hit point を face normal 方向に ±cs/2 step して、tool 別に「正しい cell」を狙う:
+  //   - add:    +normal 方向 → 隣接 cell(上面 click なら上の段、右面 click なら右隣)
+  //   - remove: -normal 方向 → click した voxel 自体の中央 → 既存 voxel の key と一致
+  function adjustWorldPos(handle, hitPoint, hitFace, raw) {
+    const s = handle.getState?.() ?? {};
+    const cs = handle.mesh.userData.voxelCellSize ?? s.cellSize ?? 0.5;
+    let px = hitPoint.x, py = hitPoint.y, pz = hitPoint.z;
+    if (hitFace && raw) {
+      const wn = hitFace.normal.clone().transformDirection(raw.matrixWorld);
+      const sign = (s.tool === 'remove') ? -1 : +1;
+      px += sign * wn.x * cs * 0.5;
+      py += sign * wn.y * cs * 0.5;
+      pz += sign * wn.z * cs * 0.5;
+    }
+    return { x: px, y: py, z: pz };
   }
 
   // raw 起点で handleRole を上方向に探す(floor-up / floor-down 等の UI handle 識別)
@@ -338,8 +355,9 @@ function setupInput(canvas, camera, handles, router, hud) {
       return;
     }
     // tool は HUD 2D UI 側に移動済(上で hud.pickButton が処理する)
-    // それ以外 → 通常の click(voxel 配置等)、world coord は A11 tagged で
-    const wp = `world:${hit.point.x},${hit.point.y},${hit.point.z}`;
+    // 通常の click(voxel 配置/削除)、tool に応じて normal-step して worldPos を渡す
+    const adj = adjustWorldPos(hit.handle, hit.point, hit.face, hit.raw);
+    const wp = `world:${adj.x},${adj.y},${adj.z}`;
     if (router) router(hit.handle, wp);
     else hit.handle.dispatch({ kind: 'click', worldPos: wp });
   });
@@ -394,14 +412,23 @@ function updateVoxelCursors(handles, hit) {
       cursor.visible = false;
       continue;
     }
-    // hit.point は world、prefab の挙動と同じ floor-aware cell-center snap で local 配置に変換
+    // hit.point + tool に応じた face normal step + floor-aware cell-center snap
     const cs = h.mesh.userData.voxelCellSize;
     const s = h.getState();
     const floor = s.floorIndex ?? 0;
     const minCy = floor * cs + cs / 2;
-    const cx = Math.floor(hit.point.x / cs) * cs + cs / 2;
-    const cy = Math.max(minCy, Math.floor(hit.point.y / cs) * cs + cs / 2);
-    const cz = Math.floor(hit.point.z / cs) * cs + cs / 2;
+    // pointerdown と同じ adjust(face normal で ±cs/2 step)
+    let px = hit.point.x, py = hit.point.y, pz = hit.point.z;
+    if (hit.face) {
+      const wn = hit.face.normal.clone().transformDirection(hit.raw.matrixWorld);
+      const sign = (s.tool === 'remove') ? -1 : +1;
+      px += sign * wn.x * cs * 0.5;
+      py += sign * wn.y * cs * 0.5;
+      pz += sign * wn.z * cs * 0.5;
+    }
+    const cx = Math.floor(px / cs) * cs + cs / 2;
+    const cy = Math.max(minCy, Math.floor(py / cs) * cs + cs / 2);
+    const cz = Math.floor(pz / cs) * cs + cs / 2;
     const gp = h.mesh.position;
     cursor.position.set(cx - gp.x, cy - gp.y, cz - gp.z);
     cursor.visible = true;

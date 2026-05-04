@@ -18,7 +18,7 @@
 // 他 v2 ツールから:
 //   `import { Kernel, Axioms, BlockSchema } from './AiRunAndRead_BIBLE.js'`
 
-export const VERSION = "2.6";
+export const VERSION = "2.7";
 export const DATE = "2026-05-04";
 export const AUTHOR = "沖井広行(蒼山りと)";
 
@@ -150,6 +150,35 @@ export const Axioms = {
     enforcementNote:
       "crystallize tool 自体が Bible-compliance compiler。build 失敗 = Bible 違反、別途 lint 不要(§4.1.1 の極致)。" +
       "2 階層アーキテクチャ: Block(pure logic、crystallize 必須) vs Adapter(platform I/O、crystallize 不問)で分離。",
+  },
+  A10: {
+    id: "A10", name: "Single Coordinate Domain",
+    summary: "Block の state / 入力 / UI / render input はすべて world coord で表現する。screen coord は render output と input adapter 境界でのみ存在し、内部に侵入させない。OS resource(text input / file picker / permission / network)は modal dialog 経由で値返却し、world と coord 共存させない。",
+    why:
+      "voxel editor 3 試行(2026-05-03)が失敗した根本原因は、CSS 3D の parent-relative transform が world-coord 統一と原理的に喧嘩したこと。" +
+      "world / model / screen / canvas pixel / DOM event の coord が混在すると、Block 間の意味論が coord 系ごとに分裂し、A0(認知非対称性)・A1(ローカリティ極大)・A5(All-as-Block)が同時に破れる。" +
+      "world coord 統一を axiom として強制すると、CSS 3D / DOM transform / 画面座標 UI 等の選択肢が構造的に弾かれ、WebGL / three.js / WebGPU 系の scene graph 中心実装に自動収束する。" +
+      "screen coord は render output(world → screen)と入力 adapter(screen → world ray)の **境界変換**でのみ存在する。OS resource は modal dialog で「world から外に出る → 値を持って戻る」形に統一し、coord の常時共存を排除する。",
+    examples: [
+      "OK: 各 asset Block が world transform + state を持ち、scene graph に並ぶ",
+      "OK: HUD は camera-following ortho camera が見る world 領域(右上 HP バー = ortho world (0.95, 0.95))",
+      "OK: マウス入力 → ray cast → world hit → Block state へ渡す",
+      "OK: text input が必要な場面は modal dialog → string 返却 → world に戻る",
+      "NG: CSS 3D で transform を parent-relative に書く(world-coord 統一不能)",
+      "NG: screen pixel 座標を Block state に持ち込む",
+      "NG: 「画面座標で書きたいから」だけの理由で coord 系を分裂させる",
+    ],
+    violations: [
+      "Block state / event payload に screen / canvas / pixel coord を持つ",
+      "CSS 3D / DOM transform を render path に使う(parent-relative で world 統一不能)",
+      "input handler が ray cast 経由せず screen coord で直接 Block を変える",
+      "HUD を world geometry でなく独立 DOM overlay として書く(world と coord 系が常時並走)",
+    ],
+    refs: ["A0","A1","A5","Vocabulary.crystallize","memo:2026-05-04_voxel-failure"],
+    enforcementNote:
+      "敗因が voxel 3 試行で明示された後の正典化 — 3D / 2D / game / tool すべてに共通する coord 戦略。" +
+      "実装 engine は world-coord scene graph を持つもの(WebGL / three.js / WebGPU)に強制収束、CSS 3D は永久封印。" +
+      "Block prefab(asset js module)は world transform + state + 畳込み遷移関数の triple で表現される。",
   },
 };
 
@@ -293,6 +322,22 @@ export const Vocabulary = {
       operation_vector: "動的・流動 → 静的・固体  (JS の動的性 → Go の static structure)",
       axiom_ref: ["A3","A5","A6","§3"],
       note: "5 段フロー: REAL(JS) → TRANSCRIPTION(AI 翻訳) → SHADOW(Go source) → COMPILE(go build) → CRYSTAL(native binary)。AI が中間段の翻訳者。JIT が「泥道を走りながらアスファルト敷く」のに対し、結晶化は「隣に最高級高速道路を建設」する事前 AOT。",
+    },
+    "world-coord": {
+      meaning: "Block の state / 入力 / UI / render input が共通で住む唯一の coord 系。screen coord は境界変換でのみ存在。",
+      replaces: "model / view / screen / canvas / DOM coord の混在",
+      etymology: "world(世界)+ coord(座標)。3D scene graph で標準的な「scene 全体の絶対座標系」。",
+      operation_vector: "coord 分裂 → 単一 domain  (voxel 失敗を構造的に弾く軸)",
+      axiom_ref: ["A10"],
+      note: "WebGL / three.js / WebGPU の scene graph 中心実装に強制収束。CSS 3D / DOM transform は永久封印。HUD は ortho camera が見る world 領域として実装。",
+    },
+    prefab: {
+      meaning: "Block の game asset 形態 — world transform + state + 畳込み遷移関数の triple",
+      replaces: "object / entity / GameObject(Unity 的概念の Block 化)",
+      etymology: "pre + fabricate(あらかじめ作る)。Unity の prefab(再利用可能な game object テンプレート)から借用、ai-desk Block 思想に整合する形に再定義。",
+      operation_vector: "汎用 Block → 3D / 2D asset 特化  (A5 All-as-Block を game domain で具体化)",
+      axiom_ref: ["A5","A10"],
+      note: "asset js module 1 個 = 1 prefab。export で公開、state は object literal、遷移は pure function、world transform は core code 側が管理。",
     },
   },
   avoid: [
@@ -439,6 +484,28 @@ export const Taboos = [
     declarative: true,
     check: (content) => !/\barguments\b\s*[\.\[]/.test(content),
     refsAxiom: "A9",
+  },
+  // ─── Single-coordinate-domain patterns(公理 A10 系列、3D / 2D / game / tool 共通)───
+  {
+    id: 13, name: "No CSS 3D transform",
+    rule: "transform: translate3d / rotate3d / matrix3d / perspective を CSS / inline style で使わない。CSS transform は parent-relative で world-coord 統一不能、voxel 3 試行で実証済み(2026-05-03)。",
+    declarative: true,
+    check: (content) => !/\b(translate3d|rotate3d|matrix3d|perspective)\s*\(/.test(content) && !/transform-style\s*:\s*preserve-3d/.test(content),
+    refsAxiom: "A10",
+  },
+  {
+    id: 14, name: "No screen-coord in Block state",
+    rule: "Block の state / event payload に screen / canvas pixel / clientX / clientY / pageX / pageY 等の screen-coord を持ち込まない。input adapter 境界で world ray に変換してから Block に渡す。",
+    declarative: true,
+    check: (content) => !/\b(clientX|clientY|pageX|pageY|screenX|screenY|offsetX|offsetY)\b\s*[:=]/.test(content),
+    refsAxiom: "A10",
+  },
+  {
+    id: 15, name: "No DOM overlay UI in world Block",
+    rule: "world Block 側で document.createElement / innerHTML で UI overlay を生成しない。HUD は ortho camera が見る world geometry として実装、または OS resource(text input 等)は modal dialog で値返却する形に統一。",
+    declarative: true,
+    check: (content) => !/\b(document\.createElement|\.innerHTML\s*=|\.style\.position\s*=\s*['"]absolute)/.test(content),
+    refsAxiom: "A10",
   },
 ];
 

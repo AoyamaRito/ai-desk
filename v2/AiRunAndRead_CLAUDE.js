@@ -26,8 +26,8 @@ export const ReadingOrder = [
   { rank: 1, file: 'AiRunAndRead_BIBLE.js',      purpose: '思想の正典(公理 A0〜A8 + Physics + BlockSchema + Taboos + Rituals)' },
   { rank: 2, file: 'AiRunAndRead_ONBOARDING.js', purpose: 'LLM の作業ルール集(禁忌 / Block ops / Graph ops / Constraint / Observation)' },
   { rank: 3, file: 'AiRunAndRead_MANUAL.js',     purpose: '操作マニュアル(workflow / Virtual Heavy Function APPLY)' },
-  { rank: 4, file: 'ai-desk.js',                  purpose: '唯一の実装ファイル(Zero-Dep、~1.7k 行)' },
-  { rank: 5, file: 'e2e.js',                      purpose: '105 テスト' },
+  { rank: 4, file: 'ai-desk.js',                  purpose: '唯一の実装ファイル(Zero-Dep、~2k 行、AiRunAndRead_BIBLE.js を import)' },
+  { rank: 5, file: 'e2e.js',                      purpose: '111 テスト(bible-* CLI 4 件含む)' },
 ];
 
 // ============================================================

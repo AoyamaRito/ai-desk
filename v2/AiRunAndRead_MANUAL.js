@@ -34,7 +34,7 @@ export const Glossary = {
 // ============================================================
 export const QuickStart = [
   { cmd: "cd /Users/AoyamaRito/PJs/ai-desk/v2", desc: "v2 フォルダへ" },
-  { cmd: "npm test", desc: "105 e2e tests, all green" },
+  { cmd: "npm test", desc: "111 e2e tests, all green" },
   { cmd: "node ai-desk.js", desc: "self-test(Block / Graph / parseJS の動作デモ)" },
   { cmd: "node ai-desk.js self", desc: "自分自身を解析(自己読み込み)" },
 ];

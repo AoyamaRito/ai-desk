@@ -22,7 +22,7 @@ export const StartHere = {
   files: [
     { path: 'AiRunAndRead_BIBLE.js', purpose: '思想の正典(公理 A0〜A8)' },
     { path: 'ai-desk.js', purpose: '唯一の実装ファイル(コア + CLI)。Block / Graph / parseJS が定義' },
-    { path: 'e2e.js', purpose: '105 テストケース。新機能追加時にここに 1 件以上追加' },
+    { path: 'e2e.js', purpose: '111 テストケース。新機能追加時にここに 1 件以上追加' },
     { path: 'package.json', purpose: '`npm test` で e2e、type:"module"(ESM)' },
     { path: '3dplus/', purpose: 'CPU 3D Twin(81 tests, CommonJS)。3D / WebGL コードを扱う際は突合層として参照' },
     { path: 'eyes/', purpose: 'AI-Eyes 観測ハーネス(in-memory virtual canvas、draw_op log)' },
@@ -228,7 +228,7 @@ export const CommitConventions = {
     fix:      "バグ修正",
     docs:     "ドキュメント",
     test:     "テスト追加・修正",
-    refactor: "振る舞いを変えないコード整理",
+    clearify: "振る舞いを変えない構造調整(AI 向け最適化)",
     chore:    "ビルド・ツール周り",
   },
   example: "feat(parse): support generator function syntax",

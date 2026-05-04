@@ -12,6 +12,7 @@ Thumbs.db
 .claude/
 .aider*
 .cursor/
+HANDOFF.md
 
 # Node
 node_modules/
@@ -25,3 +26,8 @@ yarn-error.log*
 tmp/
 snapshots/
 eyes.port
+
+# AI-target auto-gen SHADOW(BIBLE.md だけ残し、他は ./AiRunAndRead_*.js export-md で都度生成)
+v2/AI_ONBOARDING.md
+v2/CLAUDE.md
+v2/MANUAL.md

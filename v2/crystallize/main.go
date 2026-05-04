@@ -23,6 +23,10 @@ type testCase struct {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--phase2" {
+		sameOpsHarness()
+		return
+	}
 	cases := []testCase{
 		{
 			Name:  "empty version",

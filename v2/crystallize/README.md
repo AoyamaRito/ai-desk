@@ -1,7 +1,13 @@
-# crystallize — Phase 1+2+3+4+5 prototype
+# crystallize — proof phase 完了(Phase 1〜5)
 
 ai-desk v2 の Block を Go にネイティブ翻訳する仕組み(Crystallization)の最初の検証。
 **A9 Crystallization Compliance** の実証 phase。
+
+> **status (2026-05-04)**: Phase 1〜5 で proof phase 完了。Phase 6 以降は保留(コスパ判断)。
+> 詳細: `/PJs/memo/2026-05-04_crystallize-retreat.md`
+>
+> 残課題: hashVersion の nested key order bug 修正、checkBraces の template literal bug 修正。
+> 汎用化(L2 contract canonical 化)は MTG 後 / 余裕があれば。
 
 5 段フロー: REAL(JS) → TRANSCRIPTION(AI 翻訳指示) → SHADOW(Go src) → COMPILE → CRYSTAL(native binary)。
 

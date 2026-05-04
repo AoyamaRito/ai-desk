@@ -18,7 +18,7 @@
 // 他 v2 ツールから:
 //   `import { Kernel, Axioms, BlockSchema } from './AiRunAndRead_BIBLE.js'`
 
-export const VERSION = "2.8";
+export const VERSION = "2.9";
 export const DATE = "2026-05-04";
 export const AUTHOR = "沖井広行(蒼山りと)";
 
@@ -189,11 +189,61 @@ export const Axioms = {
       "input handler が ray cast 経由せず screen coord で直接 Block を変える",
       "HUD を world geometry でなく独立 DOM overlay として書く(world と coord 系が常時並走)",
     ],
-    refs: ["A0","A1","A5","Vocabulary.crystallize","Vocabulary.world-coord","Vocabulary.prefab","memo:2026-05-04_voxel-failure"],
+    refs: ["A0","A1","A5","A11","Vocabulary.crystallize","Vocabulary.world-coord","Vocabulary.prefab","memo:2026-05-04_voxel-failure"],
     enforcementNote:
       "敗因が voxel 3 試行で明示された後の正典化 — 3D / 2D / game / tool すべてに共通する coord 戦略。" +
       "実装 engine は world-coord scene graph を持つもの(WebGL / three.js / WebGPU)に強制収束、CSS 3D は永久封印。" +
-      "Block prefab(asset js module)は world transform + state + 畳込み遷移関数の triple で表現される — transform が境界、内部は local が自然。",
+      "Block prefab(asset js module)は world transform + state + 畳込み遷移関数の triple で表現される — transform が境界、内部は local が自然。" +
+      "A11(Domain-Tagged Coordinates)が runtime nominal typing でこれを構造強制する。",
+  },
+  A11: {
+    id: "A11", name: "Domain-Tagged Coordinates",
+    summary:
+      "すべての coord 値は **domain 接頭辞付き string** で表現する: `\"world:5,0,2\"` / `\"local:0,1,0\"` / `\"screen:300,200\"` / `\"ortho:0.7,0.85\"`。" +
+      "Three.js 等の engine API に渡すときは boundary で parse、Block 内 / event payload / state / refs payload はすべて tagged string で持つ。",
+    why:
+      "A10 を「規則 + bible-check で守る」から「**混ぜたら型が合わない**」構造強制に格上げする。" +
+      "JS は動的型なので [x,y,z] という素の数値配列だと world / local / screen が同形 → 取り違えが compile 時に検出できない。" +
+      "domain 接頭辞付き string にすると、`screen:` を期待する関数に `world:` を渡した瞬間に runtime で死ぬ(or 静的に検出可能)。Bible §4.1.1『規律 = 構造』の極致 — validate 関数を書かず、データ形そのものが enforcer になる。" +
+      "crystallize 整合: Go 側でも同じ string 表現をそのまま受けて parse、translation contract が単純化(string ↔ struct で 1:1)。" +
+      "LLM 視認性: prompt で `[5,0,2]` を見ても何 coord か判らないが、`\"world:5,0,2\"` は一目で domain がわかる(A0 認知非対称性 + A7 展開・明示 に直接効く)。" +
+      "計算コスト: 60fps 数十 prefab で microsecond 級、無視できる範囲。数千 particle でホットパス化なら局所的に tuple/object へ退避可。",
+    domains: {
+      world:  "scene graph / Block 間 / 入力 ray hit / refs payload で使う絶対座標。例: \"world:5,0,2\"",
+      local:  "asset.js 内部の mesh.vertices / bones / 内部 anchor で使う asset 原点基準。例: \"local:0,1,0\"",
+      screen: "render output / input adapter 境界でのみ存在する pixel 座標。Block state には侵入させない(Taboo 14)。例: \"screen:300,200\"",
+      ortho:  "HUD ortho camera が見る world 領域の coord。NDC-like (-1..1) range。例: \"ortho:0.7,0.85\"",
+    },
+    format: {
+      separator: ": と , (ASCII、parse 容易)",
+      numeric: "JS Number.toString() 互換(整数 / float / 負数 / 指数表記すべて OK)",
+      examples: ["world:5,0,2", "world:1.5,-0.5,3.14", "local:0,1,0", "screen:300,200", "ortho:0.7,0.85"],
+    },
+    api: {
+      // 実装は coord.js helper module で提供
+      builders: ["w(x,y,z) → 'world:x,y,z'", "l(x,y,z) → 'local:x,y,z'", "s(x,y) → 'screen:x,y'", "o(x,y) → 'ortho:x,y'"],
+      parsers:  ["parseCoord(str) → {domain, values}", "requireDomain(str, expected) → number[](domain 不一致で throw)"],
+      converters: ["toThreeVec3(str, expectedDomain) → THREE.Vector3 (boundary)"],
+    },
+    examples: [
+      "OK: export const transform = { position: 'world:5,0,2', rotation: 'world:0,0,0', scale: 1 }",
+      "OK: state.lastClickWorldPos = 'world:1.5,0.5,-1.2'(inter-Block 共有値)",
+      "OK: prefabLoader 内: const [x,y,z] = requireDomain(asset.transform.position, 'world')",
+      "NG: position: [5,0,2](domain 不明、A11 違反)",
+      "NG: state.lastClickWorldPos = [1.5, 0.5, -1.2](裸の数値配列)",
+      "NG: requireDomain('screen:300,200', 'world')(domain 不一致 → throw)",
+    ],
+    violations: [
+      "Block / state / event payload に domain 接頭辞無しの裸の数値配列を coord として持つ",
+      "engine API への渡しで boundary parse を経由せず、tagged string 文字列のまま投入",
+      "domain 不一致を runtime check 無しで mix する",
+    ],
+    refs: ["A0","A7","A9","A10","Vocabulary.world-coord","Vocabulary.prefab"],
+    enforcementNote:
+      "A10 が『混ぜるな』の宣言、A11 は『**混ぜれない**』の構造実装。 " +
+      "voxel 失敗を二重に防ぐ + crystallize の意味論厳密化 + LLM 認知可視化を同時達成。 " +
+      "実装は coord.js(builders / parsers / converters)、各 prefab / input / HUD / loader が利用する。 " +
+      "段階的移行可能 — 既存 [x,y,z] 配列は残置 OK、新規記述から tagged string、boundary で parse。",
   },
 };
 
@@ -339,12 +389,20 @@ export const Vocabulary = {
       note: "5 段フロー: REAL(JS) → TRANSCRIPTION(AI 翻訳) → SHADOW(Go source) → COMPILE(go build) → CRYSTAL(native binary)。AI が中間段の翻訳者。JIT が「泥道を走りながらアスファルト敷く」のに対し、結晶化は「隣に最高級高速道路を建設」する事前 AOT。",
     },
     "world-coord": {
-      meaning: "**inter-Block / scene-level** の state / 入力 / UI / render input が共通で住む唯一の coord 系。intra-Block(asset.js 内部)は local coord OK、境界は asset.transform。screen coord は境界変換でのみ存在。",
+      meaning: "**inter-Block / scene-level** の state / 入力 / UI / render input が共通で住む唯一の coord 系。intra-Block(asset.js 内部)は local coord OK、境界は asset.transform。screen coord は境界変換でのみ存在。A11 で domain-tagged string として表現する(\"world:x,y,z\")。",
       replaces: "model / view / screen / canvas / DOM coord の混在",
       etymology: "world(世界)+ coord(座標)。3D scene graph で標準的な「scene 全体の絶対座標系」。",
       operation_vector: "coord 分裂 → 単一 domain (inter-Block レベル)、intra は local 許容で実装可能性を保つ",
-      axiom_ref: ["A10"],
+      axiom_ref: ["A10","A11"],
       note: "WebGL / three.js / WebGPU の scene graph 中心実装に強制収束。CSS 3D / DOM transform は永久封印。HUD は ortho camera が見る world 領域として実装。",
+    },
+    "domain-tag": {
+      meaning: "coord 値の domain 接頭辞(\"world:\" / \"local:\" / \"screen:\" / \"ortho:\")。runtime nominal typing で coord 取り違えを構造的に防ぐ。",
+      replaces: "裸の [x,y,z] 配列で coord を表現すること",
+      etymology: "domain(領域)+ tag(印)。型のない JS で nominal typing を string prefix で emulate する技法。",
+      operation_vector: "暗黙の coord 系 → 明示的な domain 同定可能性  (A0 認知非対称性 + A7 展開・明示)",
+      axiom_ref: ["A11","A10","A0","A7"],
+      note: "format は \"<domain>:x,y[,z]\"。coord.js helper(w/l/s/o builder + requireDomain parser)で操作。boundary(Three.js 等の engine API)で parse、それ以外はすべて tagged string で持ち回す。",
     },
     prefab: {
       meaning: "Block の game asset 形態 — world transform + state + 畳込み遷移関数の triple。内部(mesh.vertices, bones, 内部 anchor)は local coord、transform が local → world の境界変換器。",

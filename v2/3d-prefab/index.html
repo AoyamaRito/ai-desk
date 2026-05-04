@@ -3,21 +3,47 @@
 <head>
   <meta charset="utf-8">
   <title>3d-prefab demo — A10 prefab triple</title>
-  <link rel="icon" href="data:,">  <!-- 空 favicon、404 noise を消す -->
-
+  <link rel="icon" href="data:,">
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #1a1a1a; color: #ccc; font-family: monospace; }
-    #canvas { display: block; width: 100vw; height: 100vh; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #1a1a1a; color: #ccc; font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; }
+    #app { display: flex; height: 100vh; }
+    #sidebar {
+      width: 240px; flex-shrink: 0; padding: 16px;
+      background: #222; border-right: 1px solid #333;
+      overflow-y: auto;
+    }
+    #viewport { flex: 1; position: relative; min-width: 0; }
+    #canvas { display: block; width: 100%; height: 100%; }
     #info {
-      position: fixed; top: 8px; left: 8px;
+      position: absolute; top: 8px; left: 8px;
       padding: 6px 10px; background: rgba(0,0,0,0.5);
-      font-size: 11px; pointer-events: none;
+      font-size: 11px; pointer-events: none; font-family: monospace;
+    }
+    .section { margin-bottom: 18px; }
+    .section h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tool-buttons { display: flex; gap: 6px; }
+    .tool-buttons label {
+      flex: 1; padding: 8px 0; text-align: center;
+      background: #2a2a2a; border-radius: 4px; cursor: pointer;
+      font-size: 13px; transition: background 0.15s;
+    }
+    .tool-buttons label:hover { background: #333; }
+    .tool-buttons input { display: none; }
+    .tool-buttons input:checked + span { color: #ff8844; font-weight: 600; }
+    .tool-buttons label:has(input:checked) { background: #3a3a3a; outline: 1px solid #ff8844; }
+    input[type="color"] { width: 100%; height: 36px; border: none; background: transparent; cursor: pointer; padding: 0; }
+    input[type="range"] { width: 100%; }
+    .floor-row { display: flex; align-items: center; gap: 8px; }
+    .floor-row span { font-size: 12px; min-width: 24px; text-align: right; color: #888; }
+    .stats { font-size: 12px; line-height: 1.7; }
+    .stats .key { color: #666; }
+    .stats .val { color: #aaa; font-family: monospace; }
+    .keyhints { font-size: 11px; color: #666; line-height: 1.6; }
+    .keyhints kbd {
+      display: inline-block; padding: 1px 5px; background: #2a2a2a;
+      border: 1px solid #333; border-radius: 3px; font-family: monospace; font-size: 10px;
     }
   </style>
-  <!--
-    importmap: three.js を revision pin で読み込む(Eternal Compat)
-    Bible Taboo 4 の局所許可枠(3D engine = three.js のみ)
-  -->
   <script type="importmap">
   {
     "imports": {
@@ -28,9 +54,53 @@
   </script>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
-  <div id="info">voxel editor — 左クリック=配置 / 右ドラッグ=回転 / 中ドラッグ=ズーム / ホイール=ズーム</div>
-  <!-- ai-eyes: error / snapshot / remote eval を AI が直接観測できる。Bible 整合の boundary -->
+  <div id="app">
+    <aside id="sidebar">
+      <div class="section">
+        <h3>Tool</h3>
+        <div class="tool-buttons">
+          <label><input type="radio" name="tool" value="add" checked><span>🖌 Brush</span></label>
+          <label><input type="radio" name="tool" value="remove"><span>⬜ Erase</span></label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Color</h3>
+        <input type="color" id="color-picker" value="#ffb6c1">
+      </div>
+
+      <div class="section">
+        <h3>Floor</h3>
+        <div class="floor-row">
+          <input type="range" id="floor-slider" min="0" max="15" value="0">
+          <span id="floor-value">0</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Stats</h3>
+        <div class="stats">
+          <div><span class="key">voxels:</span> <span class="val" id="voxel-count">0</span></div>
+          <div><span class="key">tick:</span> <span class="val" id="tick-display">0</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Shortcuts</h3>
+        <div class="keyhints">
+          <kbd>B</kbd> brush / <kbd>E</kbd> erase<br>
+          <kbd>[</kbd> <kbd>]</kbd> floor up/down<br>
+          drag: <kbd>R-click</kbd> rotate / <kbd>M-click</kbd> zoom
+        </div>
+      </div>
+    </aside>
+
+    <main id="viewport">
+      <canvas id="canvas"></canvas>
+      <div id="info">3d-prefab voxel editor</div>
+    </main>
+  </div>
+
   <script src="http://localhost:3000/client.js"></script>
   <script type="module" src="./main.js"></script>
 </body>

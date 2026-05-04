@@ -104,15 +104,21 @@ export const behaviors = {
     return { ...s, tool: ev.tool };
   },
 
-  // floor-shift: voxel canvas の配置基準面(floor)を上下する
-  // event = { kind: 'floor-shift', delta: +1 | -1 }
-  // floorIndex は integer の層番号、世界 y = floorIndex * cellSize で plane が配置される
-  // 0 が地面、1 が cs 上、... 負には行かない(地面の下に潜らない)
+  // floor-shift: floorIndex を delta 分シフト(handle / keyboard 用)
   shiftFloor: (s, ev) => {
     if (ev.kind !== 'floor-shift') return s;
     const cur = s.floorIndex ?? 0;
     const next = Math.max(0, cur + (ev.delta ?? 0));
     if (next === cur) return s;
+    return { ...s, floorIndex: next };
+  },
+
+  // set-floor: floorIndex を絶対値で設定(slider 用)
+  // event = { kind: 'set-floor', floor: integer }
+  setFloor: (s, ev) => {
+    if (ev.kind !== 'set-floor') return s;
+    const next = Math.max(0, Math.floor(ev.floor ?? 0));
+    if (next === (s.floorIndex ?? 0)) return s;
     return { ...s, floorIndex: next };
   },
 };
@@ -212,6 +218,7 @@ export const prefabs = {
     flow: {
       click: ['addOrRemoveVoxelOnClick'],
       'floor-shift': ['shiftFloor'],
+      'set-floor': ['setFloor'],
       'set-color': ['setCurrentColor'],
       'set-tool': ['setTool'],
     },

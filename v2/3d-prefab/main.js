@@ -448,11 +448,12 @@ function updateVoxelCursors(handles, hit) {
 // ============================================================
 
 function createHud(renderer) {
+  // tool button は HTML sidebar に移行済(Taboo 15 refined)。
+  // HUD は info display のみ残す(右上)。
   const hudScene = new THREE.Scene();
   const hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 100);
   hudCamera.position.z = 1;
 
-  // info text(右上)
   const off = new OffscreenCanvas(512, 160);
   const ctx = off.getContext('2d');
   const tex = new THREE.CanvasTexture(off);
@@ -462,28 +463,6 @@ function createHud(renderer) {
   const infoMesh = new THREE.Mesh(infoGeom, infoMat);
   hudScene.add(infoMesh);
 
-  // tool buttons(2D UI、左上)
-  // ortho world は (-aspect, -1) - (+aspect, +1)、左上 = (-aspect+offset, +1-offset)
-  function makeHudButton(role, colorInt, toolName) {
-    const g = new THREE.PlaneGeometry(0.12, 0.12);
-    const m = new THREE.MeshBasicMaterial({ color: colorInt, transparent: true, opacity: 0.95 });
-    const mesh = new THREE.Mesh(g, m);
-    mesh.userData.handleRole = role;
-    mesh.userData.handleTool = toolName;
-    return mesh;
-  }
-  const toolBrush = makeHudButton('tool-brush', 0xff8844, 'add');
-  const toolErase = makeHudButton('tool-erase', 0xf5f5f5, 'remove');
-  hudScene.add(toolBrush);
-  hudScene.add(toolErase);
-
-  // 選択中 indicator(枠 ring)
-  const ringGeom = new THREE.RingGeometry(0.078, 0.092, 32);
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
-  const ring = new THREE.Mesh(ringGeom, ringMat);
-  ring.raycast = () => {};
-  hudScene.add(ring);
-
   const onResize = () => {
     const c = renderer.domElement;
     const aspect = c.clientWidth / c.clientHeight;
@@ -491,21 +470,11 @@ function createHud(renderer) {
     hudCamera.right = aspect;
     hudCamera.updateProjectionMatrix();
     infoMesh.position.set(aspect - 0.3, 0.85, 0);
-    toolBrush.position.set(-aspect + 0.12, 0.85, 0);
-    toolErase.position.set(-aspect + 0.27, 0.85, 0);
-    // indicator は syncToolIndicator が tool に応じて再配置するので初期は brush 上
-    ring.position.set(toolBrush.position.x, toolBrush.position.y, 0.001);
   };
   window.addEventListener('resize', onResize);
   onResize();
 
-  // hud-side raycaster(マウス → ortho NDC → button hit 判定)
-  const hudRaycaster = new THREE.Raycaster();
-  const hudNdc = new THREE.Vector2();
-
   return {
-    hudScene,
-    hudCamera,
     setInfo(lines) {
       ctx.clearRect(0, 0, 512, 160);
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -516,25 +485,8 @@ function createHud(renderer) {
       for (const ln of lines) { ctx.fillText(ln, 12, y); y += 26; }
       tex.needsUpdate = true;
     },
-    syncToolIndicator(state) {
-      const target = state.tool === 'remove' ? toolErase : toolBrush;
-      ring.position.set(target.position.x, target.position.y, 0.001);
-    },
-    // mouse 位置 ev から HUD button の handleRole / handleTool を返す(無ければ null)
-    pickButton(ev) {
-      const c = renderer.domElement;
-      const rect = c.getBoundingClientRect();
-      const xCss = ev.clientX - rect.left;
-      const yCss = ev.clientY - rect.top;
-      hudNdc.set((xCss / rect.width) * 2 - 1, -((yCss / rect.height) * 2 - 1));
-      hudRaycaster.setFromCamera(hudNdc, hudCamera);
-      const hits = hudRaycaster.intersectObjects([toolBrush, toolErase], false);
-      if (!hits.length) return null;
-      return {
-        role: hits[0].object.userData.handleRole,
-        tool: hits[0].object.userData.handleTool,
-      };
-    },
+    syncToolIndicator() {},   // 互換用 no-op(sidebar 側で表示)
+    pickButton() { return null; },   // HUD button 廃止
     render() {
       renderer.autoClear = false;
       renderer.clearDepth();
@@ -752,10 +704,75 @@ function heartbeat() {
 
   controls.update();
   renderer.render(scene, camera);
-  if (currentTick % 6 === 0) updateHud();
+  if (currentTick % 6 === 0) {
+    updateHud();
+    syncSidebar();
+  }
   hud.render();
 
   if (currentTick % 60 === 0) reportToAiEyes();
   requestAnimationFrame(heartbeat);
 }
+
+// ============================================================
+// HTML sidebar binding(Taboo 15 refined: native form 要素 OK)
+// ============================================================
+
+const sb = {
+  toolRadios: document.querySelectorAll('input[name="tool"]'),
+  colorPicker: document.getElementById('color-picker'),
+  floorSlider: document.getElementById('floor-slider'),
+  floorValue: document.getElementById('floor-value'),
+  voxelCount: document.getElementById('voxel-count'),
+  tickDisplay: document.getElementById('tick-display'),
+};
+
+// 入力 → world tagged event を queue へ
+const vcHandle = handles.find(h => h.id === 'voxel-canvas');
+if (vcHandle) {
+  for (const r of sb.toolRadios) {
+    r.addEventListener('change', (ev) => {
+      if (ev.target.checked) {
+        pushEvent({ kind: 'set-tool', targetId: vcHandle.id, tool: ev.target.value });
+      }
+    });
+  }
+  sb.colorPicker.addEventListener('input', (ev) => {
+    const hex = 'hex:' + ev.target.value.replace(/^#/, '');
+    pushEvent({ kind: 'set-color', targetId: vcHandle.id, color: hex });
+  });
+  sb.floorSlider.addEventListener('input', (ev) => {
+    pushEvent({ kind: 'set-floor', targetId: vcHandle.id, floor: parseInt(ev.target.value, 10) });
+  });
+}
+
+// state → sidebar に反映(controlled inputs、ただし activeElement は触らない)
+function syncSidebar() {
+  if (!vcHandle) return;
+  const s = vcHandle.getState();
+
+  // tool radio
+  for (const r of sb.toolRadios) {
+    const should = (r.value === (s.tool ?? 'add'));
+    if (r.checked !== should) r.checked = should;
+  }
+
+  // color picker(編集中は触らない)
+  const colorHex = '#' + (s.currentColor ?? 'hex:ffb6c1').replace(/^hex:/, '');
+  if (document.activeElement !== sb.colorPicker && sb.colorPicker.value !== colorHex) {
+    sb.colorPicker.value = colorHex;
+  }
+
+  // floor slider(編集中は触らない)
+  const floor = s.floorIndex ?? 0;
+  if (document.activeElement !== sb.floorSlider) {
+    if (parseInt(sb.floorSlider.value, 10) !== floor) sb.floorSlider.value = floor;
+  }
+  sb.floorValue.textContent = floor;
+
+  // stats
+  sb.voxelCount.textContent = Object.keys(s.voxels ?? {}).length;
+  sb.tickDisplay.textContent = currentTick;
+}
+
 heartbeat();

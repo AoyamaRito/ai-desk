@@ -335,6 +335,29 @@ test('voxel: floor-shift で連続シフト累積', () => {
   assert.equal(s.floorIndex, 2);
 });
 
+// ============================================================
+// set-floor: 絶対値で floorIndex 設定(slider 用)
+// ============================================================
+
+const voxelSetFloor = transitionForEvent(voxel, { kind: 'set-floor' });
+
+test('voxel: set-floor で floorIndex を絶対値設定', () => {
+  const out = voxelSetFloor(voxel.state, { kind: 'set-floor', floor: 5 });
+  assert.equal(out.floorIndex, 5);
+});
+
+test('voxel: set-floor は 0 未満を 0 に clamp', () => {
+  const out = voxelSetFloor(voxel.state, { kind: 'set-floor', floor: -3 });
+  assert.equal(out.floorIndex, 0);
+  assert.equal(out, voxel.state);   // 0 → 0 で identity
+});
+
+test('voxel: set-floor は同じ値で state 不変', () => {
+  const s = { ...voxel.state, floorIndex: 7 };
+  const out = voxelSetFloor(s, { kind: 'set-floor', floor: 7 });
+  assert.equal(out, s);
+});
+
 test('voxel: floor-shift は pure(初期 state を mutate しない)', () => {
   const before = JSON.stringify(voxel.state);
   voxelFloor(voxel.state, { kind: 'floor-shift', delta: +1 });

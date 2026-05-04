@@ -14,6 +14,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, resolve as pathResolve } from 'node:path';
+import { Kernel } from './AiRunAndRead_BIBLE.js';
 
 // ============================================================
 // Version — Block の状態スナップショット(これが REAL)
@@ -1586,6 +1587,27 @@ function runCommand(cmd, args) {
       }
       break;
     }
+    case 'bible-info': {
+      // node ai-desk.js bible-info
+      // Bible の情報を表示(AiRunAndRead_BIBLE.js から取得)
+      console.log(Kernel.summonContext([], { examples: false, spotlight: false }));
+      break;
+    }
+    case 'bible-check': {
+      // node ai-desk.js bible-check <file>
+      // 指定したファイルの Bible 違反を診断
+      if (!args[0]) return console.error('usage: bible-check <file>');
+      const res = Kernel.diagnose(readFileSync(args[0], 'utf8'), args[0]);
+      console.log(JSON.stringify(res, null, 2));
+      if (!res.ok) process.exit(1);
+      break;
+    }
+    case 'bible-summon': {
+      // node ai-desk.js bible-summon <axiomIds...>
+      // 指定した公理に基づく重力場 prompt を生成
+      process.stdout.write(Kernel.summonContext(args, { spotlight: true }));
+      break;
+    }
     case 'tag': {
       // タグでフィルタ: node ai-desk.js tag <file> <tag>
       if (!args[0] || !args[1]) return console.error('usage: tag <file> <tag>');
@@ -1818,12 +1840,12 @@ function runCommand(cmd, args) {
       for (const [tag, count] of sorted) console.log(`  ${tag.padEnd(15)} ${count}`);
       break;
     }
-    default:
-      console.error('unknown command:', cmd);
-      console.error('commands: skeleton, focus, graph, impact, self, tag, tags, save, load, search, diff, blame, apply, apply-block, resolve, lint, export, stats, context, heavy, virtual-apply, mermaid, infer-tags, e2e');
-  }
-}
-
+    default: {
+      console.log('unknown command:', cmd);
+      console.log('commands: bible-info, bible-check, bible-summon, skeleton, focus, graph, impact, self, tag, tags, save, load, search, diff, blame, apply, apply-block, resolve, lint, export, stats, context, heavy, virtual-apply, mermaid, infer-tags, e2e');
+    }
+    }
+    }
 function runSelfTest() {
   console.log('=== ai-desk self-test ===\n');
 

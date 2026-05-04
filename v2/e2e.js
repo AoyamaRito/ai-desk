@@ -319,6 +319,47 @@ function foo() {}
     const containsTargets = m.refs.filter(r => r.kind === 'contains').map(r => r.target);
     assert.deepEqual(containsTargets, ['m:fn:a', 'm:fn:b']);
   });
+
+  test('文字列やコメント内のキーワードを無視 (エッジケース)', () => {
+    const src = `
+// function ignoreMe() {}
+/* class IgnoreMe {} */
+const s = "function fake() {}";
+const r = /class Fake {}/;
+function real() { return "ok"; }
+`;
+    const blocks = parseJS(src, 'm');
+    const names = blocks.map(b => b.meta.name).filter(Boolean);
+    // 'ignoreMe', 'IgnoreMe', 'fake', 'Fake' は含まれてはいけない
+    // 'real' だけが含まれるべき
+    assert.ok(names.includes('real'));
+    assert.ok(!names.includes('ignoreMe'));
+    assert.ok(!names.includes('IgnoreMe'));
+    assert.ok(!names.includes('fake'));
+    assert.ok(!names.includes('Fake'));
+  });
+
+  test('複雑なネストとブレースの追跡 (エッジケース)', () => {
+    const src = `
+function outer() {
+  if (true) {
+    const s = "{";
+    function inner() {
+      return "}";
+    }
+  }
+}
+function next() {}
+`;
+    const blocks = parseJS(src, 'm');
+    const outer = blocks.find(b => b.meta.name === 'outer');
+    const next = blocks.find(b => b.meta.name === 'next');
+    assert.ok(outer);
+    assert.ok(next);
+    // outer の content が next を含んでいないことを確認 (ブレースの閉じ間違いチェック)
+    assert.ok(!outer.content.includes('function next'));
+    assert.ok(outer.content.includes('function inner'));
+  });
 });
 
 // ============================================================
@@ -363,6 +404,43 @@ group('CLI', () => {
     const out = run('');
     assert.ok(out.includes('self-test'));
     assert.ok(out.includes('Block.versions が本体'));
+  });
+
+  test('bible-info shows axioms / block types / taboos from BIBLE.js', () => {
+    const out = run('bible-info');
+    assert.ok(out.includes('CONTEXT_GRAVITY_FIELD'));
+    assert.ok(out.includes('Physics.Gravity'));
+  });
+
+  test('bible-check on clean file → ok:true', () => {
+    const f = `${TMP}/clean.js`;
+    writeFileSync(f, 'export function foo(){ return 42; }');
+    const out = run(`bible-check ${f}`);
+    const r = JSON.parse(out);
+    assert.equal(r.ok, true);
+    assert.equal(r.violations.length, 0);
+    assert.ok(typeof r.gravity === 'number');
+  });
+
+  test('bible-check on framework import → exit 1 + violation', () => {
+    const f = `${TMP}/violation.js`;
+    writeFileSync(f, 'import x from "react";');
+    let exitCode = 0;
+    let stdout = '';
+    try { stdout = run(`bible-check ${f}`); }
+    catch (e) { exitCode = e.status; stdout = e.stdout?.toString() || ''; }
+    assert.equal(exitCode, 1);
+    const r = JSON.parse(stdout);
+    assert.equal(r.ok, false);
+    assert.ok(r.violations.some(v => v.name === 'No Frameworks'));
+  });
+
+  test('bible-summon outputs gravity-field prompt', () => {
+    const out = run('bible-summon A0 A8');
+    assert.ok(out.includes('CONTEXT_GRAVITY_FIELD'));
+    assert.ok(out.includes('A0'));
+    assert.ok(out.includes('A8'));
+    assert.ok(out.includes('認知非対称性'));
   });
 
   test('skeleton', () => {

@@ -176,6 +176,14 @@ BIBLE を読まずに評価すると、ほぼ確実に**人間最適化バイア
 
 MIT — 自由に使ってください。
 
+## Defensive Publication
+
+This repository includes a public defensive disclosure:
+[`DEFENSIVE_PUBLICATION.md`](DEFENSIVE_PUBLICATION.md).
+
+The intent is to keep the AI-native coding substrate described here available
+for public use and harder to monopolize through later patent claims.
+
 ## Author
 
 沖井広行 / [AoyamaRito](https://github.com/AoyamaRito) (蒼山りと)

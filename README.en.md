@@ -61,6 +61,14 @@ in app.js to [new behavior].
 
 MIT — use freely.
 
+## Defensive Publication
+
+This repository includes a public defensive disclosure:
+[`DEFENSIVE_PUBLICATION.md`](DEFENSIVE_PUBLICATION.md).
+
+The intent is to keep the AI-native coding substrate described here available
+for public use and harder to monopolize through later patent claims.
+
 ## Author
 
 Hiroyuki OKINOI / [AoyamaRito](https://github.com/AoyamaRito) (Aoyama Rito / 蒼山りと)

@@ -26,6 +26,8 @@ yarn-error.log*
 tmp/
 snapshots/
 eyes.port
+worklog*
+worklog-*.js
 
 # AI-target auto-gen SHADOW: canonical は AiRunAndRead_*.js、.md は派生 SHADOW。
 # GitHub から README リンクで飛ぶ外部 reader 向けに **両建て**(canonical .js + commit 済 .md)。
